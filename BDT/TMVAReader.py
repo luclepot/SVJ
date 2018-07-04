@@ -29,8 +29,6 @@ ROOT.gROOT.SetBatch()       #don't pop up canvanses
 ROOT.TH1.SetDefaultSumw2()
 ROOT.TH1.AddDirectory(False)
 
-
-
 def getSingleBDT(filename, label):
 
       try:
@@ -60,11 +58,11 @@ def getSingleBDT(filename, label):
         reader.AddVariable("deltaphi", deltaphi)
         reader.AddSpectator("pt", pt)
         
-        weightsfile = "weights/TMVAClassification_BDTG.weights.xml"
+        weightsfile = "/mnt/t3nfs01/data01/shome/grauco/SVJAna/CMSSW_8_0_20/src/BDT/weights/TMVAClassification_BDTG.weights.xml"
         reader.BookMVA("BDTG", weightsfile)
         nentries = t.GetEntries()
     
-        t.SetBranchAddress("axisminor",axisminor)
+        '''t.SetBranchAddress("axisminor",axisminor)
         t.SetBranchAddress("girth",girth)
         t.SetBranchAddress("tau21",tau21)
         t.SetBranchAddress("tau32",tau32)
@@ -72,21 +70,30 @@ def getSingleBDT(filename, label):
         t.SetBranchAddress("msd",msd)
         t.SetBranchAddress("deltaphi",deltaphi)
         t.SetBranchAddress("pt",pt)
-      
+        '''
         c = ROOT.TCanvas()
 
         hBDT = ROOT.TH1F("BDT", "BDT", 100, -1.0, 1.0)
-        for i in t:    
-          BDT = reader.EvaluateMVA("BDTG")
-          #print "BDT value: ", BDT
-          hBDT.Fill(BDT)
+        #for i in xrange(0,nentries):  
+        for entry in t:
+              mult[0] = entry.mult
+              girth[0] = entry.girth
+              tau21[0] = entry.tau21
+              tau32[0] = entry.tau32
+              msd[0] = entry.msd
+              axisminor[0] = entry.axisminor
+              deltaphi[0] = entry.deltaphi
+              pt[0] = entry.pt
 
+              #t.GetEntry(i)
+              BDT = reader.EvaluateMVA("BDTG")
+              #print "BDT value: ", BDT
+              hBDT.Fill(BDT)
 
         hBDT.Draw()
         if(not os.path.isdir("plots")): os.system('mkdir plots')
-        c.Print("plots"+label+"_BDT.pdf")
+        c.Print("plots/"+label+"_BDT.pdf")
         return hBDT
-
 
 
 def getBDT(path, sample):
@@ -101,18 +108,19 @@ def getCompositeBDT(path, sample):
     hBDT = ROOT.TH1F("BDT", "BDT", 100, -1.0, 1.0)
 
     for s in sample.components:
-        h = getBDT(path, s)
-        sf = s.sigma/h.Integral()
-        hBDT.Add(h, sf)
+          print s
+          h = getBDT(path, s)
+          sf = s.sigma/h.Integral()
+          hBDT.Add(h, sf)
 
     return hBDT
 
     
 def getEffs(hBDT, step):
     min = hBDT.GetXaxis().GetBinLowEdge(hBDT.GetXaxis().GetFirst())
-    print "First ", min
+    #print "First ", min
     max = hBDT.GetXaxis().GetBinUpEdge(hBDT.GetXaxis().GetLast())
-    print "Last ", max
+    #print "Last ", max
     nBins = hBDT.GetNbinsX()
     x = []
     eff = 0.
@@ -125,7 +133,7 @@ def getEffs(hBDT, step):
         x_ = x_+step
         x.append(x_)
         eff = hBDT.Integral(hBDT.GetXaxis().FindBin(x_), nBins)/ hBDT.Integral()
-        print "Eff: ", eff
+        #print "Eff: ", eff
         y.append(1. - eff)
 
     return y
@@ -145,14 +153,13 @@ def getROC(effSig, rejBkg):
     c.Print("plots/graph.pdf")
 
 
-
-
-
 path = "/mnt/t3nfs01/data01/shome/grauco/SVJAna/CMSSW_8_0_20/src/BDT/Ntuple/"            
-#h = getBDT(path, QCD_Pt_470to600)
 h = getBDT(path,SVJ_mZ3000_mDM1_rinv03_alpha02)
-effBkg = getEffs(h, 0.01)
-getROC(effBkg, effBkg)
+effSig = getEffs(h, 0.01)
+hb = getCompositeBDT(path, QCD)
+rejBkg = getEffs(hb, 0.01)
+
+getROC(effSig, rejBkg)
 
 
 
