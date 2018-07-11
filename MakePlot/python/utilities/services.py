@@ -287,9 +287,6 @@ class Stack(object):
     #         print h.GetTitle(), h.Integral()
 
 
-
-
-
 # ====================================================
 # Class Legend: to draw a legend
 # ====================================================
@@ -325,7 +322,14 @@ class Legend(object):
         self._leg.SetY2(coords[3]);
 
     def AddEntry(self, h, label, option = "fp"):
-        self._leg.AddEntry(h.GetHisto(), label, option)
+        if(isinstance(h, Histo)):self._leg.AddEntry(h.GetHisto(), label, option)
+        elif(isinstance (h, ROOT.TH1)): self._leg.AddEntry(h, label, option)
+
+    def GetEntry(self):
+        return self._leg.GetEntry()
+
+    def AddEntryGraph(self, gr, label, option = "fp"):
+        self._leg.AddEntry(gr, label, option)
 
     def Draw(self, options = "SAME"):
         self._leg.Draw(options)

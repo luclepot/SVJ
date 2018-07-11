@@ -17,10 +17,11 @@ import ROOT
 import copy
 import commands, os.path
 import numpy as n
-import tdrstyle, CMS_lumi
-from utilities.services import Histo, Stack, Legend
-from utilities.toPlot import *
-from utilities.settings import *
+import SVJ.MakePlot.tdrstyle as tdrstyle
+import SVJ.MakePlot.CMS_lumi as CMS_lumi
+from  SVJ.MakePlot.utilities.services import Histo, Stack, Legend
+from  SVJ.MakePlot.utilities.toPlot import *
+from  SVJ.MakePlot.utilities.settings import *
 
 
 ROOT.gROOT.Reset();
@@ -31,7 +32,7 @@ ROOT.gROOT.SetBatch()        # don't pop up canvases
 ROOT.TH1.SetDefaultSumw2()
 ROOT.TH1.AddDirectory(False)
 
-tdrstyle.setTDRStyle();
+tdrstyle.setTDRStyle()
 
 c = ROOT.TCanvas("c1","c1",600,600)
 c.SetFillColor(0);
@@ -64,18 +65,24 @@ def plot(var, samples, label=""):
 
     v = settings[var]
     stack = Stack(var, v[0])
-    leg = Legend((0.40, 0.79, 0.94, 0.94))
+    leg = Legend((0.40, 0.65, 0.94, 0.94))
     i = 0
-
+    if(label == "SVJ"):
+        print "I am looking for a signal"
+        print samples
     for sname, s in samples.items():
-        mZ= s.mZ
-        mDark = s.mDark
-        rinv = s.rinv
-        alpha = s.alpha
+        filename = path
+        if(s.label.startswith("SVJ")):
+            mZ= s.mZ
+            mDark = s.mDark
+            rinv = s.rinv
+            alpha = s.alpha
         
-        filename = path + "tree_SVJ2_mZprime-%d_mDark-%d_rinv-%.1f_alpha-%.1f.root" %(mZ, mDark, rinv, alpha)
-        if alpha == 1:     filename = path + "tree_SVJ2_mZprime-%d_mDark-%d_rinv-%.1f_alpha-%d.root" %(mZ, mDark, rinv, alpha)
-        
+            filename = filename + "tree_SVJ2_mZprime-%d_mDark-%d_rinv-%.1f_alpha-%.1f.root" %(mZ, mDark, rinv, alpha)
+            if alpha == 1:     filename = filename + "tree_SVJ2_mZprime-%d_mDark-%d_rinv-%.1f_alpha-%d.root" %(mZ, mDark, rinv, alpha)
+        else:
+            filename = path + "tree_" + s.label + ".root"
+
         h = ROOT.TH1F(v[0], v[0],v[1], v[2], v[3])
     
         try:
@@ -90,11 +97,13 @@ def plot(var, samples, label=""):
             
                 h.Fill(getattr(t,var))
 
+
+        if(label == "SVJ"): print "Integral: ", h.Integral()
         h.SetMarkerColor(s.color)
         h.SetLineColor(s.color)
         h.SetLineWidth(2)
 
-        pad.cd()
+        #pad.cd()
         if i==0: h.Draw()
         else:h.Draw("SAME")
         i = 1
@@ -106,53 +115,87 @@ def plot(var, samples, label=""):
 
 
     ROOT.gStyle.SetHistTopMargin(0.);
-    stack.DrawStack(1, opt = "nostack")
+    #stack.DrawStack(1, opt = "nostack")
     stack.SetMaximum(stack.GetMaximum("nostack")*1.2)
-    stack.DrawStack(1, opt = "nostack")
+    #stack.DrawStack(1, opt = "nostack")
 
-    CMS_lumi.writeExtraText = 1
-    CMS_lumi.extraText = ""
-    lumi = 1
-    if(lumi<1.):
-        lumi = lumi*1000
-        unit = " pb^{-1}"
-    else: unit = " fb^{-1}"
+    ## CMS_lumi.writeExtraText = 1
+    ## CMS_lumi.extraText = ""
+    ## lumi = 1
+    ## if(lumi<1.):
+    ##     lumi = lumi*1000
+    ##     unit = " pb^{-1}"
+    ## else: unit = " fb^{-1}"
     
-    CMS_lumi.lumi_sqrtS = str(lumi)+ unit +" (13 TeV)" # used with iPeriod = 0, e.g. for simulation-only plots (default is an empty string)
-    iPeriod = 0
-    iPos = 11
-    CMS_lumi.CMS_lumi(pad, iPeriod, iPos)
+    ## CMS_lumi.lumi_sqrtS = str(lumi)+ unit +" (13 TeV)" # used with iPeriod = 0, e.g. for simulation-only plots (default is an empty string)
+    ## iPeriod = 0
+    ## iPos = 11
+    ## CMS_lumi.CMS_lumi(pad, iPeriod, iPos)
 
     
-    leg.Draw("SAME")
+    #leg.Draw("SAME")
     
     c.cd()
     c.Update();
     c.RedrawAxis();
     if(not os.path.isdir("plots")): os.system('mkdir plots')
     c.Print("plots/"+var +"_"+ label+".pdf")
+    return stack, leg
+
+
+def compareSamples(var, samples_ref, label_ref, samples, label):
+
+    stack_ref, leg_ref = plot(var, samples_ref, label_ref)
+    stack, leg = plot(var, samples, label)
+
+    stack.SetMaximum(stack.GetMaximum("nostack")*1.2)
+    stack.DrawStack(1, opt = "nostack")
+    leg.AddEntry(stack_ref.GetHistogram(), label_ref, "l" )
+    print stack_ref.GetHistogram()
+    print "is TStack? ", isinstance(stack_ref, Stack)
+    stack_ref.DrawStack(1, opt = "nostack, SAME")
+    leg.Draw("SAME")
+    if(not os.path.isdir("plots")): os.system('mkdir plots')
+    c.Print("plots/"+var +".pdf")
+
+    
+    
 
 
 
 
+#samps = {"":samples, "mDM": samples_mDM, "rinv": samples_rinv, "alpha": samples_alpha}    
+
+samps = {"QCD":samples_QCD}
+samps_ref = {"SVJ":samples_ref}
 
 
+## for label, samples in samps.iteritems():
 
-samps = {"":samples, "mDM": samples_mDM, "rinv": samples_rinv, "alpha": samples_alpha}    
+##     plot("girth", samples, label)
+##     plot("pt", samples, label)
+##     plot("axismajor", samples, label)
+##     plot("axisminor", samples, label)
+##     plot("tau21", samples, label)
+##     plot("tau32", samples, label)
+##     plot("mult", samples, label)
+##     plot("momenthalf", samples, label)
+##     plot("msd", samples, label)
+##     plot("deltaphi", samples, label)
 
 
 for label, samples in samps.iteritems():
 
-    plot("girth", samples, label)
-    plot("pt", samples, label)
-    plot("axismajor", samples, label)
-    plot("axisminor", samples, label)
-    plot("tau21", samples, label)
-    plot("tau32", samples, label)
-    plot("mult", samples, label)
-    plot("momenthalf", samples, label)
-    plot("msd", samples, label)
-    plot("deltaphi", samples, label)
+    compareSamples("girth", samples_ref, "SVJ", samples, label)
+    compareSamples("pt", samples_ref, "SVJ", samples, label)
+    compareSamples("axismajor", samples_ref, "SVJ", samples, label)
+    compareSamples("axisminor", samples_ref, "SVJ", samples, label)
+    compareSamples("tau21", samples_ref, "SVJ", samples, label)
+    compareSamples("tau32", samples_ref, "SVJ", samples, label)
+    compareSamples("mult", samples_ref, "SVJ", samples, label)
+    compareSamples("momenthalf", samples_ref, "SVJ", samples, label)
+    compareSamples("msd", samples_ref, "SVJ", samples, label)
+    compareSamples("deltaphi", samples_ref, "SVJ", samples, label)
 
 
 
