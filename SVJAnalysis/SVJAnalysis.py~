@@ -1,0 +1,274 @@
+#!/bin/env python
+import os
+import shutil
+import optparse 
+
+import subprocess
+import sys
+import glob
+import math
+import pickle
+
+from os.path import join,exists
+
+print 'Python version', sys.version_info
+if sys.version_info < (2, 7):
+    raise "Must use python 2.7 or greater. Have you forgotten to do cmsenv?"
+
+workDir = 'work'
+fileListDir = join(workDir,'files')
+splitDir = 'split'
+splitDescriptionFile = 'description.pkl'
+resDirs = ['res','trees','txt']
+hline = '-'*80
+
+localPath = "/t3home/decosa/SVJ/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
+#localPath = "/mnt/t3nfs01/data01/shome/grauco/SVJAna/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
+t3Path = '//pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/v0/'
+
+t3Ls = 'xrdfs t3dcachedb03.psi.ch ls -u'
+
+samples = []
+samples.append("SVJalphaD01mZ1000rinv03")
+#samples.append("SVJalphaD01mZ2000rinv03")
+#samples.append("SVJalphaD01mZ3000rinv03")
+#samples.append("SVJalphaD01mZ4000rinv03")
+                         
+#samples.append("TT")
+   
+#samples.append("QCDHT2000ToInf")
+#samples.append("QCDHT1500To2000")
+#samples.append("QCDHT1000To1500")
+#samples.append("QCDHT700To1000")
+#samples.append("QCDHT500To700")
+#samples.append("QCDHT300To500")
+#samples.append("WJetsHT2500toInf")
+#samples.append("WJetsHT1200to2500")
+#samples.append("WJetsHT800to1200")
+#samples.append("WJetsHT600to800")
+#samples.append("WJetsHT400to600")
+#samples.append("WJetsHT200to400")
+#samples.append("ZJetsHT2500ToInf")
+#samples.append("ZJetsHT1200to2500")
+#samples.append("ZJetsHT800to1200")
+#samples.append("ZJetsHT600to800")
+#samples.append("ZJetsHT400to600")
+#samples.append("ZJetsHT200to400")
+
+######samples.append("JetHTb")
+###samples.append("JetHTc")
+##samples.append("JetHTd")
+#samples.append("JetHTe")
+#samples.append("JetHTf")
+#samples.append("JetHTg")
+#samples.append("JetHTh1")
+#samples.append("JetHTh2")
+
+splitMap = {}
+splitMap["TT"] = 30
+
+splitMap["QCDHT2000ToInf"] = 5
+splitMap["QCDHT1500To2000"] = 5
+splitMap["QCDHT1000To1500"] = 5
+splitMap["QCDHT700To1000"] = 5
+splitMap["QCDHT500To700"] = 10
+splitMap["QCDHT300To500"] = 10
+
+
+splitMap["WJetsHT2500toInf"] = 5
+splitMap["WJetsHT1200to2500"] = 5
+splitMap["WJetsHT800to1200"] = 5
+splitMap["WJetsHT600to800"] = 5
+splitMap["WJetsHT400to600"] = 5
+splitMap["WJetsHT200to400"] = 5
+
+splitMap["ZJetsHT2500ToInf"] = 2
+splitMap["ZJetsHT1200to2500"] = 2
+splitMap["ZJetsHT800to1200"] = 2
+splitMap["ZJetsHT600to800"] = 2
+splitMap["ZJetsHT400to600"] = 2
+splitMap["ZJetsHT200to400"] = 2
+
+splitMap["JetHTb"] = 5
+splitMap["JetHTc"] = 5
+splitMap["JetHTd"] = 5
+splitMap["JetHTe"] = 5
+splitMap["JetHTf"] = 5
+splitMap["JetHTg"] = 5
+splitMap["JetHTh1"] = 5
+splitMap["JetHTh2"] = 5
+
+def makedirs(subdirs,base=None):
+
+    # Calculate the full path
+    if base is not None:
+        subdirs = [ join(base,sd) for sd in subdirs]
+
+    # Loop over subdirs
+    for sd in subdirs:
+        # Check for existence
+        if exists(sd): continue
+        # Make directory and partents
+        os.makedirs(sd)
+
+def writeFileList(sample, files, opt):
+    # Save it to a semi-temp file
+    sampleFileList = join(fileListDir,sample+'_'+opt.sys+'.txt')
+    print 'File list:',sampleFileList
+    with open(sampleFileList,'w') as sl:
+        sl.write('\n'.join(files))
+
+    return sampleFileList
+
+def run(sample, cmd, opt):
+
+    print hline
+    if opt.gdb:
+        cmd = 'gdb --args '+cmd
+    elif opt.t3batch:
+        jid = '%s_%s' % (sample,opt.sys)
+        cmd = 'qexe.py -w '+workDir+' '+jid+' -- '+cmd
+    print cmd
+
+    if opt.dryrun:
+        print 'Dry Run (command will not be executed)'
+        return
+
+    subprocess.call(cmd,shell=True)
+
+systematics = ["noSys", "jesUp", "jesDown", "jerUp", "jerDown", "jmsUp", "jmsDown", "jmrUp", "jmrDown"]
+
+usage = 'usage: %prog'
+parser = optparse.OptionParser(usage)
+
+parser.add_option('-s', '--sys', dest='sys', default = 'noSys', choices=systematics, help='Systematics: '+' '.join(systematics))
+parser.add_option('--sync', dest='sync', type='string', default = 'noSync', help='Synchro exercise')
+parser.add_option('-g','--gdb', dest='gdb', action='store_true', default=False)
+parser.add_option('-n','--dryrun', dest='dryrun', action='store_true', default=False)
+parser.add_option('-m','--mode', dest='mode', default='local', choices=['local','t3se'])
+parser.add_option('--t3batch', dest='t3batch', action='store_true', default=False)
+
+isData="MC"
+#isData="DATA"
+(opt, args) = parser.parse_args()
+
+if opt.sys not in systematics:
+    parser.error('Please choose an allowed value for sys: "noSys", "jesUp", "jesDown", "jerUp", "jerDown", "jmsUp", "jmsDown", "jmrUp", "jmrDown"')
+
+
+# Create working area if it doesn't exist
+if not exists(fileListDir):
+    os.makedirs(fileListDir)
+    
+
+for s in samples:
+    if (s.startswith("JetHT") or s.startswith("SingleMu") or s.startswith("SingleEl") or  s.startswith("MET")): isData="DATA"
+    print s
+    print str(opt.sync)
+    ## cmd = "ttDManalysis "+ s + " " + path + s  + " " + opt.channel + " " + opt.sys + " " + opt.sync + " " + isData
+    ## print cmd
+    ## os.system(cmd)
+
+    if opt.mode == 'local':
+        sPath = join(localPath,s,'*.root')
+        
+        print sPath
+        # print ' '.join([lLs,sPath])
+        # Get the complete list of files
+        # listing = subprocess.check_output(lLs.split()+[sPath])
+        allFiles = glob.glob(sPath)
+        print 'Sample',s,'Files found',len(allFiles)
+
+    elif opt.mode == 't3se':
+        # Build the full path of sample files
+        sT3Path = join(t3Path,s)
+        print ' '.join([t3Ls,sT3Path])
+
+        # Get the complete list of files
+        listing = subprocess.check_output(t3Ls.split()+[sT3Path])
+        allFiles = listing.split()
+        print 'Sample',s,'Files found',len(allFiles)
+
+
+
+    if not (s in splitMap and opt.t3batch):
+
+        if not opt.t3batch:
+            print 'WARNING: Batch mode not active: Sample',s,'will not be split even if it appears in the splitMap'
+
+        # Save it to a semi-temp file
+        sampleFileList = join(fileListDir,s+'_'+opt.sys+'.txt')
+        print 'File list:',sampleFileList
+        with open(sampleFileList,'w') as sl:
+            sl.write('\n'.join(allFiles))
+
+
+        cwd = os.getcwd()
+
+        makedirs(resDirs,cwd)
+        cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  cwd
+        
+        run(s,cmd,opt)
+
+    else:
+
+        # 
+        nsplit = splitMap[s]
+
+        if len(allFiles) < nsplit:
+            nsplit = len(allFiles)
+            print 'Warning: split level larger than number of files. Splitlevel set to nfiles (',nsplit,')'
+
+        # Pretty format
+        ndigits = int(math.floor(math.log10(nsplit))+1)
+        nfmt = '%%s_%%s_j%%0%dd' % ndigits
+
+        # Calculate the size of each file block
+        chunkSize = len(allFiles)/nsplit
+        # The reminder is the number of jobs that get one file more
+        nExtra = len(allFiles)%nsplit
+
+        print ' * Split level',nsplit
+        print ' * Files per job (base):',chunkSize
+        print ' * Jobs with 1 extra file:',nExtra
+
+        resRootDir = join(splitDir,'%s_%s' % (s,opt.sys))
+
+        print ' * Result root folder',resRootDir
+
+        subsamples = {}
+        lastFileIdx = 0
+        for k in xrange(nsplit):
+            print nfmt, s, opt.sys, k
+            name = nfmt % (s,opt.sys,k)
+            wd = join(resRootDir,name)
+            # Start from last idx
+            firstFileIdx = lastFileIdx
+            # add chunk size. add 1 if k<nExtra
+            lastFileIdx = firstFileIdx+chunkSize+(k<nExtra)
+            files = allFiles[firstFileIdx:lastFileIdx]
+
+            subsamples[name] = (wd,files)
+
+        # Cleanup previous result areas
+        if exists(resRootDir):
+            print 'Cleaning directory',resRootDir
+            shutil.rmtree(resRootDir)
+
+        # Recreate the target directory
+        os.makedirs(resRootDir)
+
+        ssDesc = { 'sample':s, 'components': subsamples.keys() }
+        pickle.dump(ssDesc, open(join(resRootDir,splitDescriptionFile),'w') )
+
+        for ss in sorted(subsamples):
+            # Fetch output directory and file list
+            wd,files = subsamples[ss]
+            # Make the subdirectories
+            makedirs(resDirs,wd)
+
+            sampleFileList = writeFileList(ss, files,opt)
+
+            cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  wd
+
+            run(ss,cmd,opt)
