@@ -228,44 +228,36 @@ int main(int argc, char **argv) {
     }
   }
 
-
-  //int sizeMax_ak8=10;
-  int sizeMax_gen=50;
+  int sizeMax_gen=50000; //!!! attenzione, le gen-particles non sono ordinate per pT e quelle salvate sono molto piu numerose
   
   double metFull_Pt=0., metFull_Phi=0., metFull_Px=0., metFull_Py=0.;
-  // float genPart_E[sizeMax_gen], genPart_Pt[sizeMax_gen], genPart_Phi[sizeMax_gen], genPart_Eta[sizeMax_gen];
+
   std::vector<TLorentzVector>* genPartsPtr(0x0);
-  float genPart_pdgId[sizeMax_gen], genPart_Status[sizeMax_gen];
-  //  float jetsAK8CHS_E[sizeMax_ak8], jetsAK8CHS_Pt[sizeMax_ak8], jetsAK8CHS_Phi[sizeMax_ak8], jetsAK8CHS_Eta[sizeMax_ak8];
+  int genPart_pdgId[sizeMax_gen], genPart_Status[sizeMax_gen];
+  
   std::vector<TLorentzVector>* jetsAK8CHSPtr(0x0);
   std::vector<TLorentzVector>* MuonsPtr(0x0); 
   std::vector<TLorentzVector>* ElectronsPtr(0x0);
   double Ht=0.;
   float nLooseMuons=-1, nLooseElectrons=-1;
   ULong64_t EventNumber(0.);
-  int ak8size(0.);
+  int nAK8CHS(0.);
 
   
   chain.SetBranchAddress("EvtNum", &EventNumber);
   chain.SetBranchAddress("HT", &Ht);
 
-  
-
   chain.SetBranchAddress("MET",&metFull_Pt);
   chain.SetBranchAddress("MET",&metFull_Px);
   chain.SetBranchAddress("MET",&metFull_Py);
-  chain.SetBranchAddress("METPhi",&metFull_Phi);
+  
   chain.SetBranchAddress("GenParticles",&genPartsPtr);
-  //chain.SetBranchAddress("GenParticles.Phi",&genPart_Phi);
-  //chain.SetBranchAddress("GenParticles.Eta",&genPart_Eta);
-  //chain.SetBranchAddress("genPart_E",&genPart_E);
   chain.SetBranchAddress("GenParticles_PdgId",&genPart_pdgId);
   chain.SetBranchAddress("GenParticles_Status",&genPart_Status);
 
   chain.SetBranchAddress("Jets",&jetsAK8CHSPtr);
-  //  chain.SetBranchAddress("jetsAK8CHS_Phi",&jetsAK8CHS_Phi);
-  //  chain.SetBranchAddress("jetsAK8CHS_Eta",&jetsAK8CHS_Eta);
-  //  chain.SetBranchAddress("jetsAK8CHS_E",&jetsAK8CHS_E);
+  chain.SetBranchAddress("Muons",&MuonsPtr);
+  chain.SetBranchAddress("Electrons",&ElectronsPtr);
   
   /********************************************************************************/
   /**************                    Histogram booking              ***************/
@@ -328,198 +320,59 @@ int main(int argc, char **argv) {
   else if(strcmp (sample.c_str(),"SVJalphaD01mZ2000rinv03") == 0) p=(float)(x * (float)(1.));
   else if(strcmp (sample.c_str(),"SVJalphaD01mZ3000rinv03") == 0) p=(float)(x * (float)(1.));
   else if(strcmp (sample.c_str(),"SVJalphaD01mZ4000rinv03") == 0) p=(float)(x * (float)(1.));
-  cout << "weight is" << p << endl;
+  cout << "weight is " << p << endl;
   
-  TH1F *h0 = new TH1F("h0", "m_{T}", 100, 0, 6000);
-  TH1F *h1 = new TH1F("h1", "m_{T}", 100, 0, 6000);
-  TH1F *h2 = new TH1F("h2", "m_{T}", 100, 0, 6000);
-  TH1F *h3 = new TH1F("h3", "m_{T}", 100, 0, 6000);
-  TH1F *h4 = new TH1F("h4", "m_{T}", 100, 0, 6000);
-  TH1F *h5 = new TH1F("h5", "m_{T}", 100, 0, 6000);
-  TH1F *h6 = new TH1F("h6", "m_{T}", 100, 0, 6000);
-  TH1F *h7 = new TH1F("h7", "m_{T}", 100, 0, 6000);
-  TH1F *h8 = new TH1F("h8", "m_{T}", 100, 0, 6000);
-  TH1F *h9 = new TH1F("h9", "m_{T}", 100, 0, 6000);
-  TH1F *h10 = new TH1F("h10", "m_{T}", 100, 0, 6000);
-  TH1F *h11 = new TH1F("h11", "m_{T}", 100, 0, 6000);
-  TH1F *h12 = new TH1F("h12", "m_{T}", 100, 0, 6000);
-  TH1F *h13 = new TH1F("h13", "m_{T}", 100, 0, 6000);
+  TH1F *h_cutFlow  = new TH1F("h_cutFlow","cutFlow",7,-0.5,6.5);
 
-  TH1F *h_cutFlow  = new TH1F("h_cutFlow","cutFlow",9,-0.5,8.5);
-  TH1F *h_prob = new TH1F("h_prob", "prob", 3, -0.25, 1.25);
-  //Plots before any selection is applied
+  //Plots with no selectiona applied
+  TH1F *h_AK8jetsmult_nosel = new TH1F("h_AK8jetsmult_nosel", "AK8 jets multiplicity", 10, -0.5, 9.5);  
   TH1F *h_looseMuonsmult_nosel = new TH1F("h_looseMuonsmult_nosel", "Loose muons multiplicity", 10, -0.5, 9.5);
   TH1F *h_looseElectronsmult_nosel = new TH1F("h_looseElectronsmult_nosel", "Loose electrons multiplicity", 10, -0.5, 9.5);
-  TH1F *h_AK8jetsmult_nosel = new TH1F("h_AK8jetsmult_nosel", "AK8 jets multiplicity", 10, -0.5, 9.5);  
-  TH1F *h_AK8jets200mult_nosel = new TH1F("h_AK8jets200mult_nosel", "AK8 jets multiplicity", 10, -0.5, 9.5);
-  TH1F *h_Ht_nosel = new TH1F("h_Ht_nosel", "{H_{T}}", 100, 0, 5000);
   TH1F *h_METPt_nosel = new TH1F("h_METPt_nosel", "MET_{p_{T}}", 100, 0, 5000);
-  TH1F *h_METPhi_nosel = new TH1F("h_METPhi_nosel", "MET_{#phi}", 100, -5, 5);
+  TH1F *h_Ht_nosel = new TH1F("h_Ht_nosel", "{H_{T}}", 100, 0, 5000);
+  TH1F *h_AK8jetPt_nosel = new TH1F("h_AK8jetPt_nosel", "gen-level HV semi-visible jet p_{T}", 100, 0, 3000);
+  TH1F *h_AK8jetPhi_nosel = new TH1F("h_AK8jetPhi_nosel", "gen-level HV semi-visible jet #Phi", 100, -5, 5);  
+  TH1F *h_AK8jetEta_nosel = new TH1F("h_AK8jetEta_nosel", "gen-level HV semi-visible jet #eta", 100, -6, 6);
+  TH1F *h_AK8jetE_lead_nosel = new TH1F("h_AK8jetE_lead_nosel", "AK8 jet E", 100, 0, 3000);
+  TH1F *h_AK8jetPt_lead_nosel = new TH1F("h_AK8jetPt_lead_nosel", "AK8 jet p_{T}", 100, 0, 3000);
+  TH1F *h_AK8jetPhi_lead_nosel = new TH1F("h_AK8jetPhi_lead_nosel", "AK8 jet #Phi", 100, -5, 5);
+  TH1F *h_AK8jetEta_lead_nosel = new TH1F("h_AK8jetEta_lead_nosel", "AK8 jet #eta", 100, -6, 6);
+  TH1F *h_AK8jetE_sublead_nosel = new TH1F("h_AK8jetE_sublead_nosel", "AK8 jet E", 100, 0, 3000);
+  TH1F *h_AK8jetPt_sublead_nosel = new TH1F("h_AK8jetPt_sublead_nosel", "AK8 jet p_{T}", 100, 0, 3000);
+  TH1F *h_AK8jetPhi_sublead_nosel = new TH1F("h_AK8jetPhi_sublead_nosel", "AK8 jet #Phi", 100, -5, 5);
+  TH1F *h_AK8jetEta_sublead_nosel = new TH1F("h_AK8jetEta_sublead_nosel", "AK8 jet #eta", 100, -6, 6);
+  TH1F *h_AK8jetdR_nosel = new TH1F("h_AK8jetdR_nosel", "#DeltaR", 100, 0, 5);
+  TH1F *h_AK8jetdP_nosel = new TH1F("h_AK8jetdP_nosel", "#Delta#Phi", 100, 0, 5);
+  TH1F *h_AK8jetdE_nosel = new TH1F("h_AK8jetdE_nosel", "#Delta#Eta", 100, 0, 5);
   TH1F *h_Mmc_nosel = new TH1F("h_Mmc_nosel", "m_{MC}", 100, 0, 6000);
-  TH1F *h_MR_nosel = new TH1F("h_MR_nosel", "M_{R}", 100, 0, 5000);
-  TH2F *h_MRMT_nosel = new TH2F("h_MRMT_nosel", "M_{R} vs M_{R}", 100, 0, 5000, 100, 0, 6000);
-  TH1F *h_R_nosel = new TH1F("h_R_nosel", "M_{R}", 100, 0, 0.5);
-  TH2F *h_RMT_nosel = new TH2F("h_RMT_nosel", "M_{R} vs M_{T}", 100, 0, 0.5, 100, 0, 6000);
-  TH2F *h_razor_nosel = new TH2F("h_razor_nosel", "R^2 vs M_{R}", 100, 0, 5000, 100, 0, 0.5);
   TH1F *h_Mjj_nosel = new TH1F("h_Mjj_nosel", "m_{JJ}", 100, 0, 6000);
   TH1F *h_Mt_nosel = new TH1F("h_Mt_nosel", "m_{T}", 100, 0, 6000);
   TH1F *h_dPhimin_nosel = new TH1F("h_dPhimin_nosel", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
   TH1F *h_dPhi1_nosel = new TH1F("h_dPhi1_nosel", "min(MET,j1)", 100, 0, 3.5);
   TH1F *h_dPhi2_nosel = new TH1F("h_dPhi2_nosel", "min(MET,j2)", 100, 0, 3.5);
-  TH1F *h_dEta_nosel = new TH1F("h_dEta_nosel", "#Delta#eta(j0,j1)", 100, 0, 10);
   TH1F *h_transverseratio_nosel = new TH1F("h_transverseratio_nosel", "MET/M_{T}", 100, 0, 1);
-   
-  TH1F *h_SVJHVgenPt_nosel = new TH1F("h_SVJHVgenPt_nosel", "gen-level HV semi-visible jet p_{T}", 100, 0, 3000);
-  TH1F *h_SVJHVgenE_nosel = new TH1F("h_SVJHVgenE_nosel", "gen-level HV semi-visible jet E", 100, 0, 3000);
-  TH1F *h_SVJHVgenPhi_nosel = new TH1F("h_SVJHVgenPhi_nosel", "gen-level HV semi-visible jet #Phi", 100, -5, 5);  
-  TH1F *h_SVJHVgenEta_nosel = new TH1F("h_SVJHVgenEta_nosel", "gen-level HV semi-visible jet #eta", 100, -6, 6);
-
-  TH1F *h_SVJHVgenPt_lead_nosel = new TH1F("h_SVJHVgenPt_lead_nosel", "gen-level HV semi-visible jet p_{T}", 100, 0, 3000);
-  TH1F *h_SVJHVgenE_lead_nosel = new TH1F("h_SVJHVgenE_lead_nosel", "gen-level HV semi-visible jet E", 100, 0, 3000);
-  TH1F *h_SVJHVgenPhi_lead_nosel = new TH1F("h_SVJHVgenPhi_lead_nosel", "gen-level HV semi-visible jet #Phi", 100, -5, 5);  
-  TH1F *h_SVJHVgenEta_lead_nosel = new TH1F("h_SVJHVgenEta_lead_nosel", "gen-level HV semi-visible jet #eta", 100, -6, 6);
-
-  TH1F *h_SVJHVgenPt_sublead_nosel = new TH1F("h_SVJHVgenPt_sublead_nosel", "gen-level HV semi-visible jet p_{T}", 100, 0, 3000);
-  TH1F *h_SVJHVgenE_sublead_nosel = new TH1F("h_SVJHVgenE_sublead_nosel", "gen-level HV semi-visible jet E", 100, 0, 3000);
-  TH1F *h_SVJHVgenPhi_sublead_nosel = new TH1F("h_SVJHVgenPhi_sublead_nosel", "gen-level HV semi-visible jet #Phi", 100, -5, 5);  
-  TH1F *h_SVJHVgenEta_sublead_nosel = new TH1F("h_SVJHVgenEta_sublead_nosel", "gen-level HV semi-visible jet #eta", 100, -6, 6);
-
-  TH1F *h_AK8jetPt_nosel = new TH1F("h_AK8jetPt_nosel", "gen-level HV semi-visible jet p_{T}", 100, 0, 3000);
-  TH1F *h_AK8jetPhi_nosel = new TH1F("h_AK8jetPhi_nosel", "gen-level HV semi-visible jet #Phi", 100, -5, 5);  
-  TH1F *h_AK8jetEta_nosel = new TH1F("h_AK8jetEta_nosel", "gen-level HV semi-visible jet #eta", 100, -6, 6);
-  TH1F *h_matchedAK8jetPt_lead_nosel = new TH1F("h_matchedAK8jetPt_lead_nosel", "AK8 jet p_{T}", 100, 0, 3000);
-  TH1F *h_matchedAK8jetE_lead_nosel = new TH1F("h_matchedAK8jetE_lead_nosel", "AK8 jet E", 100, 0, 3000);
-  TH1F *h_AK8jetE_lead_nosel = new TH1F("h_AK8jetE_lead_nosel", "AK8 jet E", 100, 0, 3000);
-  TH1F *h_AK8jetPt_lead_nosel = new TH1F("h_AK8jetPt_lead_nosel", "AK8 jet p_{T}", 100, 0, 3000);
-  TH1F *h_AK8jetPhi_lead_nosel = new TH1F("h_AK8jetPhi_lead_nosel", "AK8 jet #Phi", 100, -5, 5);
-  TH1F *h_AK8jetEta_lead_nosel = new TH1F("h_AK8jetEta_lead_nosel", "AK8 jet #eta", 100, -6, 6);
-  TH1F *h_matchedAK8jetE_sublead_nosel = new TH1F("h_matchedAK8jetE_sublead_nosel", "AK8 jet E", 100, 0, 3000);
-  TH1F *h_matchedAK8jetPt_sublead_nosel = new TH1F("h_matchedAK8jetPt_sublead_nosel", "AK8 jet p_{T}", 100, 0, 3000);
-  TH1F *h_AK8jetE_sublead_nosel = new TH1F("h_AK8jetE_sublead_nosel", "AK8 jet E", 100, 0, 3000);
-  TH1F *h_AK8jetPt_sublead_nosel = new TH1F("h_AK8jetPt_sublead_nosel", "AK8 jet p_{T}", 100, 0, 3000);
-  TH1F *h_AK8jetPhi_sublead_nosel = new TH1F("h_AK8jetPhi_sublead_nosel", "AK8 jet #Phi", 100, -5, 5);
-  TH1F *h_AK8jetEta_sublead_nosel = new TH1F("h_AK8jetEta_sublead_nosel", "AK8 jet #eta", 100, -6, 6);
-
-  //Plots at preselection
-  TH1F *h_MR_presel = new TH1F("h_MR_presel", "M_{R}", 100, 0, 5000);
-  TH2F *h_MRMT_presel = new TH2F("h_MRMT_presel", "M_{R} vs M_{R}", 100, 0, 5000, 100, 0, 6000);
-  TH1F *h_R_presel = new TH1F("h_R_presel", "M_{R}", 100, 0, 0.5);
-  TH2F *h_RMT_presel = new TH2F("h_RMT_presel", "M_{R} vs M_{T}", 100, 0, 0.5, 100, 0, 6000);
-  TH1F *h_looseMuonsmult_presel = new TH1F("h_looseMuonsmult_presel", "Loose muons multiplicity", 10, -0.5, 9.5);
-  TH1F *h_looseElectronsmult_presel = new TH1F("h_looseElectronsmult_presel", "Loose electrons multiplicity", 10, -0.5, 9.5);
-  TH1F *h_AK8jetsmult_presel = new TH1F("h_AK8jetsmult_presel", "AK8 jets multiplicity", 10, -0.5, 9.5);
-  TH1F *h_AK8jets200mult_presel = new TH1F("h_AK8jets200mult_presel", "AK8 jets multiplicity", 10, -0.5, 9.5);
-  TH1F *h_Ht_presel = new TH1F("h_Ht_presel", "{H_{T}}", 100, 0, 2000);
-  TH1F *h_Ht_allselectionjets = new TH1F("h_Ht_allselectionjets", "{H_{T}}", 100, 0, 2000);
-  TH1F *h_METPt_presel = new TH1F("h_METPt_presel", "MET_{p_{T}}", 100, 0, 2000);
-  TH1F *h_METPt_allselection = new TH1F("h_METPt_allselection", "MET_{p_{T}}", 100, 0, 2000);
-  TH1F *h_METPt_allselectionjets = new TH1F("h_METPt_allselectionjets", "MET_{p_{T}}", 100, 0, 2000);
-  TH1F *h_METPhi_presel = new TH1F("h_METPhi_presel", "MET_{#phi}", 100, -5, 5);
-  TH2F *h_razor_presel = new TH2F("h_razor_presel", "R^2 vs M_{R}", 100, 0, 5000, 100, 0, 0.5);
-  TH2F *h_razor_allselectionjets = new TH2F("h_razor_allselectionjets", "R^2 vs M_{R}", 100, 0, 5000, 100, 0, 0.5);
-  TH1F *h_Mmc_presel = new TH1F("h_Mmc_presel", "m_{MC}", 100, 0, 6000);
-  TH1F *h_Mjj_presel = new TH1F("h_Mjj_presel", "m_{JJ}", 100, 0, 6000);
-  TH2F *h_Mt_dPhi = new TH2F("h_Mt_dPhi", "m_{T} vs #Delta#Phi", 100, 0, 6000, 100, 0, 3.);
-  TH2F *h_Mt_dEta = new TH2F("h_Mt_dEta", "m_{T} vs #Delta#eta", 100, 0, 6000, 100, 0, 5);
-  TH2F *h_Mt_METMt = new TH2F("h_Mt_METMt", "m_{T} vs MET/MT", 100, 0, 6000, 100, 0, 1);
-
-  TH2F *h_Mt_dPhi_all = new TH2F("h_Mt_dPhi_all", "m_{T} vs #Delta#Phi", 100, 0, 6000, 100, 0, 3.);
-  TH2F *h_Mt_dEta_all = new TH2F("h_Mt_dEta_all", "m_{T} vs #Delta#eta", 100, 0, 6000, 100, 0, 5);
-  TH2F *h_Mt_METMt_all = new TH2F("h_Mt_METMt_all", "m_{T} vs MET/MT", 100, 0, 6000, 100, 0, 1);
-  TH2F *h_MT_dX = new TH2F("h_MT_dX", "m_{T} vs X", 50, 0, 5000, 100, 0, 2000);
-  TH1F *h_Mt_presel = new TH1F("h_Mt_presel", "m_{T}", 100, 0, 6000);
-  TH1F *h_Mt_presel_0 = new TH1F("h_Mt_presel_0", "m_{T}", 100, 0, 6000);
-  TH1F *h_Mt_presel_1 = new TH1F("h_Mt_presel_1", "m_{T}", 100, 0, 6000);
-  TH1F *h_Mt_presel_2 = new TH1F("h_Mt_presel_2", "m_{T}", 100, 0, 6000);
-  TH1F *h_Mt_presel_3 = new TH1F("h_Mt_presel_3", "m_{T}", 100, 0, 6000);
-  TH1F *h_Mmc_allselectionjets = new TH1F("h_Mmc_allselectionjets", "m_{MC}", 100, 0, 6000);
-  TH1F *h_Mjj_allselectionjets = new TH1F("h_Mjj_allselectionjets", "m_{JJ}", 100, 0, 6000);
-  TH1F *h_Mt_allselectionjets = new TH1F("h_Mt_allselectionjets", "m_{T}", 100, 0, 6000);
-  TH1F *h_dPhimin_presel = new TH1F("h_dPhimin_presel", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
-  TH1F *h_dPhi1_presel = new TH1F("h_dPhi1_presel", "min(MET,j1)", 100, 0, 3.5);
-  TH1F *h_dPhi2_presel = new TH1F("h_dPhi2_presel", "min(MET,j2)", 100, 0, 3.5);
-  TH1F *h_dEta_presel = new TH1F("h_dEta_presel", "#Delta#eta(j0,j1)", 100, 0, 10);
-  TH1F *h_transverseratio_presel = new TH1F("h_transverseratio_presel", "MET/M_{T}", 100, 0, 1);
   
-  //TH1F *h_SVJHVgenPt_presel = new TH1F("h_SVJHVgenPt_presel", "gen-level HV semi-visible jet p_{T}", 100, 0, 3000);
-  //TH1F *h_SVJHVgenPhi_presel = new TH1F("h_SVJHVgenPhi_presel", "gen-level HV semi-visible jet #Phi", 100, -5, 5);  
-  //TH1F *h_SVJHVgenEta_presel = new TH1F("h_SVJHVgenEta_presel", "gen-level HV semi-visible jet #eta", 100, -6, 6);
-  TH1F *h_AK8jetPt_presel = new TH1F("h_AK8jetPt_presel", "AK8 jet p_{T}", 100, 0, 3000);
-  TH1F *h_AK8jetPhi_presel = new TH1F("h_AK8jetPhi_presel", "AK8 jet #Phi", 100, -5, 5);
-  TH1F *h_AK8jetEta_presel = new TH1F("h_AK8jetEta_presel", "AK8 jet #eta", 100, -6, 6);
-  TH1F *h_AK8jetPt_lead_presel = new TH1F("h_AK8jetPt_lead_presel", "AK8 jet p_{T}", 100, 0, 3000);
-  TH1F *h_AK8jetPhi_lead_presel = new TH1F("h_AK8jetPhi_lead_presel", "AK8 jet #Phi", 100, -5, 5);
-  TH1F *h_AK8jetEta_lead_presel = new TH1F("h_AK8jetEta_lead_presel", "AK8 jet #eta", 100, -6, 6);
-  TH1F *h_AK8jetPt_sublead_presel = new TH1F("h_AK8jetPt_sublead_presel", "AK8 jet p_{T}", 100, 0, 3000);
-  TH1F *h_AK8jetPhi_sublead_presel = new TH1F("h_AK8jetPhi_sublead_presel", "AK8 jet #Phi", 100, -5, 5);
-  TH1F *h_AK8jetEta_sublead_presel = new TH1F("h_AK8jetEta_sublead_presel", "AK8 jet #eta", 100, -6, 6);
-  
-  TH1F *h_AK8jetdR_nosel = new TH1F("h_AK8jetdR_nosel", "#DeltaR", 100, 0, 5);
-  TH1F *h_AK8jetdR_presel = new TH1F("h_AK8jetdR_presel", "#DeltaR", 100, 0, 5);
-  TH1F *h_AK8jetdP_nosel = new TH1F("h_AK8jetdP_nosel", "#Delta#Phi", 100, 0, 5);
-  TH1F *h_AK8jetdP_presel = new TH1F("h_AK8jetdP_presel", "#Delta#Phi", 100, 0, 5);
-  TH1F *h_AK8jetdE_nosel = new TH1F("h_AK8jetdE_nosel", "#Delta#Eta", 100, 0, 5);
-  TH1F *h_AK8jetdE_presel = new TH1F("h_AK8jetdE_presel", "#Delta#Eta", 100, 0, 5);
-
-  TH1F *h_AK8gendR0_presel = new TH1F("h_AK8gendR_presel0", "#DeltaR", 100, 0, 5);
-  TH1F *h_AK8gendR1_presel = new TH1F("h_AK8gendR_presel1", "#DeltaR", 100, 0, 5);
-
-  int n_twojets(0), n_prejetspt(0), n_prejetseta(0), n_jetseta(0), n_dPhi(0), n_transverse(0), n_premet(0), n_leptonveto(0);
-  int n_lead(0), n_sublead(0), n_totlead(0), n_totsublead(0);
-
-
+  //Plots after full-selection
+  TH1F *h_dEta = new TH1F("h_dEta", "#Delta#eta(j0,j1)", 100, 0, 10);
+  TH1F *h_dPhimin = new TH1F("h_dPhimin", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
+  TH1F *h_transverseratio = new TH1F("h_transverseratio", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt = new TH1F("h_Mt", "m_{T}", 100, 0, 6000);
+  TH1F *h_Mmc = new TH1F("h_Mmc", "m_{MC}", 100, 0, 6000);
+  TH1F *h_Mjj = new TH1F("h_Mjj", "m_{JJ}", 100, 0, 6000);
+  TH1F *h_METPt = new TH1F("h_METPt", "MET_{p_{T}}", 100, 0, 2000);
+  TH1F *h_dPhi = new TH1F("h_dPhi", "#Delta#Phi", 100, 0, 5);
+    
+  int n_twojets(0), n_prejetspt(0), n_prejetseta(0),  n_dPhi(0), n_transverse(0), n_leptonveto(0);
 
   std::cout<< "===> Number of Events: "<<nEventsPrePres<<std::endl;
+
   for(Int_t i=0; i<nEventsPrePres; i++ )
     {
+
       chain.GetEntry(i);
 
-      int sizeMaxLoop_ak8=min(5,ak8size);
-
-      //HV quarks
-      std::vector<TLorentzVector>& genParts = *genPartsPtr;
-      TLorentzVector vHVsum;
-      std::vector<TLorentzVector> vHVquarks;
-      
-      std::vector<TLorentzVector> genParticlesTLorVect;
-      struct genParticle{
-        TLorentzVector vect;
-        int pdgId;
-        int status;
-      };
-
-      genParticle genParticlesVect, HVgenParticles, HVgenParticlesInv, HVgenParticlesSVJ;
-
-      std::vector<genParticle> HVgenParticlesVect, HVgenParticlesInvVect, HVgenParticlesSVJVect;
-
-      for(int j=0; j<sizeMax_gen; j++){
-
-	HVgenParticles.vect = genParts[j];
-	//if(EventNumber==2000) cout << EventNumber << " " << i << " " << genPart_Pt[j] << endl;
-	HVgenParticles.pdgId=genPart_pdgId[j];
-	HVgenParticles.status=genPart_Status[j];
-	HVgenParticlesVect.push_back(genParticlesVect);
-	if(std::abs(genPart_pdgId[j])==4900211 || std::abs(genPart_pdgId[j])==4900213 ){
-	  HVgenParticlesInv.vect = genParts[j];
-	  HVgenParticlesInv.pdgId=genPart_pdgId[j];
-	  HVgenParticlesInv.status=genPart_Status[j];
-	  HVgenParticlesInvVect.push_back(HVgenParticlesInv);  
-	  vHVsum += (HVgenParticlesInv.vect);
-	}
-	if(std::abs(genPart_pdgId[j])==4900101 && genPart_Status[j] == 23){
-	  HVgenParticlesSVJ.vect = genParts[j];
-	  HVgenParticlesSVJ.pdgId=genPart_pdgId[j];
-	  HVgenParticlesSVJ.status=genPart_Status[j];
-	  HVgenParticlesSVJVect.push_back(HVgenParticlesSVJ);  	  
-	  h_SVJHVgenE_nosel->Fill(genParts[j].E());  
-	  h_SVJHVgenPt_nosel->Fill(genParts[j].Pt());  
-	  h_SVJHVgenEta_nosel->Fill(genParts[j].Eta());  
-	  h_SVJHVgenPhi_nosel->Fill(genParts[j].Phi());  
-	}
-      }
-
       //JET                
-      std::vector<TLorentzVector> AK8Jets, AK8Jets200;
+      std::vector<TLorentzVector> AK8Jets;
       TLorentzVector AK8Jet;
       std::vector<TLorentzVector> jetsAK8CHS = *jetsAK8CHSPtr;
       std::vector<TLorentzVector> muons = *MuonsPtr;
@@ -527,69 +380,20 @@ int main(int argc, char **argv) {
 
       nLooseMuons = muons.size();
       nLooseElectrons = electrons.size();
-      ak8size = jetsAK8CHS.size();
+      nAK8CHS = jetsAK8CHS.size();
+      int sizeMaxLoop_ak8=min(5,nAK8CHS);
 
-      for(int j=0; j<sizeMaxLoop_ak8;j++){
+      for(int j=0; j<sizeMaxLoop_ak8; j++){
 	AK8Jet = jetsAK8CHS[j];
-	AK8Jets.push_back(AK8Jet);
 	if(AK8Jet.Pt()>200 && AK8Jet.Pt()<1000000000){
-	  AK8Jets200.push_back(AK8Jet);
+	  AK8Jets.push_back(AK8Jet);
 	}
       }
 
-
-
-      h_AK8jets200mult_nosel->Fill(AK8Jets200.size());
       h_AK8jetsmult_nosel->Fill(AK8Jets.size());
-      TLorentzVector MatchetJet_0, MatchetJet_1;
-      if(HVgenParticlesSVJVect.size()>1 && AK8Jets200.size()>1){
 
-	//if(HVgenParticlesSVJVect[0].vect.Pt()< HVgenParticlesSVJVect[1].vect.Pt()){
-	//  HVgenParticlesSVJVect.clear();
-	//  HVgenParticlesSVJVect.push_back(HVgenParticlesSVJVect[1]);
-	//  HVgenParticlesSVJVect.push_back(HVgenParticlesSVJVect[0]);
-	//	}
-	
-
-
-	h_SVJHVgenE_lead_nosel->Fill((HVgenParticlesSVJVect[0].vect).E());  
-	h_SVJHVgenPt_lead_nosel->Fill((HVgenParticlesSVJVect[0].vect).Pt());  
-	h_SVJHVgenEta_lead_nosel->Fill((HVgenParticlesSVJVect[0].vect).Eta());  
-	h_SVJHVgenPhi_lead_nosel->Fill((HVgenParticlesSVJVect[0].vect).Phi());  
-
-	h_SVJHVgenE_sublead_nosel->Fill((HVgenParticlesSVJVect[1].vect).E());  
-	h_SVJHVgenPt_sublead_nosel->Fill((HVgenParticlesSVJVect[1].vect).Pt());  
-	h_SVJHVgenEta_sublead_nosel->Fill((HVgenParticlesSVJVect[1].vect).Eta());  
-	h_SVJHVgenPhi_sublead_nosel->Fill((HVgenParticlesSVJVect[1].vect).Phi());  
-	
-	float prob = 0;
-	if(HVgenParticlesSVJVect.size()>1) prob = check_match(HVgenParticlesSVJVect[0].vect, HVgenParticlesSVJVect[1].vect, AK8Jets200, 0.4);
-	h_prob->Fill(prob);
-	MatchetJet_0 = Rematch(HVgenParticlesSVJVect[0].vect, AK8Jets200, 0.4);
-	MatchetJet_1 = Rematch(HVgenParticlesSVJVect[1].vect, AK8Jets200, 0.4);
-
-      	if(MatchetJet_0.Pt()>1.){
-	  h_matchedAK8jetPt_lead_nosel->Fill(MatchetJet_0.Pt());
-	}
-	if(MatchetJet_1.Pt()>1.){
-	  h_matchedAK8jetPt_sublead_nosel->Fill(MatchetJet_1.Pt());
-	}
-
-	if(MatchetJet_0.E()>1.){
-	  h_matchedAK8jetE_lead_nosel->Fill(MatchetJet_0.E());
-	  if(abs(MatchetJet_0.E()-AK8Jets.at(0).E())/MatchetJet_0.E() < 0.10) n_lead +=1;
-	  n_totlead+=1;
-	}	  
-	if(MatchetJet_1.E()>1.){
-	  h_matchedAK8jetE_sublead_nosel->Fill(MatchetJet_1.E());
-	  if(abs(MatchetJet_1.Eta()-AK8Jets.at(1).Eta())/MatchetJet_1.Eta() < 0.10){
-	    n_sublead +=1;
-	  }	  
-	  n_totsublead+=1;
-	}
-      }
-      
-      bool preselection_jetspt = 0, preselection_jetseta = 0, preselection_met = 0, preselection = 0;
+      //Define preselection
+      bool preselection_jetspt = 0, preselection_jetseta = 0, preselection = 0;
       if(AK8Jets.size()<=1){
 	preselection_jetspt = 0;
 	preselection_jetseta = 0;
@@ -598,48 +402,83 @@ int main(int argc, char **argv) {
 	preselection_jetseta = (std::fabs((AK8Jets.at(0)).Eta()) < 2.5 && std::fabs((AK8Jets.at(1)).Eta()) < 2.5);
       }
 
-      preselection_met = metFull_Pt > 100 ;
-      preselection = preselection_jetspt && preselection_jetseta/* && preselection_met*/;
+      preselection = preselection_jetspt && preselection_jetseta ;
 
+      //HV quarks definition
+      std::vector<TLorentzVector>& genParts = *genPartsPtr;
+      TLorentzVector vHVsum;
+
+      struct genParticle{
+        TLorentzVector vect;
+        int pdgId;
+        int status;
+      };
+      
+      genParticle HVgenParticlesInv;
+      std::vector<genParticle> HVgenParticlesInvVect;
+
+      for(int j=0; j<sizeMax_gen; j++){
+	if(std::abs(genPart_pdgId[j])==4900211 || std::abs(genPart_pdgId[j])==4900213 ){
+	  HVgenParticlesInv.vect = genParts[j];
+	  HVgenParticlesInv.pdgId=genPart_pdgId[j];
+	  HVgenParticlesInv.status=genPart_Status[j];
+	  HVgenParticlesInvVect.push_back(HVgenParticlesInv);  
+	  vHVsum += (HVgenParticlesInv.vect);
+	}
+      }
+      
       //start of the analysis and of the variable definition                                                                                   
-      if(AK8Jets200.size()>1){
 
+      if(AK8Jets.size()>1){
+
+	//Leptons
 	h_looseMuonsmult_nosel->Fill(nLooseMuons);
 	h_looseElectronsmult_nosel->Fill(nLooseElectrons);
 
 	//MET
 	h_METPt_nosel->Fill(metFull_Pt);
-	h_METPhi_nosel->Fill(metFull_Phi);
 
+	//Hadronic objects
 	h_Ht_nosel->Fill(Ht);
-	h_AK8jetPt_nosel->Fill(AK8Jets200.at(0).Pt());
-	h_AK8jetPt_nosel->Fill(AK8Jets200.at(1).Pt());
-	h_AK8jetE_lead_nosel->Fill(AK8Jets200.at(0).E());
-	h_AK8jetPt_lead_nosel->Fill(AK8Jets200.at(0).Pt());
-	h_AK8jetPt_sublead_nosel->Fill(AK8Jets200.at(1).Pt());
-	h_AK8jetE_sublead_nosel->Fill(AK8Jets200.at(1).E());
-	h_AK8jetEta_nosel->Fill(AK8Jets200.at(0).Eta());
-	h_AK8jetEta_nosel->Fill(AK8Jets200.at(1).Eta());
-	h_AK8jetEta_lead_nosel->Fill(AK8Jets200.at(0).Eta());
-	h_AK8jetEta_sublead_nosel->Fill(AK8Jets200.at(1).Eta());
-	h_AK8jetPhi_nosel->Fill(AK8Jets200.at(0).Phi());
-	h_AK8jetPhi_nosel->Fill(AK8Jets200.at(1).Phi());
-	h_AK8jetPhi_lead_nosel->Fill(AK8Jets200.at(0).Phi());
-	h_AK8jetPhi_sublead_nosel->Fill(AK8Jets200.at(1).Phi());
 
+	h_AK8jetPt_nosel->Fill(AK8Jets.at(0).Pt());
+	h_AK8jetPt_nosel->Fill(AK8Jets.at(1).Pt());
+	h_AK8jetEta_nosel->Fill(AK8Jets.at(0).Eta());
+	h_AK8jetEta_nosel->Fill(AK8Jets.at(1).Eta());
+	h_AK8jetPhi_nosel->Fill(AK8Jets.at(0).Phi());
+	h_AK8jetPhi_nosel->Fill(AK8Jets.at(1).Phi());
+
+	h_AK8jetE_lead_nosel->Fill(AK8Jets.at(0).E());
+	h_AK8jetE_sublead_nosel->Fill(AK8Jets.at(1).E());
+	h_AK8jetPt_lead_nosel->Fill(AK8Jets.at(0).Pt());
+	h_AK8jetPt_sublead_nosel->Fill(AK8Jets.at(1).Pt());
+	h_AK8jetEta_lead_nosel->Fill(AK8Jets.at(0).Eta());
+	h_AK8jetEta_sublead_nosel->Fill(AK8Jets.at(1).Eta());
+	h_AK8jetPhi_lead_nosel->Fill(AK8Jets.at(0).Phi());
+	h_AK8jetPhi_sublead_nosel->Fill(AK8Jets.at(1).Phi());
+
+	//Compute angular distances between the two leading jets
 	float AK8Jets_dr=-1;
-	AK8Jets_dr = (AK8Jets200.at(0)).DeltaR(AK8Jets200.at(1));
+	AK8Jets_dr = (AK8Jets.at(0)).DeltaR(AK8Jets.at(1));
 	float dEta=0, dPhi=0;
-	dEta= (std::fabs((AK8Jets200.at(0)).Eta() - (AK8Jets200.at(1)).Eta()));
-	dPhi= std::abs(reco::deltaPhi(AK8Jets200.at(0).Phi(),AK8Jets200.at(1).Phi()));;
+	dEta= (std::fabs((AK8Jets.at(0)).Eta() - (AK8Jets.at(1)).Eta()));
+	dPhi= std::abs(reco::deltaPhi(AK8Jets.at(0).Phi(),AK8Jets.at(1).Phi()));
 	h_AK8jetdR_nosel->Fill(AK8Jets_dr);
 	h_AK8jetdP_nosel->Fill(dPhi);
 	h_AK8jetdE_nosel->Fill(dEta);
-	h_dEta_nosel->Fill(dEta);
 
-	float Mjj=0., Mmc=0., MT2=0., dPhi_j0_met=0., dPhi_j1_met=0., dPhi_min=0.;     
+	float dPhi_j0_met=0., dPhi_j1_met=0., dPhi_min=0.;  
+	dPhi_j0_met = std::abs(reco::deltaPhi(AK8Jets.at(0).Phi(),metFull_Phi));
+	dPhi_j1_met = std::abs(reco::deltaPhi(AK8Jets.at(1).Phi(),metFull_Phi));
+	dPhi_min = std::min(dPhi_j0_met,dPhi_j1_met);
+
+	h_dPhi1_nosel->Fill(dPhi_j0_met);
+	h_dPhi2_nosel->Fill(dPhi_j1_met);
+
+	//Compute masses
+	float Mjj=0., Mmc=0., MT2=0.;
 	//Mjj = mass of the two large reclustered jets                                                                                    
-	TLorentzVector vjj = AK8Jets200.at(0) + AK8Jets200.at(1);
+	TLorentzVector vjj = AK8Jets.at(0) + AK8Jets.at(1);
 	Mjj = vjj.M();
 	
 	//Mmc = the reconstructed Z' mass using all the dark matter particles in the MC                                                           
@@ -648,174 +487,53 @@ int main(int argc, char **argv) {
 
 	//MT2                                                                                                                                      
 	MT2 = sqrt(vjj.M()*vjj.M() + 2*(sqrt(vjj.M()* vjj.M() + vjj.Pt()* vjj.Pt())*sqrt(metFull_Px*metFull_Px + metFull_Py*metFull_Py) - (vjj.Px() * metFull_Px + vjj.Py() * metFull_Py)));
-	
+
 	h_Mmc_nosel->Fill(Mmc);
 	h_Mjj_nosel->Fill(Mjj);
 	h_Mt_nosel->Fill(MT2);
-	
-	dPhi_j0_met = std::abs(reco::deltaPhi(AK8Jets200.at(0).Phi(),metFull_Phi));
-	dPhi_j1_met = std::abs(reco::deltaPhi(AK8Jets200.at(1).Phi(),metFull_Phi));
-	dPhi_min = std::min(dPhi_j0_met,dPhi_j1_met);
+
+	bool selection_dPhi = 0, selection_transverseratio = 0, selection_leptonveto = 0, selection = 0;
+	selection_leptonveto = (nLooseElectrons + nLooseMuons < 1);
+	selection_dPhi = dPhi_min < 0.75;
+	selection_transverseratio = (metFull_Pt/MT2) > 0.25; 
 
 	h_dPhimin_nosel->Fill(dPhi_min);
-	h_dPhi1_nosel->Fill(dPhi_j0_met);
-	h_dPhi2_nosel->Fill(dPhi_j1_met);
-
-	//razor variables
-	float MR=0, R;
-	
-	float pj0=0, pj1=0;
-	pj0 = sqrt( pow(AK8Jets200.at(0).Px(),2) + pow(AK8Jets200.at(0).Py(),2) + pow(AK8Jets200.at(0).Pz(),2));
-	pj1 = sqrt( pow(AK8Jets200.at(1).Px(),2) + pow(AK8Jets200.at(1).Py(),2) + pow(AK8Jets200.at(1).Pz(),2));
-	MR = pow((pj0 + pj1),2) - pow(AK8Jets200.at(0).Pz() + AK8Jets200.at(1).Pz(),2);
-	MR = sqrt(MR);
-	
-	h_MR_nosel->Fill(MR);
-	h_MRMT_nosel->Fill(MR,MT2,p);
-	TLorentzVector sumJets;
-	sumJets=AK8Jets200.at(0) + AK8Jets200.at(1);
-	R = metFull_Pt * (AK8Jets200.at(0).Pt() + AK8Jets200.at(1).Pt()) - ((metFull_Px * sumJets.Px() + metFull_Py * sumJets.Py())); 
-	R = R/(2*pow(MR,2));
-	h_R_nosel->Fill(R);
-	h_RMT_nosel->Fill(R,MT2,p);
-
-	bool selection_jetseta = 0, selection_dPhi = 0, selection_transverseratio = 0, selection_leptonveto = 0, selection = 0;
-	selection_jetseta = dEta < (1/1800 * MT2 +  1.5) ;//(dEta < 1.5); //1.1 1.25
-	selection_leptonveto = (nLooseElectrons + nLooseMuons < 1);
-	selection_dPhi = dPhi_min < 0.85;//dPhi_min < (-3/10000 * MT2 + 1.5) ;//(dPhi_min < 0.75); //1.
-	selection_transverseratio = (metFull_Pt/MT2) > (-1/40000 * MT2 + 3/10);//(metFull_Pt/MT2) > 0.25; //0.15 0.20
-
 	h_transverseratio_nosel->Fill((metFull_Pt/MT2));
-	selection = (preselection && selection_jetseta  && selection_dPhi && selection_transverseratio && selection_leptonveto);
+	selection = (preselection  && selection_dPhi && selection_transverseratio && selection_leptonveto);
 
-	if(/*selection_jetseta &&*/ preselection_jetspt && preselection_jetseta && selection_leptonveto/* && preselection_met */ && selection_dPhi /*&& selection_transverseratio && AK8Jets_dr>2.80*/){
-	  if(MT2>1500 && MT2<2500){	    
-	    if(metFull_Pt/MT2 >  0.15) h0->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.16) h1->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.17) h2->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.18) h3->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.19) h4->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.20) h5->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.21) h6->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.22) h7->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.23) h8->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.24) h9->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.25) h10->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.26) h11->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.27) h12->Fill(MT2);
-	    if(metFull_Pt/MT2 >  0.28) h13->Fill(MT2);
-	  }
-
-	  h_MT_dX->Fill(MT2, metFull_Pt, p);
-	  h_dEta_presel->Fill(dEta);
-	  h_dPhi1_presel->Fill(dPhi_j0_met);                                                                                        
-	  h_dPhi2_presel->Fill(dPhi_j1_met);                                                                                        
-	  h_dPhimin_presel->Fill(dPhi_min); 
-	  h_transverseratio_presel->Fill((metFull_Pt/MT2));
-	  h_MR_presel->Fill(MR);                                                                                                               
-          h_R_presel->Fill(R);                                                                                                                 
-	  h_Mt_presel->Fill(MT2);                                                                                                              
-          h_Mjj_presel->Fill(Mjj);                                                                                                             
-          h_Mmc_presel->Fill(Mmc);   
-	  h_razor_presel->Fill(MR,R,p);
-	  h_MRMT_presel->Fill(MR,MT2,p);
-	  h_RMT_presel->Fill(R,MT2,p);
-	  h_METPt_presel->Fill(metFull_Pt);
-	  h_METPhi_presel->Fill(metFull_Phi);     		    
-	  h_AK8jetdP_presel->Fill(dPhi);
-	  h_AK8jetdR_presel->Fill(AK8Jets_dr);
-
-	  h_Mt_METMt_all->Fill(MT2, metFull_Pt/MT2,p);
-	  h_Mt_dEta_all->Fill(MT2, dEta,p);
-	  h_Mt_dPhi_all->Fill(MT2, dPhi_min,p);
+	if(selection){	  
+	  h_dEta->Fill(dEta);
+	  h_dPhi->Fill(dPhi);
+	  h_dPhimin->Fill(dPhi_min); 
+	  h_transverseratio->Fill((metFull_Pt/MT2));
+	  h_Mt->Fill(MT2);                                                                                                              
+          h_Mjj->Fill(Mjj);                                                                                                             
+          h_Mmc->Fill(Mmc);   
+	  h_METPt->Fill(metFull_Pt);
 	}
-
+	      
+	// Fill cutflow entries
 	n_twojets+=1;
-	//plots fillings	
 	if(preselection_jetspt){
 	  n_prejetspt+=1;
-	  if(preselection_jetseta){ 
+	  if(preselection_jetseta){
 	    n_prejetseta+=1;
-	    if(preselection_met){
-	      n_premet+=1;
-	      if(selection_leptonveto){
-		n_leptonveto +=1;
-		h_Mt_presel_0->Fill(MT2);
-		h_Mt_METMt->Fill(MT2, metFull_Pt/MT2,p);
-		h_Mt_dEta->Fill(MT2, dEta,p);
-		h_Mt_dPhi->Fill(MT2, dPhi_min,p);
-		h_razor_nosel->Fill(MR,R,p);		
-		if(selection_jetseta){
-		  h_Mt_presel_1->Fill(MT2);
-		  n_jetseta+=1;
-		  if(selection_dPhi){
-		    h_Mt_presel_2->Fill(MT2);
-		    n_dPhi+=1;
-		    if(selection_transverseratio){
-		      n_transverse+=1;
-		      h_Mt_presel_3->Fill(MT2);
-		      
-		    }
-		  }
+	    if(selection_leptonveto){
+	      n_leptonveto+=1;
+	      if(selection_dPhi){
+		n_dPhi+=1;
+		if(selection_transverseratio){
+		  n_transverse+=1;
 		}
 	      }
 	    }
 	  }
 	}
-	
-	if(selection_transverseratio && preselection_met && selection_dPhi){
-	  //h_dEta_presel->Fill(dEta);
-	  h_AK8jetdE_presel->Fill(dEta,p);
-	  h_AK8jetPt_presel->Fill(AK8Jets.at(0).Pt());
-	  h_AK8jetPt_presel->Fill(AK8Jets.at(1).Pt());
-	  h_AK8jetPt_lead_presel->Fill(AK8Jets.at(0).Pt());
-	  h_AK8jetPt_sublead_presel->Fill(AK8Jets.at(1).Pt());
-	  h_AK8jetEta_presel->Fill(AK8Jets.at(0).Eta());
-	  h_AK8jetEta_presel->Fill(AK8Jets.at(1).Eta());
-	  h_AK8jetEta_lead_presel->Fill(AK8Jets.at(0).Eta());
-	  h_AK8jetEta_sublead_presel->Fill(AK8Jets.at(1).Eta());
-	  h_AK8jetPhi_presel->Fill(AK8Jets.at(0).Phi());
-	  h_AK8jetPhi_presel->Fill(AK8Jets.at(1).Phi());
-	  h_AK8jetPhi_lead_presel->Fill(AK8Jets.at(0).Phi());
-	  h_AK8jetPhi_sublead_presel->Fill(AK8Jets.at(1).Phi());
-	}
-	
-	if(selection_dPhi && preselection_jetspt && preselection_jetseta && selection_jetseta){
-	  //h_transverseratio_presel->Fill((metFull_Pt/MT2));
-	}
-	
-	if(selection){
-	  if(HVgenParticlesSVJVect.size()>1){
-	    h_AK8gendR0_presel -> Fill((HVgenParticlesSVJVect[0].vect).DeltaR(AK8Jets200.at(0)));
-	    h_AK8gendR1_presel -> Fill((HVgenParticlesSVJVect[1].vect).DeltaR(AK8Jets200.at(1)));
-	  }
-	  //h_MR_presel->Fill(MR);
-	  //h_R_presel->Fill(R);
-	  //h_Mt_presel->Fill(MT2);
-	  //h_Mjj_presel->Fill(Mjj);
-	  //h_Mmc_presel->Fill(Mmc);
-	  h_Ht_presel->Fill(Ht);
 
-	  h_AK8jetsmult_presel->Fill(AK8Jets.size());
-	  h_AK8jets200mult_presel->Fill(AK8Jets200.size());
-	  h_looseMuonsmult_presel->Fill(nLooseMuons);
-	  h_looseElectronsmult_presel->Fill(nLooseElectrons);
-
-	  h_METPt_allselection->Fill(metFull_Pt);
-
-	  if(AK8Jets200.at(1).Pt()>1100 && AK8Jets.at(0).Pt()>1300){
-	    h_METPt_allselectionjets->Fill(metFull_Pt);
-	    h_Mt_allselectionjets->Fill(MT2);
-	    h_Mjj_allselectionjets->Fill(Mjj);
-	    h_Mmc_allselectionjets->Fill(Mmc);
-	    h_Ht_allselectionjets->Fill(Ht);
-	  }
-	}
-
-      }
+      }//end of nAK8CHSJets>1
 
     }//end of loop over events
-  
+
   h_cutFlow->SetBinContent(1,nEvents);
   h_cutFlow->GetXaxis()->SetBinLabel(1,"no selection");
   h_cutFlow->SetBinContent(2, n_twojets);
@@ -824,160 +542,54 @@ int main(int argc, char **argv) {
   h_cutFlow->GetXaxis()->SetBinLabel(3,"p_{T, j1/j2} > 200 GeV");
   h_cutFlow->SetBinContent(4, n_prejetseta);
   h_cutFlow->GetXaxis()->SetBinLabel(4,"|#eta_{j1, j2}| < 2.5");
-  h_cutFlow->SetBinContent(5, n_premet);
-  h_cutFlow->GetXaxis()->SetBinLabel(5,"MET > 100");
-  h_cutFlow->SetBinContent(6, n_leptonveto);
-  h_cutFlow->GetXaxis()->SetBinLabel(6," Lepton veto ");
-  h_cutFlow->SetBinContent(7, n_jetseta);
-  h_cutFlow->GetXaxis()->SetBinLabel(7,"|#eta_1 - #eta_2|");
-  h_cutFlow->SetBinContent(8, n_dPhi);
-  h_cutFlow->GetXaxis()->SetBinLabel(8,"#Delta#Phi");
-  h_cutFlow->SetBinContent(9, n_transverse);
-  h_cutFlow->GetXaxis()->SetBinLabel(9, "MET/M_{T}");
+  h_cutFlow->SetBinContent(5, n_leptonveto);
+  h_cutFlow->GetXaxis()->SetBinLabel(5," Lepton veto ");
+  h_cutFlow->SetBinContent(6, n_dPhi);
+  h_cutFlow->GetXaxis()->SetBinLabel(6,"#Delta#Phi");
+  h_cutFlow->SetBinContent(7, n_transverse);
+  h_cutFlow->GetXaxis()->SetBinLabel(7, "MET/M_{T}");
 
   fout.cd();
   
-  h_MT_dX->Write();
-
-  h0->Write();
-  h1->Write();
-  h2->Write();
-  h3->Write();
-  h4->Write();
-  h5->Write();
-  h6->Write();
-  h7->Write();
-  h8->Write();
-  h9->Write();
-  h10->Write();
-  h11->Write();
-  h12->Write();
-  h13->Write();
-
   h_cutFlow->Write();
-  h_prob->Write();
-  h_SVJHVgenE_sublead_nosel->Write();
 
-  h_MR_nosel->Write();
-  h_MRMT_nosel->Write();
-  h_MR_presel->Write();  
-  h_MRMT_presel->Write();  
-  h_R_nosel->Write();  
-  h_RMT_nosel->Write();  
-  h_R_presel->Write();
-  h_RMT_presel->Write();
-
-  h_looseMuonsmult_presel->Write();
-  h_looseMuonsmult_nosel->Write();
-  h_looseElectronsmult_presel->Write();
-  h_looseElectronsmult_nosel->Write();
-  h_AK8jetsmult_presel->Write();
   h_AK8jetsmult_nosel->Write();
-  h_AK8jets200mult_presel->Write();
-  h_AK8jets200mult_nosel->Write();
-  h_Ht_nosel->Write();
-  h_razor_nosel->Write();
+  h_looseMuonsmult_nosel->Write();
+  h_looseElectronsmult_nosel->Write();
   h_METPt_nosel->Write();
-  h_METPhi_nosel->Write();
-  h_SVJHVgenE_nosel->Write();
-  h_SVJHVgenPt_nosel->Write();
-  h_SVJHVgenEta_nosel->Write();
-  h_SVJHVgenPhi_nosel->Write();
-  h_SVJHVgenE_lead_nosel->Write();
-  h_SVJHVgenPt_lead_nosel->Write();
-  h_SVJHVgenEta_lead_nosel->Write();
-  h_SVJHVgenPhi_lead_nosel->Write();
-  h_SVJHVgenE_lead_nosel->Write();
-  h_SVJHVgenPt_sublead_nosel->Write();
-  h_SVJHVgenEta_sublead_nosel->Write();
-  h_SVJHVgenPhi_sublead_nosel->Write();
-
-  h_dEta_nosel->Write();
-  h_transverseratio_nosel->Write();
-  h_AK8jetdR_nosel->Write();
-  h_AK8jetdE_nosel->Write();
-  h_AK8jetdE_presel->Write();
-  h_AK8jetdP_nosel->Write();
-  h_AK8jetdP_presel->Write();
-
+  h_Ht_nosel->Write();
   h_AK8jetPt_nosel->Write();
   h_AK8jetPhi_nosel->Write();
   h_AK8jetEta_nosel->Write();
-  h_matchedAK8jetE_lead_nosel->Write();
-  h_matchedAK8jetPt_lead_nosel->Write();
   h_AK8jetE_lead_nosel->Write();
   h_AK8jetPt_lead_nosel->Write();
   h_AK8jetPhi_lead_nosel->Write();
   h_AK8jetEta_lead_nosel->Write();
-  h_matchedAK8jetE_sublead_nosel->Write();
-  h_matchedAK8jetPt_sublead_nosel->Write();
   h_AK8jetE_sublead_nosel->Write();
   h_AK8jetPt_sublead_nosel->Write();
   h_AK8jetPhi_sublead_nosel->Write();
   h_AK8jetEta_sublead_nosel->Write();
-
-  h_Ht_presel->Write();
-  h_razor_presel->Write();
-  h_METPt_presel->Write();
-  h_METPhi_presel->Write();
-
-  h_AK8jetPt_presel->Write();
-  h_AK8jetPhi_presel->Write();
-  h_AK8jetEta_presel->Write();
-  h_AK8jetPt_lead_presel->Write();
-  h_AK8jetPhi_lead_presel->Write();
-  h_AK8jetEta_lead_presel->Write();
-  h_AK8jetPt_sublead_presel->Write();
-  h_AK8jetPhi_sublead_presel->Write();
-  h_AK8jetEta_sublead_presel->Write();
-  h_dEta_presel->Write();
-  h_transverseratio_presel->Write();
-  h_AK8jetdR_presel->Write();
-
-  h_Mt_METMt->Write();
-  h_Mt_dPhi->Write();
-  h_Mt_dEta->Write();
-
-  h_Mt_METMt_all->Write();
-  h_Mt_dPhi_all->Write();
-  h_Mt_dEta_all->Write();
-  h_Mt_presel->Write();
-  h_Mt_presel_0->Write();
-  h_Mt_presel_1->Write();
-  h_Mt_presel_2->Write();
-  h_Mt_presel_3->Write();
-  h_Mjj_presel->Write();
-  h_Mmc_presel->Write();
-
+  h_AK8jetdR_nosel->Write();
+  h_AK8jetdE_nosel->Write();
+  h_AK8jetdP_nosel->Write();
   h_Mt_nosel->Write();
   h_Mjj_nosel->Write();
   h_Mmc_nosel->Write();
-
   h_dPhimin_nosel->Write();
   h_dPhi1_nosel->Write();
   h_dPhi2_nosel->Write();
-  h_dPhimin_presel->Write();
-  h_dPhi1_presel->Write();
-  h_dPhi2_presel->Write();
+  h_transverseratio_nosel->Write();
 
-  h_AK8gendR0_presel->Write(); 
-  h_AK8gendR1_presel->Write(); 
-
-  h_METPt_allselectionjets->Write();
-  h_METPt_allselection->Write();
-  h_Mt_allselectionjets->Write();
-  h_Mjj_allselectionjets->Write();
-  h_Mmc_allselectionjets->Write();
-  h_razor_allselectionjets->Write();
-  h_Ht_allselectionjets->Write();
-  //systZero.writeHistogramsSysts(h_METPt, allMyFiles);
+  h_dEta->Write();
+  h_dPhimin->Write();
+  h_transverseratio->Write();
+  h_Mt->Write();
+  h_Mjj->Write();
+  h_Mmc->Write();
+  h_METPt->Write();
+  h_dPhi->Write();
 
   fileout.close();
-  
-  std::cout<< "---> "<<sample<<std::endl;
-  std::cout<< "* Cutflow in Signal Region *    "<<std::endl;
-  std::cout<< "**************************** "<<std::endl;
-  
      
 }//end of main
 
