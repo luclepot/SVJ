@@ -1,3 +1,4 @@
+
 ######################################
 #
 # Annapaola de Cosa, January 2015
@@ -36,8 +37,8 @@ class Histo(object):
 
     _labelFont = 42
     _titleFont = 42
-    _xTitleOffset = 0.9
-    _yTitleOffset = 1.15
+    _xTitleOffset = 1.3
+    _yTitleOffset = 1.6
     _lineWidth = 2
 
     def __init__(self, name="", title="", nBins=100, xmin=0, xmax=100):
@@ -73,13 +74,15 @@ class Histo(object):
         self._h.SetTitle("");
         if(color != ROOT.kRed): self._h.SetLineColor(1)
         else: self._h.SetLineColor(color)
-        self._h.SetLineWidth(self._lineWidth)
+        if(color != ROOT.kRed): self._h.SetLineWidth(self._lineWidth)
+        else: self._h.SetLineWidth(3)
         self._h.SetLineStyle(style)
         self._h.SetFillColor(color)
         self._h.SetFillStyle(fill)
         self._h.GetXaxis().SetTitle(self._title)
         nEvts = (self._h.GetXaxis().GetXmax() - self._h.GetXaxis().GetXmin()) / self._h.GetNbinsX()
-        self._h.GetYaxis().SetTitle("Events/"+ str.format("{0:.2f}", nEvts) );
+        self._h.GetYaxis().SetTitle("Events");
+        #self._h.GetYaxis().SetTitle("Events/"+ str.format("{0:.2f}", nEvts) );
     
     def Fill(self, value, weight = "1"):
         self._h.Fill(value, weight)
@@ -103,7 +106,7 @@ class Histo(object):
         if(self._h.Integral()>0):self._h.Scale(1./self._h.Integral())
         color = self._h.GetFillColor()
         self._h.SetLineColor(color)        
-        self._h.SetLineWidth(2)        
+        self._h.SetLineWidth(3)        
         self._h.SetFillStyle(0)
 
     def SetBinContent(self, bin, content):
@@ -204,12 +207,12 @@ class Stack(object):
     _labelFont = 42
     _titleFont = 42
 
-    _labelSize = 0.05
-    _xTitleSize = 0.055
-    _yTitleSize = 0.06
+    _labelSize = 0.045
+    _xTitleSize = 0.052
+    _yTitleSize = 0.065
 
-    _xTitleOffset = 0.9
-    _yTitleOffset = 1.25
+    _xTitleOffset = 1.10
+    _yTitleOffset = 1.20
 
     def __init__(self, name, title):
         self._name = name
@@ -217,7 +220,7 @@ class Stack(object):
         self._hs = ROOT.THStack(self._name,"")
         self._latex = ROOT.TLatex()
         self._latex.SetNDC()
-        self._latex.SetTextSize(0.04)
+        self._latex.SetTextSize(0.03)
         self._latex.SetTextFont(42)
         self._latex.SetTextAlign(11)
 
@@ -240,7 +243,8 @@ class Stack(object):
 
         self._hs.GetHistogram().GetXaxis().SetTitle(self._title)
         nEvts = (self._hs.GetHistogram().GetXaxis().GetXmax() - self._hs.GetHistogram().GetXaxis().GetXmin()) / self._hs.GetHistogram().GetNbinsX()
-        self._hs.GetHistogram().GetYaxis().SetTitle("Number of events / "+ str.format("{0:.2f}", nEvts) );
+        self._hs.GetHistogram().GetYaxis().SetTitle("Number of events / bin"); #{0:.2f}
+        #self._hs.GetHistogram().GetYaxis().SetTitle("Number of events / "+ str.format("{0:.0f}", nEvts) ); #{0:.2f}
  #       self._hs.Draw(options)
 
 
@@ -253,11 +257,11 @@ class Stack(object):
     def GetHistogram(self):
         return self._hs.GetHistogram()
 
-    def GetMaximum(self, options = ""):
-        return self._hs.GetMaximum(options)
+    def GetMaximum(self):
+        return self._hs.GetMaximum()
 
-    def GetMinimum(self, options = ""):
-        return self._hs.GetMinimum(options)
+    def GetMinimum(self):
+        return self._hs.GetMinimum()
 
     def GetLast(self):
         return self._hs.GetStack().Last()
@@ -287,20 +291,22 @@ class Stack(object):
     #         print h.GetTitle(), h.Integral()
 
 
+
+
+
 # ====================================================
 # Class Legend: to draw a legend
 # ====================================================
 
 class Legend(object):
 
-    # _coords = (0.5, 0.72, 0.89, 0.90)
-    #    _coords = (0.40, 0.85, 0.94, 0.95)
-    _coords = (0.40, 0.69, 0.94, 0.84)
+    _coords = (0.37, 0.78, 0.94, 0.94)
+    #_coords = (0.25, 0.83, 0.94, 0.97)
 
-    _textSize = 0.018
-    # _textSize = 0.045
+    _textSize = 0.04
+    #_textSize = 0.045
 
-    def __init__(self, coords = None):
+    def __init__(self, coords = _coords):
 
         # Take class default if coords are not specified
         coords = coords if coords is not None else Legend._coords
@@ -308,28 +314,15 @@ class Legend(object):
         #print 'Legend Coords',coords
         #self._leg = ROOT.TLegend(.61, .58, .94, .89)
         self._leg = ROOT.TLegend(*coords)
-        self._leg.SetNColumns(1)
+        self._leg.SetNColumns(3)
         self._leg.SetFillColor(0)
         self._leg.SetFillStyle(0)
         self._leg.SetTextSize(self._textSize)
         self._leg.SetTextFont(42)
         self._leg.SetBorderSize(0)
         
-    def SetCoords(self, coords):
-        self._leg.SetX1(coords[0]);
-        self._leg.SetY1(coords[1]);
-        self._leg.SetX2(coords[2]);
-        self._leg.SetY2(coords[3]);
-
     def AddEntry(self, h, label, option = "fp"):
-        if(isinstance(h, Histo)):self._leg.AddEntry(h.GetHisto(), label, option)
-        elif(isinstance (h, ROOT.TH1)): self._leg.AddEntry(h, label, option)
-
-    def GetEntry(self):
-        return self._leg.GetEntry()
-
-    def AddEntryGraph(self, gr, label, option = "fp"):
-        self._leg.AddEntry(gr, label, option)
+        self._leg.AddEntry(h.GetHisto(), label, option)
 
     def Draw(self, options = "SAME"):
         self._leg.Draw(options)
@@ -368,10 +361,10 @@ class StackRatio(Stack):
 class LegendRatio(Legend):
 
     # _coords = (0.50, 0.65, 0.94, 0.89)
-    _coords = (0.40, 0.76, 0.94, 0.89)
-    _textSize = 0.04
+    _coords = (0.25, 0.65, 0.94, 0.89)
+    _textSize = 0.065
 
-    def __init__(self, coords = None):
+    def __init__(self, coords = _coords):
         # Take class default if coords are not specified
         coords = coords if coords is not None else LegendRatio._coords
 
@@ -514,7 +507,7 @@ mucuts = ["(nTightMu == 1 )",
 def _cutFlow(tree,cuts, ch):
 
     histo = Histo("CutFlow", "CutFlow", len(cutNames), 0., len(cutNames))
-    histo.SetStyle(ROOT.kBlue, "")
+    histo.SetStyle(ROOT.kRed, "")
     h = histo.GetHisto()
     h.SetBinContent(1, tree.GetEntries())
     h.GetXaxis().SetBinLabel(1, cutNames[0])
@@ -611,7 +604,7 @@ def plot(var, t1, t2, nBins = 100, xmin = 0,xmax = 100, cut = ''):
         return h
     
     
-    b = setH("background", t1, ROOT.kBlue +2)
+    b = setH("background", t1, ROOT.kRed +2)
     #print 'b integral ', b.Integral()
     #print ROOT.gDirectory.ls()
     s = setH("signal", t2, ROOT.kRed +2)

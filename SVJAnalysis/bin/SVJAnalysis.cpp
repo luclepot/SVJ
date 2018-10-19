@@ -166,13 +166,22 @@ int main(int argc, char **argv) {
   TFile fout(outfile, "recreate");
   cout << "output file name: " <<  outfile << endl;
   std::cout<<"File to open: "<<path_<<endl;
+  /*
   TString treePath = "TreeMaker2/PreSelection";
   TString treePathNEvents = "TreeMaker2/PreSelection";
   if(sys=="jesUp") treePath = "TreeMaker2/ttDM__jes__up";
   else if(sys=="jesDown") treePath = "TreeMaker2/ttDM__jes__down";
   else if(sys=="jerUp") treePath = "TreeMaker2/ttDM__jer__up";
   else if(sys=="jerDown")treePath = "TreeMaker2/ttDM__jer__down";
-   
+  */
+  TString treePath = "tree";
+  TString treePathNEvents = "tree";
+  if(sys=="jesUp") treePath = "tree/ttDM__jes__up";
+  else if(sys=="jesDown") treePath = "tree/ttDM__jes__down";
+  else if(sys=="jerUp") treePath = "tree/ttDM__jer__up";
+  else if(sys=="jerDown")treePath = "tree/ttDM__jer__down";
+  
+
   bench.Start("NEvents");
   //  TChain chainNEvents(treePathNEvents);
   TChain chainNEvents(treePath);
@@ -228,9 +237,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  int sizeMax_gen=50000; //!!! attenzione, le gen-particles non sono ordinate per pT e quelle salvate sono molto piu numerose
+  int sizeMax_gen=50000; 
   
-  double metFull_Pt=0., metFull_Phi=0., metFull_Px=0., metFull_Py=0.;
+  double metFull_Pt=0., metFull_Phi=0.;//, metFull_Px=0., metFull_Py=0.;
 
   std::vector<TLorentzVector>* genPartsPtr(0x0);
   int genPart_pdgId[sizeMax_gen], genPart_Status[sizeMax_gen];
@@ -248,17 +257,18 @@ int main(int argc, char **argv) {
   chain.SetBranchAddress("HT", &Ht);
 
   chain.SetBranchAddress("MET",&metFull_Pt);
-  chain.SetBranchAddress("MET",&metFull_Px);
-  chain.SetBranchAddress("MET",&metFull_Py);
+  chain.SetBranchAddress("METPhi",&metFull_Phi);
+  //chain.SetBranchAddress("MET",&metFull_Px);
+  //chain.SetBranchAddress("MET",&metFull_Py);
   
-  chain.SetBranchAddress("GenParticles",&genPartsPtr);
+  chain.SetBranchAddress("GenParticles", &genPartsPtr);
   chain.SetBranchAddress("GenParticles_PdgId",&genPart_pdgId);
   chain.SetBranchAddress("GenParticles_Status",&genPart_Status);
 
   chain.SetBranchAddress("Jets",&jetsAK8CHSPtr);
   chain.SetBranchAddress("Muons",&MuonsPtr);
   chain.SetBranchAddress("Electrons",&ElectronsPtr);
-  
+
   /********************************************************************************/
   /**************                    Histogram booking              ***************/
   /********************************************************************************/
@@ -485,6 +495,11 @@ int main(int argc, char **argv) {
 	TLorentzVector vmc = vHVsum + vjj;//+ vjj;
 	Mmc = vmc.M();
 
+
+	double metFull_Px=0., metFull_Py=0.; 
+	metFull_Py = metFull_Pt*sin(metFull_Phi);
+	metFull_Px = metFull_Pt*cos(metFull_Phi);
+
 	//MT2                                                                                                                                      
 	MT2 = sqrt(vjj.M()*vjj.M() + 2*(sqrt(vjj.M()* vjj.M() + vjj.Pt()* vjj.Pt())*sqrt(metFull_Px*metFull_Px + metFull_Py*metFull_Py) - (vjj.Px() * metFull_Px + vjj.Py() * metFull_Py)));
 
@@ -495,12 +510,13 @@ int main(int argc, char **argv) {
 	bool selection_dPhi = 0, selection_transverseratio = 0, selection_leptonveto = 0, selection = 0;
 	selection_leptonveto = (nLooseElectrons + nLooseMuons < 1);
 	selection_dPhi = dPhi_min < 0.75;
+
 	selection_transverseratio = (metFull_Pt/MT2) > 0.25; 
 
 	h_dPhimin_nosel->Fill(dPhi_min);
 	h_transverseratio_nosel->Fill((metFull_Pt/MT2));
 	selection = (preselection  && selection_dPhi && selection_transverseratio && selection_leptonveto);
-
+	
 	if(selection){	  
 	  h_dEta->Fill(dEta);
 	  h_dPhi->Fill(dPhi);

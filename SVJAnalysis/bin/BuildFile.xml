@@ -1,5 +1,6 @@
 <use   name="PhysicsTools/Utilities"/>
 <use name="DataFormats/Math"/>
+<use   name="DataFormats/PatCandidates"/>
 <use     name="rootgraphics"/>
 <use     name="rootphysics"/>
 <use     name="rootminuit"/>

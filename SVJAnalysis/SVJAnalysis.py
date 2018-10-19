@@ -22,81 +22,62 @@ splitDescriptionFile = 'description.pkl'
 resDirs = ['res','trees','txt']
 hline = '-'*80
 
-localPath = "/t3home/decosa/SVJ/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
-#localPath = "/mnt/t3nfs01/data01/shome/grauco/SVJAna/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
-t3Path = '//pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/v0/'
-
+#localPath = "/t3home/decosa/SVJ/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
+localPath = "/mnt/t3nfs01/data01/shome/grauco/SVJAnalysis/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
+#localPath = "/mnt/t3nfs01/data01/shome/grauco/SVJAnalysis/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
+#t3Path = '//pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/v0/'
+t3Path = '/pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/'
 t3Ls = 'xrdfs t3dcachedb03.psi.ch ls -u'
 
 samples = []
-samples.append("SVJalphaD01mZ1000rinv03alpha02")
-#samples.append("SVJalphaD01mZ2000rinv03")
-#samples.append("SVJalphaD01mZ3000rinv03")
-#samples.append("SVJalphaD01mZ4000rinv03")
-                         
-#samples.append("TT")
-   
-#samples.append("QCDHT2000ToInf")
-#samples.append("QCDHT1500To2000")
-#samples.append("QCDHT1000To1500")
-#samples.append("QCDHT700To1000")
-#samples.append("QCDHT500To700")
-#samples.append("QCDHT300To500")
-#samples.append("WJetsHT2500toInf")
-#samples.append("WJetsHT1200to2500")
-#samples.append("WJetsHT800to1200")
-#samples.append("WJetsHT600to800")
-#samples.append("WJetsHT400to600")
-#samples.append("WJetsHT200to400")
-#samples.append("ZJetsHT2500ToInf")
-#samples.append("ZJetsHT1200to2500")
-#samples.append("ZJetsHT800to1200")
-#samples.append("ZJetsHT600to800")
-#samples.append("ZJetsHT400to600")
-#samples.append("ZJetsHT200to400")
 
-######samples.append("JetHTb")
-###samples.append("JetHTc")
-##samples.append("JetHTd")
-#samples.append("JetHTe")
-#samples.append("JetHTf")
-#samples.append("JetHTg")
-#samples.append("JetHTh1")
-#samples.append("JetHTh2")
+#samples.append("SVJ_mZprime-1000_mDark-20_rinv-0.3_alpha-0.2")
+'''
+samples.append("QCD_Pt_1000to1400")
+samples.append("QCD_Pt_120to170")
+samples.append("QCD_Pt_170to300")   
+samples.append("QCD_Pt_1400to1800")
+samples.append("QCD_Pt_1800to2400")
+samples.append("QCD_Pt_2400to3200")
+samples.append("QCD_Pt_300to470")
+samples.append("QCD_Pt_3200toInf")
+samples.append("QCD_Pt_470to600")
+samples.append("QCD_Pt_600to800")
+samples.append("QCD_Pt_800to1000")
+samples.append("QCD_Pt_80to120")
+'''
+'''
+samples.append("TTJets")
+
+samples.append("WJetsToLNu_HT100to200")
+samples.append("WJetsToLNu_HT1200to2500")
+samples.append("WJetsToLNu_HT200to400")
+samples.append("WJetsToLNu_HT2500toInf")
+samples.append("WJetsToLNu_HT400to600")
+samples.append("WJetsToLNu_HT600to800")
+samples.append("WJetsToLNu_HT800to1200")
+samples.append("ZJetsToNuNu_Zpt100to200")
+samples.append("ZJetsToNuNu_Zpt200toInf")
+'''
+
+samples.append("SVJ_mZprime1000_mDark20_rinv03_alpha02")
+samples.append("SVJ_mZprime2000_mDark20_rinv03_alpha02")
+samples.append("SVJ_mZprime3000_mDark100_rinv03_alpha02")
+samples.append("SVJ_mZprime3000_mDark1_rinv03_alpha02")
+samples.append("SVJ_mZprime3000_mDark20_rinv01_alpha02")
+samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha01")
+samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha02")
+samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha05")
+samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha1")
+samples.append("SVJ_mZprime3000_mDark20_rinv05_alpha02")
+samples.append("SVJ_mZprime3000_mDark20_rinv07_alpha02")
+samples.append("SVJ_mZprime3000_mDark50_rinv03_alpha02")
+samples.append("SVJ_mZprime4000_mDark20_rinv03_alpha02")
+
 
 splitMap = {}
 splitMap["TT"] = 30
 
-splitMap["QCDHT2000ToInf"] = 5
-splitMap["QCDHT1500To2000"] = 5
-splitMap["QCDHT1000To1500"] = 5
-splitMap["QCDHT700To1000"] = 5
-splitMap["QCDHT500To700"] = 10
-splitMap["QCDHT300To500"] = 10
-
-
-splitMap["WJetsHT2500toInf"] = 5
-splitMap["WJetsHT1200to2500"] = 5
-splitMap["WJetsHT800to1200"] = 5
-splitMap["WJetsHT600to800"] = 5
-splitMap["WJetsHT400to600"] = 5
-splitMap["WJetsHT200to400"] = 5
-
-splitMap["ZJetsHT2500ToInf"] = 2
-splitMap["ZJetsHT1200to2500"] = 2
-splitMap["ZJetsHT800to1200"] = 2
-splitMap["ZJetsHT600to800"] = 2
-splitMap["ZJetsHT400to600"] = 2
-splitMap["ZJetsHT200to400"] = 2
-
-splitMap["JetHTb"] = 5
-splitMap["JetHTc"] = 5
-splitMap["JetHTd"] = 5
-splitMap["JetHTe"] = 5
-splitMap["JetHTf"] = 5
-splitMap["JetHTg"] = 5
-splitMap["JetHTh1"] = 5
-splitMap["JetHTh2"] = 5
 
 def makedirs(subdirs,base=None):
 
@@ -145,8 +126,8 @@ parser.add_option('-s', '--sys', dest='sys', default = 'noSys', choices=systemat
 parser.add_option('--sync', dest='sync', type='string', default = 'noSync', help='Synchro exercise')
 parser.add_option('-g','--gdb', dest='gdb', action='store_true', default=False)
 parser.add_option('-n','--dryrun', dest='dryrun', action='store_true', default=False)
-parser.add_option('-m','--mode', dest='mode', default='local', choices=['local','t3se'])
-parser.add_option('--t3batch', dest='t3batch', action='store_true', default=False)
+parser.add_option('-m','--mode', dest='mode', default='t3se', choices=['local','t3se'])
+parser.add_option('--t3batch', dest='t3batch', action='store_true', default=True)
 
 isData="MC"
 #isData="DATA"

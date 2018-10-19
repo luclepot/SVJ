@@ -68,11 +68,6 @@ SVJ_mZ3000_mDM1_rinv03_alpha02.fill = 1001
 SVJ_mZ3000_mDM1_rinv03_alpha02.leglabel = "SVJ m_{Z}=%d,m_{DM}=%d,r_{inv}=%.1f,#alpha=%.1f"%(SVJ_mZ3000_mDM1_rinv03_alpha02.mZ,SVJ_mZ3000_mDM1_rinv03_alpha02.mDark, SVJ_mZ3000_mDM1_rinv03_alpha02.rinv, SVJ_mZ3000_mDM1_rinv03_alpha02.alpha)
 SVJ_mZ3000_mDM1_rinv03_alpha02.label = "SVJ2_mZprime-3000_mDark-1_rinv-0.3_alpha-0.2"
 
-
-
-
-
-
 SVJ_mZ3000_mDM50_rinv03_alpha02 = sample()
 SVJ_mZ3000_mDM50_rinv03_alpha02.mZ = 3000
 SVJ_mZ3000_mDM50_rinv03_alpha02.mDark = 50
@@ -97,8 +92,6 @@ SVJ_mZ3000_mDM100_rinv03_alpha02.fill = 1001
 SVJ_mZ3000_mDM100_rinv03_alpha02.leglabel = "SVJ m_{Z}=%d,m_{DM}=%d,r_{inv}=%.1f,#alpha=%.1f"%(SVJ_mZ3000_mDM100_rinv03_alpha02.mZ,SVJ_mZ3000_mDM100_rinv03_alpha02.mDark, SVJ_mZ3000_mDM100_rinv03_alpha02.rinv, SVJ_mZ3000_mDM100_rinv03_alpha02.alpha)
 SVJ_mZ3000_mDM100_rinv03_alpha02.label = "SVJ2_mZprime-3000_mDark-100_rinv-0.3_alpha-0.2"
 
-
-
 SVJ_mZ3000_mDM20_rinv01_alpha02 = sample()
 SVJ_mZ3000_mDM20_rinv01_alpha02.mZ = 3000
 SVJ_mZ3000_mDM20_rinv01_alpha02.mDark = 20
@@ -110,8 +103,6 @@ SVJ_mZ3000_mDM20_rinv01_alpha02.style = 1
 SVJ_mZ3000_mDM20_rinv01_alpha02.fill = 1001
 SVJ_mZ3000_mDM20_rinv01_alpha02.leglabel = "SVJ m_{Z}=%d,m_{DM}=%d,r_{inv}=%.1f,#alpha=%.1f"%(SVJ_mZ3000_mDM20_rinv01_alpha02.mZ,SVJ_mZ3000_mDM20_rinv01_alpha02.mDark, SVJ_mZ3000_mDM20_rinv01_alpha02.rinv, SVJ_mZ3000_mDM20_rinv01_alpha02.alpha)
 SVJ_mZ3000_mDM20_rinv01_alpha02.label = "SVJ2_mZprime-3000_mDark-20_rinv-0.1_alpha-0.2"
-
-
 
 SVJ_mZ3000_mDM20_rinv05_alpha02 = sample()
 SVJ_mZ3000_mDM20_rinv05_alpha02.mZ = 3000
@@ -125,7 +116,6 @@ SVJ_mZ3000_mDM20_rinv05_alpha02.fill = 1001
 SVJ_mZ3000_mDM20_rinv05_alpha02.leglabel = "SVJ m_{Z}=%d,m_{DM}=%d,r_{inv}=%.1f,#alpha=%.1f"%(SVJ_mZ3000_mDM20_rinv05_alpha02.mZ,SVJ_mZ3000_mDM20_rinv05_alpha02.mDark, SVJ_mZ3000_mDM20_rinv05_alpha02.rinv, SVJ_mZ3000_mDM20_rinv05_alpha02.alpha)
 SVJ_mZ3000_mDM20_rinv05_alpha02.label = "SVJ2_mZprime-3000_mDark-20_rinv-0.5_alpha-0.2"
 
-
 SVJ_mZ3000_mDM20_rinv07_alpha02 = sample()
 SVJ_mZ3000_mDM20_rinv07_alpha02.mZ = 3000
 SVJ_mZ3000_mDM20_rinv07_alpha02.mDark = 20
@@ -137,7 +127,6 @@ SVJ_mZ3000_mDM20_rinv07_alpha02.style = 1
 SVJ_mZ3000_mDM20_rinv07_alpha02.fill = 1001
 SVJ_mZ3000_mDM20_rinv07_alpha02.leglabel = "SVJ m_{Z}=%d,m_{DM}=%d,r_{inv}=%.1f,#alpha=%.1f"%(SVJ_mZ3000_mDM20_rinv07_alpha02.mZ,SVJ_mZ3000_mDM20_rinv07_alpha02.mDark, SVJ_mZ3000_mDM20_rinv07_alpha02.rinv, SVJ_mZ3000_mDM20_rinv07_alpha02.alpha)
 SVJ_mZ3000_mDM20_rinv07_alpha02.label = "SVJ2_mZprime-3000_mDark-20_rinv-0.7_alpha-0.2"
-
 
 SVJ_mZ3000_mDM20_rinv03_alpha01 = sample()
 SVJ_mZ3000_mDM20_rinv03_alpha01.mZ = 3000
@@ -163,12 +152,11 @@ SVJ_mZ3000_mDM20_rinv03_alpha05.fill = 1001
 SVJ_mZ3000_mDM20_rinv03_alpha05.leglabel = "SVJ m_{Z}=%d,m_{DM}=%d,r_{inv}=%.1f,#alpha=%.1f"%(SVJ_mZ3000_mDM20_rinv03_alpha05.mZ,SVJ_mZ3000_mDM20_rinv03_alpha05.mDark, SVJ_mZ3000_mDM20_rinv03_alpha05.rinv, SVJ_mZ3000_mDM20_rinv03_alpha05.alpha)
 SVJ_mZ3000_mDM20_rinv03_alpha05.label = "SVJ2_mZprime-3000_mDark-20_rinv-0.3_alpha-0.5"
 
-
 SVJ_mZ3000_mDM20_rinv03_alpha1 = sample()
 SVJ_mZ3000_mDM20_rinv03_alpha1.mZ = 3000
 SVJ_mZ3000_mDM20_rinv03_alpha1.mDark = 20
 SVJ_mZ3000_mDM20_rinv03_alpha1.rinv = 0.3
-SVJ_mZ3000_mDM20_rinv03_alpha1.alpha = 1.0
+SVJ_mZ3000_mDM20_rinv03_alpha1.alpha = 1
 SVJ_mZ3000_mDM20_rinv03_alpha1.sigma = 1
 SVJ_mZ3000_mDM20_rinv03_alpha1.color = ROOT.kRed -3
 SVJ_mZ3000_mDM20_rinv03_alpha1.style = 1
@@ -176,4 +164,5 @@ SVJ_mZ3000_mDM20_rinv03_alpha1.fill = 1001
 SVJ_mZ3000_mDM20_rinv03_alpha1.leglabel = "SVJ m_{Z}=%d,m_{DM}=%d,r_{inv}=%.1f,#alpha=%.1f"%(SVJ_mZ3000_mDM20_rinv03_alpha1.mZ,SVJ_mZ3000_mDM20_rinv03_alpha1.mDark, SVJ_mZ3000_mDM20_rinv03_alpha1.rinv, SVJ_mZ3000_mDM20_rinv03_alpha1.alpha)
 SVJ_mZ3000_mDM20_rinv03_alpha1.label = "SVJ2_mZprime-3000_mDark-20_rinv-0.3_alpha-1"
 
-
+signals = sample()
+signals.components = [SVJ_mZ3000_mDM20_rinv03_alpha1]
