@@ -386,7 +386,7 @@ int main(int argc, char **argv) {
   else if(strcmp (sample.c_str(),"SVJalphaD01mZ4000rinv03") == 0) p=(float)(x * (float)(1.));
   cout << "weight is " << p << endl;
   
-  TH1F *h_cutFlow  = new TH1F("h_cutFlow","cutFlow",7,-0.5,6.5);
+  TH1F *h_cutFlow  = new TH1F("h_cutFlow","cutFlow",10,-0.5,9.5);
 
   //Plots with no selectiona applied
   TH1F *h_AK8jetsmult_nosel = new TH1F("h_AK8jetsmult_nosel", "AK8 jets multiplicity", 10, -0.5, 9.5);  
@@ -434,7 +434,34 @@ int main(int argc, char **argv) {
   TH1F *h_Mjj_CR = new TH1F("h_Mjj_CR", "m_{JJ}", 100, 0, 6000);
   TH1F *h_METPt_CR = new TH1F("h_METPt_CR", "MET_{p_{T}}", 100, 0, 2000);
   TH1F *h_dPhi_CR = new TH1F("h_dPhi_CR", "#Delta#Phi", 100, 0, 5);
-    
+
+  TH1F *h_dEta_BDT = new TH1F("h_dEta_BDT", "#Delta#eta(j0,j1)", 100, 0, 10);
+  TH1F *h_dPhimin_BDT = new TH1F("h_dPhimin_BDT", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
+  TH1F *h_transverseratio_BDT = new TH1F("h_transverseratio_BDT", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt_BDT = new TH1F("h_Mt_BDT", "m_{T}", 100, 0, 6000);
+  TH1F *h_Mmc_BDT = new TH1F("h_Mmc_BDT", "m_{MC}", 100, 0, 6000);
+  TH1F *h_Mjj_BDT = new TH1F("h_Mjj_BDT", "m_{JJ}", 100, 0, 6000);
+  TH1F *h_METPt_BDT = new TH1F("h_METPt_BDT", "MET_{p_{T}}", 100, 0, 2000);
+  TH1F *h_dPhi_BDT = new TH1F("h_dPhi_BDT", "#Delta#Phi", 100, 0, 5);
+
+  TH1F *h_transverseratio_0SVJ = new TH1F("h_transverseratio_0SVJ", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt_0SVJ = new TH1F("h_Mt_0SVJ", "m_{T}", 100, 0, 6000);
+  TH1F *h_Mmc_0SVJ = new TH1F("h_Mmc_0SVJ", "m_{MC}", 100, 0, 6000);
+  TH1F *h_Mjj_0SVJ = new TH1F("h_Mjj_0SVJ", "m_{JJ}", 100, 0, 6000);
+  TH1F *h_METPt_0SVJ = new TH1F("h_METPt_0SVJ", "MET_{p_{T}}", 100, 0, 2000);
+
+  TH1F *h_transverseratio_1SVJ = new TH1F("h_transverseratio_1SVJ", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt_1SVJ = new TH1F("h_Mt_1SVJ", "m_{T}", 100, 0, 6000);
+  TH1F *h_Mmc_1SVJ = new TH1F("h_Mmc_1SVJ", "m_{MC}", 100, 0, 6000);
+  TH1F *h_Mjj_1SVJ = new TH1F("h_Mjj_1SVJ", "m_{JJ}", 100, 0, 6000);
+  TH1F *h_METPt_1SVJ = new TH1F("h_METPt_1SVJ", "MET_{p_{T}}", 100, 0, 2000);
+
+  TH1F *h_transverseratio_2SVJ = new TH1F("h_transverseratio_2SVJ", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt_2SVJ = new TH1F("h_Mt_2SVJ", "m_{T}", 100, 0, 6000);
+  TH1F *h_Mmc_2SVJ = new TH1F("h_Mmc_2SVJ", "m_{MC}", 100, 0, 6000);
+  TH1F *h_Mjj_2SVJ = new TH1F("h_Mjj_2SVJ", "m_{JJ}", 100, 0, 6000);
+  TH1F *h_METPt_2SVJ = new TH1F("h_METPt_2SVJ", "MET_{p_{T}}", 100, 0, 2000);
+
   int n_twojets(0), n_prejetspt(0), n_pretrigplateau(0),  n_transratio(0), n_MT(0), n_METfilters(0), n_dPhi(0), n_transverse(0), n_leptonveto(0);
 
   std::cout<< "===> Number of Events: "<<nEventsPrePres<<std::endl;
@@ -783,6 +810,33 @@ int main(int argc, char **argv) {
   h_Mmc_CR->Write();
   h_METPt_CR->Write();
   h_dPhi_CR->Write();
+
+  h_dEta_BDT->Write();
+  h_dPhi_BDT->Write();
+  h_dPhimin_BDT->Write();
+  h_transverseratio_BDT->Write();
+  h_Mt_BDT->Write();
+  h_Mjj_BDT->Write();
+  h_Mmc_BDT->Write();
+  h_METPt_BDT->Write();
+
+  h_transverseratio_0SVJ->Write();
+  h_Mt_0SVJ->Write();
+  h_Mjj_0SVJ->Write();
+  h_Mmc_0SVJ->Write();
+  h_METPt_0SVJ->Write();
+
+  h_transverseratio_1SVJ->Write();
+  h_Mt_1SVJ->Write();
+  h_Mjj_1SVJ->Write();
+  h_Mmc_1SVJ->Write();
+  h_METPt_1SVJ->Write();
+
+  h_transverseratio_2SVJ->Write();
+  h_Mt_2SVJ->Write();
+  h_Mjj_2SVJ->Write();
+  h_Mmc_2SVJ->Write();
+  h_METPt_2SVJ->Write();
 
   fileout.close();
      
