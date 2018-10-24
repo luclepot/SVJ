@@ -623,6 +623,8 @@ int main(int argc, char **argv) {
 	selection_2SVJ= selection & mva1_>bdtCut & mva2_>bdtCut;
  	selection_1SVJ= selection & ((mva1_>bdtCut & mva2_<bdtCut) || (mva1_<bdtCut & mva2_>bdtCut));
  	selection_0SVJ= selection & (mva1_<bdtCut & mva2_<bdtCut);
+
+	// Per la categoria Almeno1SVJJ => selection_1SVJ && selection_2SVJ
 	
 
 	if(selection){	  
