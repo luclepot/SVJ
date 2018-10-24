@@ -620,11 +620,11 @@ int main(int argc, char **argv) {
 	
 	float bdtCut = -0.17;
 	bool selection_2SVJ(0), selection_1SVJ(0), selection_0SVJ(0);
-	selection_2SVJ= selection & mva1_>bdtCut & mva2_>bdtCut;
- 	selection_1SVJ= selection & ((mva1_>bdtCut & mva2_<bdtCut) || (mva1_<bdtCut & mva2_>bdtCut));
- 	selection_0SVJ= selection & (mva1_<bdtCut & mva2_<bdtCut);
+	selection_2SVJ= selection & (mva1_>bdtCut) & (mva2_>bdtCut);
+ 	selection_1SVJ= selection & (((mva1_>bdtCut) & (mva2_<bdtCut)) || ((mva1_<bdtCut) & (mva2_>bdtCut)));
+ 	selection_0SVJ= selection & ((mva1_<bdtCut) & (mva2_<bdtCut));
 
-	// Per la categoria Almeno1SVJJ => selection_1SVJ && selection_2SVJ
+	// Per la categoria Almeno1SVJJ => selection_1SVJ or selection_2SVJ
 	
 
 	if(selection){	  
@@ -636,6 +636,41 @@ int main(int argc, char **argv) {
           h_Mjj->Fill(Mjj);                                                                                                             
           h_Mmc->Fill(Mmc);   
 	  h_METPt->Fill(metFull_Pt);
+	}
+
+	if(selection && (selection_1SVJ or selection_2SVJ)){	  
+	  h_dEta_BDT->Fill(dEta);
+	  h_dPhi_BDT->Fill(dPhi);
+	  h_dPhimin_BDT->Fill(dPhi_min); 
+	  h_transverseratio_BDT->Fill((metFull_Pt/MT2));
+	  h_Mt_BDT->Fill(MT2);                                                                                                              
+          h_Mjj_BDT->Fill(Mjj);                                                                                                             
+          h_Mmc_BDT->Fill(Mmc);   
+	  h_METPt_BDT->Fill(metFull_Pt);
+	}
+
+	if(selection_0SVJ){
+	  h_transverseratio_0SVJ->Fill((metFull_Pt/MT2));
+	  h_Mt_0SVJ->Fill(MT2);      
+          h_Mjj_0SVJ->Fill(Mjj);                                                                                                             
+          h_Mmc_0SVJ->Fill(Mmc);   
+	  h_METPt_0SVJ->Fill(metFull_Pt);                                                                                                
+	}
+
+	if(selection_1SVJ){
+	  h_transverseratio_1SVJ->Fill((metFull_Pt/MT2));
+	  h_Mt_1SVJ->Fill(MT2);      
+          h_Mjj_1SVJ->Fill(Mjj);                                                                                                             
+          h_Mmc_1SVJ->Fill(Mmc);   
+	  h_METPt_1SVJ->Fill(metFull_Pt);                                                                                                
+	}
+
+	if(selection_2SVJ){
+	  h_transverseratio_2SVJ->Fill((metFull_Pt/MT2));
+	  h_Mt_2SVJ->Fill(MT2);      
+          h_Mjj_2SVJ->Fill(Mjj);                                                                                                             
+          h_Mmc_2SVJ->Fill(Mmc);   
+	  h_METPt_2SVJ->Fill(metFull_Pt);                                                                                                
 	}
 
 	if(selection_CR){	  
