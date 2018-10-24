@@ -61,6 +61,8 @@ samples.append("ZJetsToNuNu_Zpt200toInf")
 '''
 
 samples.append("SVJ_mZprime1000_mDark20_rinv03_alpha02")
+
+'''
 samples.append("SVJ_mZprime2000_mDark20_rinv03_alpha02")
 samples.append("SVJ_mZprime3000_mDark100_rinv03_alpha02")
 samples.append("SVJ_mZprime3000_mDark1_rinv03_alpha02")
@@ -73,7 +75,7 @@ samples.append("SVJ_mZprime3000_mDark20_rinv05_alpha02")
 samples.append("SVJ_mZprime3000_mDark20_rinv07_alpha02")
 samples.append("SVJ_mZprime3000_mDark50_rinv03_alpha02")
 samples.append("SVJ_mZprime4000_mDark20_rinv03_alpha02")
-
+'''
 
 splitMap = {}
 splitMap["TT"] = 30
@@ -127,7 +129,7 @@ parser.add_option('--sync', dest='sync', type='string', default = 'noSync', help
 parser.add_option('-g','--gdb', dest='gdb', action='store_true', default=False)
 parser.add_option('-n','--dryrun', dest='dryrun', action='store_true', default=False)
 parser.add_option('-m','--mode', dest='mode', default='t3se', choices=['local','t3se'])
-parser.add_option('--t3batch', dest='t3batch', action='store_true', default=True)
+parser.add_option('--t3batch', dest='t3batch', action='store_true', default=False)
 
 isData="MC"
 #isData="DATA"

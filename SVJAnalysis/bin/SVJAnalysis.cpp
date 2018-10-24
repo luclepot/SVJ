@@ -8,7 +8,6 @@
 #include "TLorentzVector.h"
 #include <vector>
 #include <assert.h>
-#include <TMVA/Reader.h>
 #include <algorithm>
 #include <iostream>
 #include <fstream>
@@ -22,6 +21,8 @@
 #include "TBenchmark.h"
 #include <iostream>
 #include <typeinfo>
+#include "TMVA/Tools.h"
+#include "TMVA/Reader.h"
 
 #include "DataFormats/Math/interface/deltaPhi.h"
 #include "PhysicsTools/Utilities/interface/LumiReWeighting.h"
@@ -237,6 +238,25 @@ int main(int argc, char **argv) {
     }
   }
 
+  /* Configuring BDT */
+  Float_t bdt_mult, bdt_axisminor, bdt_girth, bdt_tau21, bdt_tau32, bdt_msd, bdt_deltaphi, bdt_pt, bdt_eta, bdt_mt;
+  //  Float_t mult, axisminor, girth, tau21, tau32, msd, deltaphi, pt, eta, mt; 
+  TMVA::Reader reader( "!Color:!Silent" );
+  reader.AddVariable( "mult", &bdt_mult ); 
+  reader.AddVariable( "axisminor", &bdt_axisminor );
+  reader.AddVariable( "girth", &bdt_girth );
+  reader.AddVariable( "tau21", &bdt_tau21 );
+  reader.AddVariable( "tau32", &bdt_tau32 );
+  reader.AddVariable( "msd", &bdt_msd );
+  reader.AddVariable( "deltaphi", &bdt_deltaphi );
+  reader.AddSpectator( "spec1 := pt", &bdt_pt);
+  reader.AddSpectator( "spec1 := eta", &bdt_eta);
+  reader.AddSpectator( "spec1 := mt", &bdt_mt);
+
+  const std::string cmssw_base = getenv("CMSSW_BASE");
+  const std::string weightsfile = cmssw_base + std::string("/src/SVJ/SVJAnalysis/data/TMVAClassification_BDTG.weights.xml");
+  reader.BookMVA("BDTG", weightsfile.c_str() );
+
   int sizeMax_gen=50000; 
   
   double metFull_Pt=0., metFull_Phi=0.;//, metFull_Px=0., metFull_Py=0.;
@@ -251,8 +271,21 @@ int main(int argc, char **argv) {
   float nLooseMuons=-1, nLooseElectrons=-1;
   ULong64_t EventNumber(0.);
   int nAK8CHS(0.);
-
   
+  bool BadChargedCandidateFilter = 0, BadPFMuonFilter = 0;
+  int EcalDeadCellTriggerPrimitiveFilter = 0,   HBHEIsoNoiseFilter = 0,  HBHENoiseFilter = 0,  globalTightHalo2016Filter = 0, NVtx = 0;
+
+  std::vector<int>* multPtr(0x0);
+  std::vector<double>* axisminorPtr(0x0);
+  std::vector<double>* girthPtr(0x0);
+  std::vector<double>* tau1Ptr(0x0); 
+  std::vector<double>* tau2Ptr(0x0); 
+  std::vector<double>* tau3Ptr(0x0); 
+  std::vector<double>* msdPtr(0x0);
+  double deltaphi1, deltaphi2;
+  
+  //float mult, axisminor, girth, tau21, tau32, msd, deltaphi;
+
   chain.SetBranchAddress("EvtNum", &EventNumber);
   chain.SetBranchAddress("HT", &Ht);
 
@@ -268,6 +301,27 @@ int main(int argc, char **argv) {
   chain.SetBranchAddress("Jets",&jetsAK8CHSPtr);
   chain.SetBranchAddress("Muons",&MuonsPtr);
   chain.SetBranchAddress("Electrons",&ElectronsPtr);
+
+  chain.SetBranchAddress("BadChargedCandidateFilter", &BadChargedCandidateFilter);
+  chain.SetBranchAddress("BadPFMuonFilter", &BadPFMuonFilter);
+  chain.SetBranchAddress("EcalDeadCellTriggerPrimitiveFilter", &EcalDeadCellTriggerPrimitiveFilter);
+  chain.SetBranchAddress("HBHEIsoNoiseFilter", &HBHEIsoNoiseFilter);
+  chain.SetBranchAddress("HBHENoiseFilter", &HBHENoiseFilter);  
+  chain.SetBranchAddress("globalTightHalo2016Filter", &globalTightHalo2016Filter);
+  chain.SetBranchAddress("NVtx", &NVtx);
+  
+  chain.SetBranchAddress("JetsAK8_multiplicity", &multPtr);
+  chain.SetBranchAddress("JetsAK8_axisminor", &axisminorPtr);
+  chain.SetBranchAddress("JetsAK8_girth", &girthPtr);
+  chain.SetBranchAddress("JetsAK8_NsubjettinessTau1", &tau1Ptr);
+  chain.SetBranchAddress("JetsAK8_NsubjettinessTau2", &tau2Ptr);
+  chain.SetBranchAddress("JetsAK8_NsubjettinessTau3", &tau3Ptr);
+
+
+  chain.SetBranchAddress("JetsAK8_softDropMass", &msdPtr);
+  chain.SetBranchAddress("DeltaPhi1_AK8", &deltaphi1);
+  chain.SetBranchAddress("DeltaPhi2_AK8", &deltaphi2);
+
 
   /********************************************************************************/
   /**************                    Histogram booking              ***************/
@@ -371,8 +425,17 @@ int main(int argc, char **argv) {
   TH1F *h_Mjj = new TH1F("h_Mjj", "m_{JJ}", 100, 0, 6000);
   TH1F *h_METPt = new TH1F("h_METPt", "MET_{p_{T}}", 100, 0, 2000);
   TH1F *h_dPhi = new TH1F("h_dPhi", "#Delta#Phi", 100, 0, 5);
+
+  TH1F *h_dEta_CR = new TH1F("h_dEta_CR", "#Delta#eta(j0,j1)", 100, 0, 10);
+  TH1F *h_dPhimin_CR = new TH1F("h_dPhimin_CR", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
+  TH1F *h_transverseratio_CR = new TH1F("h_transverseratio_CR", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt_CR = new TH1F("h_Mt_CR", "m_{T}", 100, 0, 6000);
+  TH1F *h_Mmc_CR = new TH1F("h_Mmc_CR", "m_{MC}", 100, 0, 6000);
+  TH1F *h_Mjj_CR = new TH1F("h_Mjj_CR", "m_{JJ}", 100, 0, 6000);
+  TH1F *h_METPt_CR = new TH1F("h_METPt_CR", "MET_{p_{T}}", 100, 0, 2000);
+  TH1F *h_dPhi_CR = new TH1F("h_dPhi_CR", "#Delta#Phi", 100, 0, 5);
     
-  int n_twojets(0), n_prejetspt(0), n_prejetseta(0),  n_dPhi(0), n_transverse(0), n_leptonveto(0);
+  int n_twojets(0), n_prejetspt(0), n_pretrigplateau(0),  n_transratio(0), n_MT(0), n_METfilters(0), n_dPhi(0), n_transverse(0), n_leptonveto(0);
 
   std::cout<< "===> Number of Events: "<<nEventsPrePres<<std::endl;
 
@@ -384,6 +447,14 @@ int main(int argc, char **argv) {
       //JET                
       std::vector<TLorentzVector> AK8Jets;
       TLorentzVector AK8Jet;
+      std::vector<int> mult = *multPtr;
+      std::vector<double> axisminor = *axisminorPtr;
+      std::vector<double> girth = *girthPtr;
+      std::vector<double> tau1 = *tau1Ptr;
+      std::vector<double> tau2 = *tau2Ptr;
+      std::vector<double> tau3 = *tau3Ptr;
+      std::vector<double> msd = *msdPtr;
+
       std::vector<TLorentzVector> jetsAK8CHS = *jetsAK8CHSPtr;
       std::vector<TLorentzVector> muons = *MuonsPtr;
       std::vector<TLorentzVector> electrons = *ElectronsPtr;
@@ -395,24 +466,12 @@ int main(int argc, char **argv) {
 
       for(int j=0; j<sizeMaxLoop_ak8; j++){
 	AK8Jet = jetsAK8CHS[j];
-	if(AK8Jet.Pt()>200 && AK8Jet.Pt()<1000000000){
+	if(AK8Jet.Pt()>170 && AK8Jet.Pt()<1000000000){
 	  AK8Jets.push_back(AK8Jet);
 	}
       }
 
       h_AK8jetsmult_nosel->Fill(AK8Jets.size());
-
-      //Define preselection
-      bool preselection_jetspt = 0, preselection_jetseta = 0, preselection = 0;
-      if(AK8Jets.size()<=1){
-	preselection_jetspt = 0;
-	preselection_jetseta = 0;
-      } else if(AK8Jets.size()>1){
-	preselection_jetspt = (AK8Jets.at(0).Pt() > 200 && (AK8Jets.at(1)).Pt() > 200);
-	preselection_jetseta = (std::fabs((AK8Jets.at(0)).Eta()) < 2.5 && std::fabs((AK8Jets.at(1)).Eta()) < 2.5);
-      }
-
-      preselection = preselection_jetspt && preselection_jetseta ;
 
       //HV quarks definition
       std::vector<TLorentzVector>& genParts = *genPartsPtr;
@@ -495,7 +554,6 @@ int main(int argc, char **argv) {
 	TLorentzVector vmc = vHVsum + vjj;//+ vjj;
 	Mmc = vmc.M();
 
-
 	double metFull_Px=0., metFull_Py=0.; 
 	metFull_Py = metFull_Pt*sin(metFull_Phi);
 	metFull_Px = metFull_Pt*cos(metFull_Phi);
@@ -507,16 +565,66 @@ int main(int argc, char **argv) {
 	h_Mjj_nosel->Fill(Mjj);
 	h_Mt_nosel->Fill(MT2);
 
-	bool selection_dPhi = 0, selection_transverseratio = 0, selection_leptonveto = 0, selection = 0;
-	selection_leptonveto = (nLooseElectrons + nLooseMuons < 1);
-	selection_dPhi = dPhi_min < 0.75;
+	//Define preselection
+	bool preselection_jetspt = 0, /*preselection_jetseta = 0,*/ preselection_trigplateau=0, preselection_ptj1 = 0, preselection_deltaeta=0, preselection_transratio = 0, preselection_leptonveto = 0 ,preselection = 0;
 
+	/* ====>                     ATT                       <====*/
+	/* ====> Qui si e' sotto la condizione che AK8 size >1 <====*/
+	if(AK8Jets.size()<=1){
+	  preselection_jetspt = 0;
+	  //preselection_jetseta = 0;
+	  preselection_transratio = 0;
+	  preselection_trigplateau = 0;
+	} else if(AK8Jets.size()>1){
+	  preselection_jetspt = (AK8Jets.at(0).Pt() > 170 && (AK8Jets.at(1)).Pt() > 170);
+	  //preselection_jetseta = (std::fabs((AK8Jets.at(0)).Eta()) < 2.5 && std::fabs((AK8Jets.at(1)).Eta()) < 2.5);
+	  preselection_ptj1  = AK8Jets.at(0).Pt() > 600;
+	  preselection_deltaeta = abs(AK8Jets.at(0).Eta() - AK8Jets.at(1).Eta()) < 1.5;
+	  preselection_trigplateau = preselection_ptj1 || preselection_deltaeta;
+	  preselection_transratio = metFull_Pt/MT2 > 0.15;
+	  preselection_leptonveto = nLooseElectrons + nLooseMuons < 1;
+	}
+	
+	preselection = preselection_jetspt && preselection_trigplateau && preselection_transratio && preselection_leptonveto;
+	bool preselection_CR = 0;
+	preselection_CR = preselection_jetspt && preselection_ptj1 && !preselection_deltaeta && preselection_transratio && preselection_leptonveto;
+
+	bool selection_dPhi = 0, selection_transverseratio = 0, selection_mt = 0, selection_metfilters = 0, selection = 0;
+	selection_dPhi = dPhi_min < 0.75;
+	selection_metfilters = BadChargedCandidateFilter>0 && BadPFMuonFilter>0 && EcalDeadCellTriggerPrimitiveFilter>0 && HBHEIsoNoiseFilter>0 && HBHENoiseFilter>0 && globalTightHalo2016Filter>0 && NVtx > 0;
+	selection_mt = MT2 > 1400;
 	selection_transverseratio = (metFull_Pt/MT2) > 0.25; 
 
 	h_dPhimin_nosel->Fill(dPhi_min);
 	h_transverseratio_nosel->Fill((metFull_Pt/MT2));
-	selection = (preselection  && selection_dPhi && selection_transverseratio && selection_leptonveto);
+	selection = (preselection  && selection_dPhi && selection_transverseratio && selection_mt && selection_metfilters);
+	bool selection_CR = 0;
+	selection_CR = preselection_CR && selection_dPhi && selection_transverseratio && selection_mt && selection_metfilters;
+
+	float mva1_(0.), mva2_(0.);
+
+	bdt_mult= mult.at(0); bdt_axisminor = axisminor.at(0); bdt_girth = girth.at(0); bdt_tau21 = tau2.at(0)/tau1.at(0);  bdt_tau32 = tau3.at(0)/tau1.at(0);
+	bdt_msd = msd.at(0); bdt_deltaphi = deltaphi1;  bdt_pt = AK8Jets.at(0).Pt();  bdt_eta =  AK8Jets.at(0).Eta(); bdt_mt =  MT2;
+
+	mva1_ = reader.EvaluateMVA("BDTG");
+	//cout << "--->BDT value for jet 1:  " << mva1_ << endl;
+
+	bdt_mult= mult.at(1); bdt_axisminor = axisminor.at(1); bdt_girth = girth.at(1); bdt_tau21 = tau2.at(1)/tau1.at(1);  bdt_tau32 = tau3.at(1)/tau1.at(1);
+	bdt_msd = msd.at(1); bdt_deltaphi = deltaphi2;  bdt_pt = AK8Jets.at(1).Pt();  bdt_eta = AK8Jets.at(1).Eta(); bdt_mt = MT2;
+
+	mva2_ = reader.EvaluateMVA("BDTG");
+	//cout << "--->BDT value for jet 2:  " << mva2_ << endl;
+
+
+
 	
+	float bdtCut = -0.17;
+	bool selection_2SVJ(0), selection_1SVJ(0), selection_0SVJ(0);
+	selection_2SVJ= selection & mva1_>bdtCut & mva2_>bdtCut;
+ 	selection_1SVJ= selection & ((mva1_>bdtCut & mva2_<bdtCut) || (mva1_<bdtCut & mva2_>bdtCut));
+ 	selection_0SVJ= selection & (mva1_<bdtCut & mva2_<bdtCut);
+	
+
 	if(selection){	  
 	  h_dEta->Fill(dEta);
 	  h_dPhi->Fill(dPhi);
@@ -527,25 +635,44 @@ int main(int argc, char **argv) {
           h_Mmc->Fill(Mmc);   
 	  h_METPt->Fill(metFull_Pt);
 	}
+
+	if(selection_CR){	  
+	  h_dEta_CR->Fill(dEta);
+	  h_dPhi_CR->Fill(dPhi);
+	  h_dPhimin_CR->Fill(dPhi_min); 
+	  h_transverseratio_CR->Fill((metFull_Pt/MT2));
+	  h_Mt_CR->Fill(MT2);                                                                                                              
+          h_Mjj_CR->Fill(Mjj);                                                                                                             
+          h_Mmc_CR->Fill(Mmc);   
+	  h_METPt_CR->Fill(metFull_Pt);
+	}
 	      
 	// Fill cutflow entries
 	n_twojets+=1;
 	if(preselection_jetspt){
 	  n_prejetspt+=1;
-	  if(preselection_jetseta){
-	    n_prejetseta+=1;
-	    if(selection_leptonveto){
+	  if(preselection_trigplateau){
+	    n_pretrigplateau+=1;
+	    if(preselection_leptonveto){
 	      n_leptonveto+=1;
-	      if(selection_dPhi){
-		n_dPhi+=1;
-		if(selection_transverseratio){
-		  n_transverse+=1;
+	      if(preselection_transratio ){
+		n_transratio +=1;
+		if(selection_mt){
+		  n_MT+=1;
+		  if(selection_metfilters){
+		    n_METfilters +=1;
+		    if(selection_dPhi){
+		      n_dPhi+=1;
+		      if(selection_transverseratio){
+			n_transverse+=1;
+		      }
+		    }
+		  }
 		}
 	      }
 	    }
 	  }
 	}
-
       }//end of nAK8CHSJets>1
 
     }//end of loop over events
@@ -555,15 +682,21 @@ int main(int argc, char **argv) {
   h_cutFlow->SetBinContent(2, n_twojets);
   h_cutFlow->GetXaxis()->SetBinLabel(2,"n(AK8 jets) > 1");
   h_cutFlow->SetBinContent(3, n_prejetspt);
-  h_cutFlow->GetXaxis()->SetBinLabel(3,"p_{T, j1/j2} > 200 GeV");
-  h_cutFlow->SetBinContent(4, n_prejetseta);
-  h_cutFlow->GetXaxis()->SetBinLabel(4,"|#eta_{j1, j2}| < 2.5");
+  h_cutFlow->GetXaxis()->SetBinLabel(3,"p_{T, j1/j2} > 170 GeV");
+  h_cutFlow->SetBinContent(4, n_pretrigplateau);
+  h_cutFlow->GetXaxis()->SetBinLabel(4,"|#Delta#eta(j1,j2)| < 1.5 or p_{T, j1} > 600");
   h_cutFlow->SetBinContent(5, n_leptonveto);
-  h_cutFlow->GetXaxis()->SetBinLabel(5," Lepton veto ");
-  h_cutFlow->SetBinContent(6, n_dPhi);
-  h_cutFlow->GetXaxis()->SetBinLabel(6,"#Delta#Phi");
-  h_cutFlow->SetBinContent(7, n_transverse);
-  h_cutFlow->GetXaxis()->SetBinLabel(7, "MET/M_{T}");
+  h_cutFlow->GetXaxis()->SetBinLabel(5,"Lepton veto ");
+  h_cutFlow->SetBinContent(6, n_transratio);
+  h_cutFlow->GetXaxis()->SetBinLabel(6,"MET/M_T > 0.15");
+  h_cutFlow->SetBinContent(7, n_MT);
+  h_cutFlow->GetXaxis()->SetBinLabel(7,"M_T > 1400");
+  h_cutFlow->SetBinContent(8, n_METfilters);
+  h_cutFlow->GetXaxis()->SetBinLabel(8,"MET filters");
+  h_cutFlow->SetBinContent(9, n_dPhi);
+  h_cutFlow->GetXaxis()->SetBinLabel(9,"#Delta#Phi < 0.75");
+  h_cutFlow->SetBinContent(10, n_transverse);
+  h_cutFlow->GetXaxis()->SetBinLabel(10, "MET/M_{T} > 0.25");
 
   fout.cd();
   
@@ -604,6 +737,15 @@ int main(int argc, char **argv) {
   h_Mmc->Write();
   h_METPt->Write();
   h_dPhi->Write();
+
+  h_dEta_CR->Write();
+  h_dPhimin_CR->Write();
+  h_transverseratio_CR->Write();
+  h_Mt_CR->Write();
+  h_Mjj_CR->Write();
+  h_Mmc_CR->Write();
+  h_METPt_CR->Write();
+  h_dPhi_CR->Write();
 
   fileout.close();
      
