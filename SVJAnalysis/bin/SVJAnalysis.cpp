@@ -393,7 +393,7 @@ int main(int argc, char **argv) {
   else if(strcmp (sample.c_str(),"SVJalphaD01mZ4000rinv03") == 0) p=(float)(x * (float)(1.));
   cout << "weight is " << p << endl;
   
-  TH1F *h_cutFlow  = new TH1F("h_cutFlow","cutFlow",10,-0.5,9.5);
+  TH1F *h_cutFlow  = new TH1F("h_cutFlow","cutFlow",12,-0.5,11.5);
 
   //Plots with no selectiona applied
   TH1F *h_AK8jetsmult_nosel = new TH1F("h_AK8jetsmult_nosel", "AK8 jets multiplicity", 10, -0.5, 9.5);  
@@ -469,8 +469,8 @@ int main(int argc, char **argv) {
   TH1F *h_Mjj_2SVJ = new TH1F("h_Mjj_2SVJ", "m_{JJ}", 100, 0, 6000);
   TH1F *h_METPt_2SVJ = new TH1F("h_METPt_2SVJ", "MET_{p_{T}}", 100, 0, 2000);
 
-  int n_twojets(0), n_prejetspt(0), n_pretrigplateau(0),  n_transratio(0), n_MT(0), n_METfilters(0), n_dPhi(0), n_transverse(0), n_leptonveto(0);
-
+  float n_twojets(0.), n_prejetspt(0.), n_pretrigplateau(0.),  n_transratio(0.), n_MT(0.), n_METfilters(0.), n_dPhi(0.), n_transverse(0.);
+  float  n_muonveto(0.), n_electronveto(0.), n_BDT(0.) ;
   std::cout<< "===> Number of Events: "<<nEventsPrePres<<std::endl;
 
   for(Int_t i=0; i<nEventsPrePres; i++ )
@@ -584,20 +584,27 @@ int main(int argc, char **argv) {
 
 	//Compute masses
 	float Mjj=0., Mmc=0., MT2=0.;
+	float  Mjj2=0., ptjj = 0., ptjj2 = 0., ptMet = 0.;
 	//Mjj = mass of the two large reclustered jets                                                                                    
 	TLorentzVector vjj = AK8Jets.at(0) + AK8Jets.at(1);
+	double metFull_Px=0., metFull_Py=0.; 
+	metFull_Px = metFull_Pt*sin(metFull_Phi);
+	metFull_Py = metFull_Pt*cos(metFull_Phi);
+
 	Mjj = vjj.M();
+	Mjj2 = Mjj*Mjj;
+	ptjj = vjj.Pt();
+	ptjj2 = ptjj * ptjj;
+	ptMet = vjj.Px()*metFull_Px +  vjj.Py()*metFull_Py;
 	
 	//Mmc = the reconstructed Z' mass using all the dark matter particles in the MC                                                           
 	TLorentzVector vmc = vHVsum + vjj;//+ vjj;
 	Mmc = vmc.M();
 
-	double metFull_Px=0., metFull_Py=0.; 
-	metFull_Py = metFull_Pt*sin(metFull_Phi);
-	metFull_Px = metFull_Pt*cos(metFull_Phi);
 
-	//MT2                                                                                                                                      
-	MT2 = sqrt(vjj.M()*vjj.M() + 2*(sqrt(vjj.M()* vjj.M() + vjj.Pt()* vjj.Pt())*sqrt(metFull_Px*metFull_Px + metFull_Py*metFull_Py) - (vjj.Px() * metFull_Px + vjj.Py() * metFull_Py)));
+
+	MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*metFull_Pt   -  ptMet) );                                                                                                                                
+	  //MT2 = sqrt(vjj.M()*vjj.M() + 2*(sqrt(vjj.M()* vjj.M() + vjj.Pt()* vjj.Pt())*sqrt(metFull_Px*metFull_Px + metFull_Py*metFull_Py) - (vjj.Px() * metFull_Px + vjj.Py() * metFull_Py)));
 
 	h_Mmc_nosel->Fill(Mmc);
 	h_Mjj_nosel->Fill(Mjj);
@@ -605,7 +612,7 @@ int main(int argc, char **argv) {
 
 	//Define preselection
 	bool preselection_jetspt = 0, preselection_jetsID = 0,  /*preselection_jetseta = 0,*/ preselection_trigplateau=0, preselection_ptj1 = 0, preselection_deltaeta=0, preselection_transratio = 0, preselection_leptonveto = 0 ,preselection = 0;
-
+	bool preselection_dijet(0), preselection_muonveto(0), preselection_electronveto(0);
 	/* ====>                     ATT                       <====*/
 	/* ====> Qui si e' sotto la condizione che AK8 size >1 <====*/
 	if(AK8Jets.size()<=1){
@@ -622,8 +629,14 @@ int main(int argc, char **argv) {
 	  preselection_trigplateau = /*preselection_ptj1 ||*/ preselection_deltaeta;
 	  preselection_transratio = metFull_Pt/MT2 > 0.15;
 	  preselection_leptonveto = nElectrons + nMuons < 1;
+	  preselection_muonveto = nMuons<1;
+	  preselection_electronveto =nElectrons<1;
+	  preselection_dijet =  preselection_jetspt &&  preselection_jetsID;
 	}
 	
+
+
+
 	preselection = preselection_jetspt && preselection_jetsID && preselection_trigplateau && preselection_transratio && preselection_leptonveto;
 	bool preselection_CR = 0;
 	preselection_CR = preselection_jetspt && preselection_ptj1 && !preselection_deltaeta && preselection_transratio && preselection_leptonveto;
@@ -723,24 +736,31 @@ int main(int argc, char **argv) {
 	  h_METPt_CR->Fill(metFull_Pt);
 	}
 	      
+
 	// Fill cutflow entries
 	n_twojets+=1;
-	if(preselection_jetspt){
+	if(preselection_dijet){
 	  n_prejetspt+=1;
-	  if(preselection_trigplateau){
-	    n_pretrigplateau+=1;
-	    if(preselection_leptonveto){
-	      n_leptonveto+=1;
-	      if(preselection_transratio ){
-		n_transratio +=1;
-		if(selection_mt){
-		  n_MT+=1;
-		  if(selection_metfilters){
-		    n_METfilters +=1;
-		    if(selection_dPhi){
-		      n_dPhi+=1;
-		      if(selection_transverseratio){
-			n_transverse+=1;
+	  if(preselection_transratio ){
+	    n_transratio +=1;
+	    if(preselection_trigplateau){
+	      n_pretrigplateau+=1;
+	      if(preselection_muonveto){
+		n_muonveto+=1;
+		if(preselection_electronveto){
+		  n_electronveto+=1;
+		  if(selection_mt){
+		    n_MT+=1;
+		    if(selection_transverseratio){
+		      n_transverse+=1;
+		      if(selection_dPhi){
+			n_dPhi+=1;
+			if(selection_metfilters){
+			  n_METfilters +=1;
+			  if(selection_1SVJ || selection_2SVJ){
+			    n_BDT+=1;
+			  }
+			}
 		      }
 		    }
 		  }
@@ -750,7 +770,7 @@ int main(int argc, char **argv) {
 	  }
 	}
       }//end of nAK8CHSJets>1
-
+	
     }//end of loop over events
 
   h_cutFlow->SetBinContent(1,nEvents);
@@ -758,21 +778,40 @@ int main(int argc, char **argv) {
   h_cutFlow->SetBinContent(2, n_twojets);
   h_cutFlow->GetXaxis()->SetBinLabel(2,"n(AK8 jets) > 1");
   h_cutFlow->SetBinContent(3, n_prejetspt);
-  h_cutFlow->GetXaxis()->SetBinLabel(3,"p_{T, j1/j2} > 170 GeV");
-  h_cutFlow->SetBinContent(4, n_pretrigplateau);
-  h_cutFlow->GetXaxis()->SetBinLabel(4,"|#Delta#eta(j1,j2)| < 1.5 or p_{T, j1} > 600");
-  h_cutFlow->SetBinContent(5, n_leptonveto);
-  h_cutFlow->GetXaxis()->SetBinLabel(5,"Lepton veto ");
-  h_cutFlow->SetBinContent(6, n_transratio);
-  h_cutFlow->GetXaxis()->SetBinLabel(6,"MET/M_T > 0.15");
-  h_cutFlow->SetBinContent(7, n_MT);
-  h_cutFlow->GetXaxis()->SetBinLabel(7,"M_T > 1400");
-  h_cutFlow->SetBinContent(8, n_METfilters);
-  h_cutFlow->GetXaxis()->SetBinLabel(8,"MET filters");
-  h_cutFlow->SetBinContent(9, n_dPhi);
-  h_cutFlow->GetXaxis()->SetBinLabel(9,"#Delta#Phi < 0.75");
-  h_cutFlow->SetBinContent(10, n_transverse);
-  h_cutFlow->GetXaxis()->SetBinLabel(10, "MET/M_{T} > 0.25");
+  h_cutFlow->GetXaxis()->SetBinLabel(3,"p_{T, j1/j2} > 170 GeV & jetID");
+  h_cutFlow->SetBinContent(4, n_transratio);
+  h_cutFlow->GetXaxis()->SetBinLabel(4,"MET/M_T > 0.15"); 
+  h_cutFlow->SetBinContent(5, n_pretrigplateau);
+  h_cutFlow->GetXaxis()->SetBinLabel(5,"|#Delta#eta(j1,j2)| < 1.5 or p_{T, j1} > 600");
+  h_cutFlow->SetBinContent(6, n_muonveto);
+  h_cutFlow->GetXaxis()->SetBinLabel(6,"Muon veto ");
+  h_cutFlow->SetBinContent(7, n_electronveto);
+  h_cutFlow->GetXaxis()->SetBinLabel(7,"Electron veto ");
+  h_cutFlow->SetBinContent(8, n_MT);
+  h_cutFlow->GetXaxis()->SetBinLabel(8,"M_T > 1400");
+  h_cutFlow->SetBinContent(9, n_transverse);
+  h_cutFlow->GetXaxis()->SetBinLabel(9, "MET/M_{T} > 0.25"); 
+  h_cutFlow->SetBinContent(10, n_dPhi);
+  h_cutFlow->GetXaxis()->SetBinLabel(10,"#Delta#Phi < 0.75");
+  h_cutFlow->SetBinContent(11, n_METfilters);
+  h_cutFlow->GetXaxis()->SetBinLabel(11,"MET filters");
+  h_cutFlow->SetBinContent(12, n_BDT);
+  h_cutFlow->GetXaxis()->SetBinLabel(12,"At least 1 SVJ (BDTG>-0.17)");
+ 
+
+  std::cout<<"===================="<<std::endl;
+  std:: cout<<"Cutflow"<<"Raw events  Abs Eff (%)     Rel Eff (%)"<<std::endl;
+  std:: cout<<"Dijet:          "<<n_prejetspt <<   "    "<< float(n_prejetspt/nEventsPrePres) * 100 << "    "<< float(n_prejetspt/nEventsPrePres) * 100.<< std::endl;
+  std:: cout<<"MET/MT>0.15:    "<<n_transratio <<   "    "<< float(n_transratio/nEventsPrePres) * 100<< "    "<< float(n_transratio/n_prejetspt) * 100.<< std::endl;
+  std:: cout<<"DeltaEta < 1.5: "<<n_pretrigplateau <<   "    "<< float(n_pretrigplateau/nEventsPrePres) * 100<< "    "<<  float(n_pretrigplateau/n_transratio) * 100<< std::endl;
+  std:: cout<<"Muon Veto:      "<< n_muonveto<<   "    "<< float(n_muonveto/nEventsPrePres) * 100<< "    "<< float(n_muonveto/n_pretrigplateau) * 100<<std::endl;
+  std:: cout<<"Electron Veto:  "<< n_electronveto<<  "    "<< float(n_electronveto/nEventsPrePres) * 100<< "    "<< float(n_electronveto/n_muonveto) * 100<<std::endl;
+  std:: cout<<"MT>1400:        "<< n_MT<<  "    "<< float(n_MT/nEventsPrePres) * 100<< "    "<< float(n_MT/n_electronveto) * 100<<std::endl;
+  std:: cout<<"MET/MT>0.25:    "<< n_transverse<<  "    "<< float(n_transverse/nEventsPrePres) * 100<< "    "<< float(n_transverse/n_MT) * 100<<std::endl;
+  std:: cout<<"DeltaPhi<0.75:  "<<n_dPhi <<  "    "<< float(n_dPhi/nEventsPrePres) * 100<< "    "<< float(n_dPhi/n_transverse) * 100<<std::endl;
+  std:: cout<<"MetFilters:     "<<n_METfilters <<  "    "<< float(n_METfilters/nEventsPrePres) * 100<< "    "<< float(n_METfilters/n_dPhi) * 100<<std::endl;
+  std:: cout<<"BDGT>-0.17 -at least 1: "<< n_BDT <<  "    "<< float(n_BDT/nEventsPrePres) * 100<< "    "<< float(n_BDT/n_METfilters) * 100<<std::endl;
+
 
   fout.cd();
   
