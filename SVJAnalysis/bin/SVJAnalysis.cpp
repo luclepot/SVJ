@@ -268,7 +268,7 @@ int main(int argc, char **argv) {
   std::vector<TLorentzVector>* MuonsPtr(0x0); 
   std::vector<TLorentzVector>* ElectronsPtr(0x0);
   double Ht=0.;
-  float nLooseMuons=-1, nLooseElectrons=-1;
+  int nMuons=-1, nElectrons=-1;
   ULong64_t EventNumber(0.);
   int nAK8CHS(0.);
   
@@ -282,7 +282,9 @@ int main(int argc, char **argv) {
   std::vector<double>* tau2Ptr(0x0); 
   std::vector<double>* tau3Ptr(0x0); 
   std::vector<double>* msdPtr(0x0);
+  std::vector<bool>* jetsIDPtr(0x0);
   double deltaphi1, deltaphi2;
+  double DeltaPhiMin;
   
   //float mult, axisminor, girth, tau21, tau32, msd, deltaphi;
 
@@ -302,6 +304,9 @@ int main(int argc, char **argv) {
   chain.SetBranchAddress("Muons",&MuonsPtr);
   chain.SetBranchAddress("Electrons",&ElectronsPtr);
 
+  chain.SetBranchAddress("NMuons",&nMuons);
+  chain.SetBranchAddress("NElectrons",&nElectrons);
+
   chain.SetBranchAddress("BadChargedCandidateFilter", &BadChargedCandidateFilter);
   chain.SetBranchAddress("BadPFMuonFilter", &BadPFMuonFilter);
   chain.SetBranchAddress("EcalDeadCellTriggerPrimitiveFilter", &EcalDeadCellTriggerPrimitiveFilter);
@@ -310,6 +315,8 @@ int main(int argc, char **argv) {
   chain.SetBranchAddress("globalTightHalo2016Filter", &globalTightHalo2016Filter);
   chain.SetBranchAddress("NVtx", &NVtx);
   
+  chain.SetBranchAddress("DeltaPhiMin_AK8", &DeltaPhiMin);
+  chain.SetBranchAddress("JetsAK8_ID", &jetsIDPtr);
   chain.SetBranchAddress("JetsAK8_multiplicity", &multPtr);
   chain.SetBranchAddress("JetsAK8_axisminor", &axisminorPtr);
   chain.SetBranchAddress("JetsAK8_girth", &girthPtr);
@@ -390,8 +397,8 @@ int main(int argc, char **argv) {
 
   //Plots with no selectiona applied
   TH1F *h_AK8jetsmult_nosel = new TH1F("h_AK8jetsmult_nosel", "AK8 jets multiplicity", 10, -0.5, 9.5);  
-  TH1F *h_looseMuonsmult_nosel = new TH1F("h_looseMuonsmult_nosel", "Loose muons multiplicity", 10, -0.5, 9.5);
-  TH1F *h_looseElectronsmult_nosel = new TH1F("h_looseElectronsmult_nosel", "Loose electrons multiplicity", 10, -0.5, 9.5);
+  TH1F *h_Muonsmult_nosel = new TH1F("h_Muonsmult_nosel", " muons multiplicity", 10, -0.5, 9.5);
+  TH1F *h_Electronsmult_nosel = new TH1F("h_Electronsmult_nosel", " electrons multiplicity", 10, -0.5, 9.5);
   TH1F *h_METPt_nosel = new TH1F("h_METPt_nosel", "MET_{p_{T}}", 100, 0, 5000);
   TH1F *h_Ht_nosel = new TH1F("h_Ht_nosel", "{H_{T}}", 100, 0, 5000);
   TH1F *h_AK8jetPt_nosel = new TH1F("h_AK8jetPt_nosel", "gen-level HV semi-visible jet p_{T}", 100, 0, 3000);
@@ -481,13 +488,17 @@ int main(int argc, char **argv) {
       std::vector<double> tau2 = *tau2Ptr;
       std::vector<double> tau3 = *tau3Ptr;
       std::vector<double> msd = *msdPtr;
+      std::vector<bool> jetsID = *jetsIDPtr;
 
       std::vector<TLorentzVector> jetsAK8CHS = *jetsAK8CHSPtr;
+
+      std::vector<TLorentzVector> Muons;
+      TLorentzVector Muon;
+      std::vector<TLorentzVector> Electrons;
+      TLorentzVector Electron;
       std::vector<TLorentzVector> muons = *MuonsPtr;
       std::vector<TLorentzVector> electrons = *ElectronsPtr;
 
-      nLooseMuons = muons.size();
-      nLooseElectrons = electrons.size();
       nAK8CHS = jetsAK8CHS.size();
       int sizeMaxLoop_ak8=min(5,nAK8CHS);
 
@@ -528,8 +539,8 @@ int main(int argc, char **argv) {
       if(AK8Jets.size()>1){
 
 	//Leptons
-	h_looseMuonsmult_nosel->Fill(nLooseMuons);
-	h_looseElectronsmult_nosel->Fill(nLooseElectrons);
+	h_Muonsmult_nosel->Fill(nMuons);
+	h_Electronsmult_nosel->Fill(nElectrons);
 
 	//MET
 	h_METPt_nosel->Fill(metFull_Pt);
@@ -558,15 +569,15 @@ int main(int argc, char **argv) {
 	AK8Jets_dr = (AK8Jets.at(0)).DeltaR(AK8Jets.at(1));
 	float dEta=0, dPhi=0;
 	dEta= (std::fabs((AK8Jets.at(0)).Eta() - (AK8Jets.at(1)).Eta()));
-	dPhi= std::abs(reco::deltaPhi(AK8Jets.at(0).Phi(),AK8Jets.at(1).Phi()));
+	dPhi= std::fabs(reco::deltaPhi(AK8Jets.at(0).Phi(),AK8Jets.at(1).Phi()));
 	h_AK8jetdR_nosel->Fill(AK8Jets_dr);
 	h_AK8jetdP_nosel->Fill(dPhi);
 	h_AK8jetdE_nosel->Fill(dEta);
 
-	float dPhi_j0_met=0., dPhi_j1_met=0., dPhi_min=0.;  
-	dPhi_j0_met = std::abs(reco::deltaPhi(AK8Jets.at(0).Phi(),metFull_Phi));
-	dPhi_j1_met = std::abs(reco::deltaPhi(AK8Jets.at(1).Phi(),metFull_Phi));
-	dPhi_min = std::min(dPhi_j0_met,dPhi_j1_met);
+	float dPhi_j0_met=0., dPhi_j1_met=0.;//, dPhi_min=0.;  
+	dPhi_j0_met = std::fabs(reco::deltaPhi(AK8Jets.at(0).Phi(),metFull_Phi));
+	dPhi_j1_met = std::fabs(reco::deltaPhi(AK8Jets.at(1).Phi(),metFull_Phi));
+	//dPhi_min = std::min(dPhi_j0_met,dPhi_j1_met);
 
 	h_dPhi1_nosel->Fill(dPhi_j0_met);
 	h_dPhi2_nosel->Fill(dPhi_j1_met);
@@ -593,7 +604,7 @@ int main(int argc, char **argv) {
 	h_Mt_nosel->Fill(MT2);
 
 	//Define preselection
-	bool preselection_jetspt = 0, /*preselection_jetseta = 0,*/ preselection_trigplateau=0, preselection_ptj1 = 0, preselection_deltaeta=0, preselection_transratio = 0, preselection_leptonveto = 0 ,preselection = 0;
+	bool preselection_jetspt = 0, preselection_jetsID = 0,  /*preselection_jetseta = 0,*/ preselection_trigplateau=0, preselection_ptj1 = 0, preselection_deltaeta=0, preselection_transratio = 0, preselection_leptonveto = 0 ,preselection = 0;
 
 	/* ====>                     ATT                       <====*/
 	/* ====> Qui si e' sotto la condizione che AK8 size >1 <====*/
@@ -605,24 +616,25 @@ int main(int argc, char **argv) {
 	} else if(AK8Jets.size()>1){
 	  preselection_jetspt = (AK8Jets.at(0).Pt() > 170 && (AK8Jets.at(1)).Pt() > 170);
 	  //preselection_jetseta = (std::fabs((AK8Jets.at(0)).Eta()) < 2.5 && std::fabs((AK8Jets.at(1)).Eta()) < 2.5);
+	  preselection_jetsID = jetsID.at(0) > 0 && jetsID.at(1)>0;
 	  preselection_ptj1  = AK8Jets.at(0).Pt() > 600;
-	  preselection_deltaeta = abs(AK8Jets.at(0).Eta() - AK8Jets.at(1).Eta()) < 1.5;
-	  preselection_trigplateau = preselection_ptj1 || preselection_deltaeta;
+	  preselection_deltaeta = fabs(AK8Jets.at(0).Eta() - AK8Jets.at(1).Eta()) < 1.5;
+	  preselection_trigplateau = /*preselection_ptj1 ||*/ preselection_deltaeta;
 	  preselection_transratio = metFull_Pt/MT2 > 0.15;
-	  preselection_leptonveto = nLooseElectrons + nLooseMuons < 1;
+	  preselection_leptonveto = nElectrons + nMuons < 1;
 	}
 	
-	preselection = preselection_jetspt && preselection_trigplateau && preselection_transratio && preselection_leptonveto;
+	preselection = preselection_jetspt && preselection_jetsID && preselection_trigplateau && preselection_transratio && preselection_leptonveto;
 	bool preselection_CR = 0;
 	preselection_CR = preselection_jetspt && preselection_ptj1 && !preselection_deltaeta && preselection_transratio && preselection_leptonveto;
 
 	bool selection_dPhi = 0, selection_transverseratio = 0, selection_mt = 0, selection_metfilters = 0, selection = 0;
-	selection_dPhi = dPhi_min < 0.75;
+	selection_dPhi = DeltaPhiMin < 0.75;
 	selection_metfilters = BadChargedCandidateFilter>0 && BadPFMuonFilter>0 && EcalDeadCellTriggerPrimitiveFilter>0 && HBHEIsoNoiseFilter>0 && HBHENoiseFilter>0 && globalTightHalo2016Filter>0 && NVtx > 0;
 	selection_mt = MT2 > 1400;
 	selection_transverseratio = (metFull_Pt/MT2) > 0.25; 
 
-	h_dPhimin_nosel->Fill(dPhi_min);
+	h_dPhimin_nosel->Fill(DeltaPhiMin);
 	h_transverseratio_nosel->Fill((metFull_Pt/MT2));
 	selection = (preselection  && selection_dPhi && selection_transverseratio && selection_mt && selection_metfilters);
 	bool selection_CR = 0;
@@ -645,11 +657,11 @@ int main(int argc, char **argv) {
 
 
 	
-	float bdtCut = -0.17;
+	float bdtCut = -0.14;
 	bool selection_2SVJ(0), selection_1SVJ(0), selection_0SVJ(0);
-	selection_2SVJ= selection & (mva1_>bdtCut) & (mva2_>bdtCut);
- 	selection_1SVJ= selection & (((mva1_>bdtCut) & (mva2_<bdtCut)) || ((mva1_<bdtCut) & (mva2_>bdtCut)));
- 	selection_0SVJ= selection & ((mva1_<bdtCut) & (mva2_<bdtCut));
+	selection_2SVJ= selection && (mva1_>bdtCut) && (mva2_>bdtCut);
+ 	selection_1SVJ= selection && (((mva1_>bdtCut) && (mva2_<bdtCut)) || ((mva1_<bdtCut) && (mva2_>bdtCut)));
+ 	selection_0SVJ= selection && ((mva1_<bdtCut) && (mva2_<bdtCut));
 
 	// Per la categoria Almeno1SVJJ => selection_1SVJ or selection_2SVJ
 	
@@ -657,7 +669,7 @@ int main(int argc, char **argv) {
 	if(selection){	  
 	  h_dEta->Fill(dEta);
 	  h_dPhi->Fill(dPhi);
-	  h_dPhimin->Fill(dPhi_min); 
+	  h_dPhimin->Fill(DeltaPhiMin); 
 	  h_transverseratio->Fill((metFull_Pt/MT2));
 	  h_Mt->Fill(MT2);                                                                                                              
           h_Mjj->Fill(Mjj);                                                                                                             
@@ -665,10 +677,10 @@ int main(int argc, char **argv) {
 	  h_METPt->Fill(metFull_Pt);
 	}
 
-	if(selection && (selection_1SVJ or selection_2SVJ)){	  
+	if(selection && (selection_1SVJ || selection_2SVJ)){	  
 	  h_dEta_BDT->Fill(dEta);
 	  h_dPhi_BDT->Fill(dPhi);
-	  h_dPhimin_BDT->Fill(dPhi_min); 
+	  h_dPhimin_BDT->Fill(DeltaPhiMin); 
 	  h_transverseratio_BDT->Fill((metFull_Pt/MT2));
 	  h_Mt_BDT->Fill(MT2);                                                                                                              
           h_Mjj_BDT->Fill(Mjj);                                                                                                             
@@ -703,7 +715,7 @@ int main(int argc, char **argv) {
 	if(selection_CR){	  
 	  h_dEta_CR->Fill(dEta);
 	  h_dPhi_CR->Fill(dPhi);
-	  h_dPhimin_CR->Fill(dPhi_min); 
+	  h_dPhimin_CR->Fill(DeltaPhiMin); 
 	  h_transverseratio_CR->Fill((metFull_Pt/MT2));
 	  h_Mt_CR->Fill(MT2);                                                                                                              
           h_Mjj_CR->Fill(Mjj);                                                                                                             
@@ -767,8 +779,8 @@ int main(int argc, char **argv) {
   h_cutFlow->Write();
 
   h_AK8jetsmult_nosel->Write();
-  h_looseMuonsmult_nosel->Write();
-  h_looseElectronsmult_nosel->Write();
+  h_Muonsmult_nosel->Write();
+  h_Electronsmult_nosel->Write();
   h_METPt_nosel->Write();
   h_Ht_nosel->Write();
   h_AK8jetPt_nosel->Write();
