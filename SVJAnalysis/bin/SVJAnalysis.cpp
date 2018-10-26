@@ -177,6 +177,10 @@ int main(int argc, char **argv) {
   */
   TString treePath = "tree";
   TString treePathNEvents = "tree";
+
+  //TString treePath = "TreeMaker2/PreSelection";
+  //  TString treePathNEvents = "TreeMaker2/PreSelection";
+
   if(sys=="jesUp") treePath = "tree/ttDM__jes__up";
   else if(sys=="jesDown") treePath = "tree/ttDM__jes__down";
   else if(sys=="jerUp") treePath = "tree/ttDM__jer__up";
@@ -267,7 +271,7 @@ int main(int argc, char **argv) {
   std::vector<TLorentzVector>* jetsAK8CHSPtr(0x0);
   std::vector<TLorentzVector>* MuonsPtr(0x0); 
   std::vector<TLorentzVector>* ElectronsPtr(0x0);
-  double Ht=0.;
+  double Ht(0.), MT(0.);
   int nMuons=-1, nElectrons=-1;
   ULong64_t EventNumber(0.);
   int nAK8CHS(0.);
@@ -290,6 +294,7 @@ int main(int argc, char **argv) {
 
   chain.SetBranchAddress("EvtNum", &EventNumber);
   chain.SetBranchAddress("HT", &Ht);
+  chain.SetBranchAddress("MT_AK8", &MT);
 
   chain.SetBranchAddress("MET",&metFull_Pt);
   chain.SetBranchAddress("METPhi",&metFull_Phi);
@@ -504,9 +509,9 @@ int main(int argc, char **argv) {
 
       for(int j=0; j<sizeMaxLoop_ak8; j++){
 	AK8Jet = jetsAK8CHS[j];
-	if(AK8Jet.Pt()>170 && AK8Jet.Pt()<1000000000){
+	//if(AK8Jet.Pt()>170 && AK8Jet.Pt()<1000000000){
 	  AK8Jets.push_back(AK8Jet);
-	}
+	  //}
       }
 
       h_AK8jetsmult_nosel->Fill(AK8Jets.size());
@@ -603,7 +608,9 @@ int main(int argc, char **argv) {
 
 
 
-	MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*metFull_Pt   -  ptMet) );                                                                                                                                
+	MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*metFull_Pt   -  ptMet) );   
+
+	MT2 = MT;
 	  //MT2 = sqrt(vjj.M()*vjj.M() + 2*(sqrt(vjj.M()* vjj.M() + vjj.Pt()* vjj.Pt())*sqrt(metFull_Px*metFull_Px + metFull_Py*metFull_Py) - (vjj.Px() * metFull_Px + vjj.Py() * metFull_Py)));
 
 	h_Mmc_nosel->Fill(Mmc);
@@ -621,11 +628,12 @@ int main(int argc, char **argv) {
 	  preselection_transratio = 0;
 	  preselection_trigplateau = 0;
 	} else if(AK8Jets.size()>1){
-	  preselection_jetspt = (AK8Jets.at(0).Pt() > 170 && (AK8Jets.at(1)).Pt() > 170);
-	  //preselection_jetseta = (std::fabs((AK8Jets.at(0)).Eta()) < 2.5 && std::fabs((AK8Jets.at(1)).Eta()) < 2.5);
-	  preselection_jetsID = jetsID.at(0) > 0 && jetsID.at(1)>0;
+
+	  //	  preselection_jetspt = (AK8Jets.at(0).Pt() > 170 && (AK8Jets.at(1)).Pt() > 170);
+	  preselection_jetspt = (std::abs((AK8Jets.at(0)).Eta()) < 5. && std::abs((AK8Jets.at(1)).Eta()) < 5.);
+	  preselection_jetsID = jetsID.at(0) == 1 && jetsID.at(1)==1;
 	  preselection_ptj1  = AK8Jets.at(0).Pt() > 600;
-	  preselection_deltaeta = fabs(AK8Jets.at(0).Eta() - AK8Jets.at(1).Eta()) < 1.5;
+	  preselection_deltaeta = std::abs(AK8Jets.at(0).Eta() - AK8Jets.at(1).Eta()) < 1.5;
 	  preselection_trigplateau = /*preselection_ptj1 ||*/ preselection_deltaeta;
 	  preselection_transratio = metFull_Pt/MT2 > 0.15;
 	  preselection_leptonveto = nElectrons + nMuons < 1;
@@ -743,23 +751,23 @@ int main(int argc, char **argv) {
 	  n_prejetspt+=1;
 	  if(preselection_transratio ){
 	    n_transratio +=1;
-	    if(preselection_trigplateau){
-	      n_pretrigplateau+=1;
 	      if(preselection_muonveto){
 		n_muonveto+=1;
 		if(preselection_electronveto){
 		  n_electronveto+=1;
-		  if(selection_mt){
-		    n_MT+=1;
-		    if(selection_transverseratio){
-		      n_transverse+=1;
-		      if(selection_dPhi){
-			n_dPhi+=1;
-			if(selection_metfilters){
-			  n_METfilters +=1;
-			  if(selection_1SVJ || selection_2SVJ){
-			    n_BDT+=1;
-			  }
+		  if(preselection_trigplateau){
+		    n_pretrigplateau+=1;
+		    if(selection_mt){
+		      n_MT+=1;
+		      if(selection_transverseratio){
+			n_transverse+=1;
+			if(selection_dPhi){
+			  n_dPhi+=1;
+			  if(selection_metfilters){
+			    n_METfilters +=1;
+			    if(selection_1SVJ || selection_2SVJ){
+			      n_BDT+=1;
+			    }
 			}
 		      }
 		    }
@@ -781,12 +789,12 @@ int main(int argc, char **argv) {
   h_cutFlow->GetXaxis()->SetBinLabel(3,"p_{T, j1/j2} > 170 GeV & jetID");
   h_cutFlow->SetBinContent(4, n_transratio);
   h_cutFlow->GetXaxis()->SetBinLabel(4,"MET/M_T > 0.15"); 
-  h_cutFlow->SetBinContent(5, n_pretrigplateau);
-  h_cutFlow->GetXaxis()->SetBinLabel(5,"|#Delta#eta(j1,j2)| < 1.5 or p_{T, j1} > 600");
-  h_cutFlow->SetBinContent(6, n_muonveto);
-  h_cutFlow->GetXaxis()->SetBinLabel(6,"Muon veto ");
-  h_cutFlow->SetBinContent(7, n_electronveto);
-  h_cutFlow->GetXaxis()->SetBinLabel(7,"Electron veto ");
+  h_cutFlow->SetBinContent(7, n_pretrigplateau);
+  h_cutFlow->GetXaxis()->SetBinLabel(7,"|#Delta#eta(j1,j2)| < 1.5 or p_{T, j1} > 600");
+  h_cutFlow->SetBinContent(5, n_muonveto);
+  h_cutFlow->GetXaxis()->SetBinLabel(5,"Muon veto ");
+  h_cutFlow->SetBinContent(6, n_electronveto);
+  h_cutFlow->GetXaxis()->SetBinLabel(6,"Electron veto ");
   h_cutFlow->SetBinContent(8, n_MT);
   h_cutFlow->GetXaxis()->SetBinLabel(8,"M_T > 1400");
   h_cutFlow->SetBinContent(9, n_transverse);
