@@ -274,7 +274,6 @@ int main(int argc, char **argv) {
   double Ht(0.), MT(0.);
   int nMuons=-1, nElectrons=-1;
   ULong64_t EventNumber(0.);
-  int nAK8CHS(0.);
   
   bool BadChargedCandidateFilter = 0, BadPFMuonFilter = 0;
   int EcalDeadCellTriggerPrimitiveFilter = 0,   HBHEIsoNoiseFilter = 0,  HBHENoiseFilter = 0,  globalTightHalo2016Filter = 0, NVtx = 0;
@@ -484,8 +483,6 @@ int main(int argc, char **argv) {
       chain.GetEntry(i);
 
       //JET                
-      std::vector<TLorentzVector> AK8Jets;
-      TLorentzVector AK8Jet;
       std::vector<int> mult = *multPtr;
       std::vector<double> axisminor = *axisminorPtr;
       std::vector<double> girth = *girthPtr;
@@ -495,7 +492,7 @@ int main(int argc, char **argv) {
       std::vector<double> msd = *msdPtr;
       std::vector<bool> jetsID = *jetsIDPtr;
 
-      std::vector<TLorentzVector> jetsAK8CHS = *jetsAK8CHSPtr;
+      std::vector<TLorentzVector> AK8Jets = *jetsAK8CHSPtr;
 
       std::vector<TLorentzVector> Muons;
       TLorentzVector Muon;
@@ -504,15 +501,6 @@ int main(int argc, char **argv) {
       std::vector<TLorentzVector> muons = *MuonsPtr;
       std::vector<TLorentzVector> electrons = *ElectronsPtr;
 
-      nAK8CHS = jetsAK8CHS.size();
-      int sizeMaxLoop_ak8=min(5,nAK8CHS);
-
-      for(int j=0; j<sizeMaxLoop_ak8; j++){
-	AK8Jet = jetsAK8CHS[j];
-	//if(AK8Jet.Pt()>170 && AK8Jet.Pt()<1000000000){
-	  AK8Jets.push_back(AK8Jet);
-	  //}
-      }
 
       h_AK8jetsmult_nosel->Fill(AK8Jets.size());
 
@@ -622,25 +610,25 @@ int main(int argc, char **argv) {
 	bool preselection_dijet(0), preselection_muonveto(0), preselection_electronveto(0);
 	/* ====>                     ATT                       <====*/
 	/* ====> Qui si e' sotto la condizione che AK8 size >1 <====*/
-	if(AK8Jets.size()<=1){
+	/*	if(AK8Jets.size()<=1){
 	  preselection_jetspt = 0;
 	  //preselection_jetseta = 0;
 	  preselection_transratio = 0;
 	  preselection_trigplateau = 0;
 	} else if(AK8Jets.size()>1){
-
+	*/
 	  //	  preselection_jetspt = (AK8Jets.at(0).Pt() > 170 && (AK8Jets.at(1)).Pt() > 170);
 	  preselection_jetspt = (std::abs((AK8Jets.at(0)).Eta()) < 5. && std::abs((AK8Jets.at(1)).Eta()) < 5.);
 	  preselection_jetsID = jetsID.at(0) == 1 && jetsID.at(1)==1;
 	  preselection_ptj1  = AK8Jets.at(0).Pt() > 600;
 	  preselection_deltaeta = std::abs(AK8Jets.at(0).Eta() - AK8Jets.at(1).Eta()) < 1.5;
-	  preselection_trigplateau = /*preselection_ptj1 ||*/ preselection_deltaeta;
+	  preselection_trigplateau = preselection_deltaeta;
 	  preselection_transratio = metFull_Pt/MT2 > 0.15;
 	  preselection_leptonveto = nElectrons + nMuons < 1;
 	  preselection_muonveto = nMuons<1;
 	  preselection_electronveto =nElectrons<1;
 	  preselection_dijet =  preselection_jetspt &&  preselection_jetsID;
-	}
+	  //}
 	
 
 
@@ -808,9 +796,9 @@ int main(int argc, char **argv) {
   std:: cout<<"Cutflow"<<"Raw events  Abs Eff (%)     Rel Eff (%)"<<std::endl;
   std:: cout<<"Dijet:          "<<n_prejetspt <<   "    "<< float(n_prejetspt/nEventsPrePres) * 100 << "    "<< float(n_prejetspt/nEventsPrePres) * 100.<< std::endl;
   std:: cout<<"MET/MT>0.15:    "<<n_transratio <<   "    "<< float(n_transratio/nEventsPrePres) * 100<< "    "<< float(n_transratio/n_prejetspt) * 100.<< std::endl;
-  std:: cout<<"DeltaEta < 1.5: "<<n_pretrigplateau <<   "    "<< float(n_pretrigplateau/nEventsPrePres) * 100<< "    "<<  float(n_pretrigplateau/n_transratio) * 100<< std::endl;
-  std:: cout<<"Muon Veto:      "<< n_muonveto<<   "    "<< float(n_muonveto/nEventsPrePres) * 100<< "    "<< float(n_muonveto/n_pretrigplateau) * 100<<std::endl;
+  std:: cout<<"Muon Veto:      "<< n_muonveto<<   "    "<< float(n_muonveto/nEventsPrePres) * 100<< "    "<< float(n_muonveto/n_transratio) * 100<<std::endl;
   std:: cout<<"Electron Veto:  "<< n_electronveto<<  "    "<< float(n_electronveto/nEventsPrePres) * 100<< "    "<< float(n_electronveto/n_muonveto) * 100<<std::endl;
+  std:: cout<<"DeltaEta < 1.5: "<<n_pretrigplateau <<   "    "<< float(n_pretrigplateau/nEventsPrePres) * 100<< "    "<<  float(n_pretrigplateau/n_electronveto) * 100<< std::endl;
   std:: cout<<"MT>1400:        "<< n_MT<<  "    "<< float(n_MT/nEventsPrePres) * 100<< "    "<< float(n_MT/n_electronveto) * 100<<std::endl;
   std:: cout<<"MET/MT>0.25:    "<< n_transverse<<  "    "<< float(n_transverse/nEventsPrePres) * 100<< "    "<< float(n_transverse/n_MT) * 100<<std::endl;
   std:: cout<<"DeltaPhi<0.75:  "<<n_dPhi <<  "    "<< float(n_dPhi/nEventsPrePres) * 100<< "    "<< float(n_dPhi/n_transverse) * 100<<std::endl;
