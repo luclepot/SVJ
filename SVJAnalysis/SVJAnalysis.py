@@ -26,7 +26,9 @@ hline = '-'*80
 localPath = "/mnt/t3nfs01/data01/shome/grauco/SVJAnalysis/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
 #localPath = "/mnt/t3nfs01/data01/shome/grauco/SVJAnalysis/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
 #t3Path = '//pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/v0/'
-t3Path = '/pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/'
+t3Path = '/pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/dijetmthad/'
+#t3Path = '/pnfs/psi.ch/cms/trivcat/store/user/decosa/SVJ/dijetmtdetahadfull2/'
+
 t3Ls = 'xrdfs t3dcachedb03.psi.ch ls -u'
 
 samples = []
@@ -58,17 +60,19 @@ samples.append("WJetsToLNu_HT600to800")
 samples.append("WJetsToLNu_HT800to1200")
 samples.append("ZJetsToNuNu_Zpt100to200")
 samples.append("ZJetsToNuNu_Zpt200toInf")
-'''
-
 samples.append("SVJ_mZprime1000_mDark20_rinv03_alpha02")
 
-'''
+
 samples.append("SVJ_mZprime2000_mDark20_rinv03_alpha02")
+
 samples.append("SVJ_mZprime3000_mDark100_rinv03_alpha02")
 samples.append("SVJ_mZprime3000_mDark1_rinv03_alpha02")
 samples.append("SVJ_mZprime3000_mDark20_rinv01_alpha02")
 samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha01")
+'''
 samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha02")
+'''
+
 samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha05")
 samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha1")
 samples.append("SVJ_mZprime3000_mDark20_rinv05_alpha02")
