@@ -570,16 +570,16 @@ int main(int argc, char **argv) {
 	h_AK8jetPhi_sublead_nosel->Fill(AK8Jets.at(1).Phi());
 
 	//Compute angular distances between the two leading jets
-	float AK8Jets_dr=-1;
+	double AK8Jets_dr=-1;
 	AK8Jets_dr = (AK8Jets.at(0)).DeltaR(AK8Jets.at(1));
-	float dEta=0, dPhi=0;
+	double dEta=0, dPhi=0;
 	dEta= (std::fabs((AK8Jets.at(0)).Eta() - (AK8Jets.at(1)).Eta()));
 	dPhi= std::fabs(reco::deltaPhi(AK8Jets.at(0).Phi(),AK8Jets.at(1).Phi()));
 	h_AK8jetdR_nosel->Fill(AK8Jets_dr);
 	h_AK8jetdP_nosel->Fill(dPhi);
 	h_AK8jetdE_nosel->Fill(dEta);
 
-	float dPhi_j0_met=0., dPhi_j1_met=0.;//, dPhi_min=0.;  
+	double dPhi_j0_met=0., dPhi_j1_met=0.;//, dPhi_min=0.;  
 	dPhi_j0_met = std::fabs(reco::deltaPhi(AK8Jets.at(0).Phi(),metFull_Phi));
 	dPhi_j1_met = std::fabs(reco::deltaPhi(AK8Jets.at(1).Phi(),metFull_Phi));
 	//dPhi_min = std::min(dPhi_j0_met,dPhi_j1_met);
@@ -588,8 +588,8 @@ int main(int argc, char **argv) {
 	h_dPhi2_nosel->Fill(dPhi_j1_met);
 
 	//Compute masses
-	float Mjj=0., Mmc=0., MT2=0.;
-	float  Mjj2=0., ptjj = 0., ptjj2 = 0., ptMet = 0.;
+	double Mjj=0., Mmc=0., MT2=0.;
+	double  Mjj2=0., ptjj = 0., ptjj2 = 0., ptMet = 0.;
 	//Mjj = mass of the two large reclustered jets                                                                                    
 	TLorentzVector vjj = AK8Jets.at(0) + AK8Jets.at(1);
 	double metFull_Px=0., metFull_Py=0.; 
@@ -661,7 +661,7 @@ int main(int argc, char **argv) {
 	bool selection_CR = 0;
 	selection_CR = preselection_CR && selection_dPhi && selection_transverseratio && selection_mt && selection_metfilters;
 
-	float mva1_(0.), mva2_(0.);
+	double mva1_(0.), mva2_(0.);
 
 	bdt_mult= mult.at(0); bdt_axisminor = axisminor.at(0); bdt_girth = girth.at(0); bdt_tau21 = tau2.at(0)/tau1.at(0);  bdt_tau32 = tau3.at(0)/tau1.at(0);
 	bdt_msd = msd.at(0); bdt_deltaphi = deltaphi1;  bdt_pt = AK8Jets.at(0).Pt();  bdt_eta =  AK8Jets.at(0).Eta(); bdt_mt =  MT2;
@@ -675,10 +675,7 @@ int main(int argc, char **argv) {
 	mva2_ = reader.EvaluateMVA("BDTG");
 	//cout << "--->BDT value for jet 2:  " << mva2_ << endl;
 
-
-
-	
-	float bdtCut = -0.14;
+        double bdtCut = -0.14;
 	bool selection_2SVJ(0), selection_1SVJ(0), selection_0SVJ(0);
 	selection_2SVJ= selection && (mva1_>bdtCut) && (mva2_>bdtCut);
  	selection_1SVJ= selection && (((mva1_>bdtCut) && (mva2_<bdtCut)) || ((mva1_<bdtCut) && (mva2_>bdtCut)));
