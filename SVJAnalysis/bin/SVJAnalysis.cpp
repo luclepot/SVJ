@@ -195,7 +195,7 @@ int main(int argc, char **argv) {
   bench.Stop("NEvents");
   bench.Print("NEvents");
 
-  bench.Start("NEventsPrePres");
+
 
   TH1D totalWeightTop("w_top_total","Top pt reweighting: overall sample weight",2000,0,2.0);
   //chainNEvents.Project("w_top_total","Event_T_Weight","Event_T_Weight!=1.00");
@@ -203,14 +203,21 @@ int main(int argc, char **argv) {
   cout << "totaltopweight is "<< topWeight<<endl;
   if(topWeight==0)topWeight=1;
 
+  
+  //bench.Start("NEventsPrePres");
   TChain chain(treePath);
   chain.AddFileInfoList(fc.GetList());
-  Int_t nEventsPrePres = (Int_t)chain.GetEntries();
+
+  Int_t nEventsPrePres = -1;
+  TH1F * h_nEventProc = new TH1F("h_nEventProc", "h_nEventProc", 1, 0, 1);
+  h_nEventProc = (TH1F*)chain.GetFile()->Get("nEventProc");
+  nEventsPrePres = h_nEventProc->Integral();
+  /*Int_t nEventsPrePres = (Int_t)chain.GetEntries();
   //nEventsPrePres=100;
   std::cout<<"--> --> Number of Events: "<<nEvents<< " after preselection "<< nEventsPrePres << endl;
   bench.Stop("NEventsPrePres");
   bench.Print("NEventsPrePres");
-
+  */
   std::string samplestr(sample.c_str());
   
   //Q2 and PDF splitting                                                                                                                                                                                                    
@@ -397,7 +404,7 @@ int main(int argc, char **argv) {
   else if(strcmp (sample.c_str(),"SVJalphaD01mZ4000rinv03") == 0) p=(float)(x * (float)(1.));
   cout << "weight is " << p << endl;
   
-  TH1F *h_cutFlow  = new TH1F("h_cutFlow","cutFlow",12,-0.5,11.5);
+  TH1F *h_cutFlow  = new TH1F("h_cutFlow","cutFlow",13,-0.5,12.5);
 
   //Plots with no selectiona applied
   TH1F *h_AK8jetsmult_nosel = new TH1F("h_AK8jetsmult_nosel", "AK8 jets multiplicity", 10, -0.5, 9.5);  
@@ -475,9 +482,9 @@ int main(int argc, char **argv) {
 
   float n_twojets(0.), n_prejetspt(0.), n_pretrigplateau(0.),  n_transratio(0.), n_MT(0.), n_METfilters(0.), n_dPhi(0.), n_transverse(0.);
   float  n_muonveto(0.), n_electronveto(0.), n_BDT(0.) ;
-  std::cout<< "===> Number of Events: "<<nEventsPrePres<<std::endl;
+  std::cout<< "===> Number of Processed Events: "<<nEventsPrePres << " ===> Number of Skimmed Events: "<<nEvents <<std::endl;
 
-  for(Int_t i=0; i<nEventsPrePres; i++ )
+  for(Int_t i=0; i<nEvents; i++ )
     {
 
       chain.GetEntry(i);
@@ -750,7 +757,7 @@ int main(int argc, char **argv) {
 			  n_dPhi+=1;
 			  if(selection_metfilters){
 			    n_METfilters +=1;
-			    if(selection_1SVJ || selection_2SVJ){
+			    if(selection_2SVJ){
 			      n_BDT+=1;
 			    }
 			}
@@ -766,30 +773,33 @@ int main(int argc, char **argv) {
 	
     }//end of loop over events
 
-  h_cutFlow->SetBinContent(1,nEvents);
+  
+  h_cutFlow->SetBinContent(1,nEventsPrePres);
   h_cutFlow->GetXaxis()->SetBinLabel(1,"no selection");
-  h_cutFlow->SetBinContent(2, n_twojets);
-  h_cutFlow->GetXaxis()->SetBinLabel(2,"n(AK8 jets) > 1");
-  h_cutFlow->SetBinContent(3, n_prejetspt);
-  h_cutFlow->GetXaxis()->SetBinLabel(3,"p_{T, j1/j2} > 170 GeV & jetID");
-  h_cutFlow->SetBinContent(4, n_transratio);
-  h_cutFlow->GetXaxis()->SetBinLabel(4,"MET/M_T > 0.15"); 
-  h_cutFlow->SetBinContent(7, n_pretrigplateau);
-  h_cutFlow->GetXaxis()->SetBinLabel(7,"|#Delta#eta(j1,j2)| < 1.5 or p_{T, j1} > 600");
-  h_cutFlow->SetBinContent(5, n_muonveto);
-  h_cutFlow->GetXaxis()->SetBinLabel(5,"Muon veto ");
-  h_cutFlow->SetBinContent(6, n_electronveto);
-  h_cutFlow->GetXaxis()->SetBinLabel(6,"Electron veto ");
-  h_cutFlow->SetBinContent(8, n_MT);
-  h_cutFlow->GetXaxis()->SetBinLabel(8,"M_T > 1400");
-  h_cutFlow->SetBinContent(9, n_transverse);
-  h_cutFlow->GetXaxis()->SetBinLabel(9, "MET/M_{T} > 0.25"); 
-  h_cutFlow->SetBinContent(10, n_dPhi);
-  h_cutFlow->GetXaxis()->SetBinLabel(10,"#Delta#Phi < 0.75");
-  h_cutFlow->SetBinContent(11, n_METfilters);
-  h_cutFlow->GetXaxis()->SetBinLabel(11,"MET filters");
-  h_cutFlow->SetBinContent(12, n_BDT);
-  h_cutFlow->GetXaxis()->SetBinLabel(12,"At least 1 SVJ (BDTG>-0.17)");
+  h_cutFlow->SetBinContent(2,nEvents);
+  h_cutFlow->GetXaxis()->SetBinLabel(2,"ntuples skimming");
+  h_cutFlow->SetBinContent(3, n_twojets);
+  h_cutFlow->GetXaxis()->SetBinLabel(3,"n(AK8 jets) > 1");
+  h_cutFlow->SetBinContent(4, n_prejetspt);
+  h_cutFlow->GetXaxis()->SetBinLabel(4,"p_{T, j1/j2} > 170 GeV & jetID");
+  h_cutFlow->SetBinContent(5, n_transratio);
+  h_cutFlow->GetXaxis()->SetBinLabel(5,"MET/M_T > 0.15"); 
+  h_cutFlow->SetBinContent(6, n_pretrigplateau);
+  h_cutFlow->GetXaxis()->SetBinLabel(6,"|#Delta#eta(j1,j2)| < 1.5 or p_{T, j1} > 600");
+  h_cutFlow->SetBinContent(7, n_muonveto);
+  h_cutFlow->GetXaxis()->SetBinLabel(7,"Muon veto ");
+  h_cutFlow->SetBinContent(8, n_electronveto);
+  h_cutFlow->GetXaxis()->SetBinLabel(8,"Electron veto ");
+  h_cutFlow->SetBinContent(9, n_MT);
+  h_cutFlow->GetXaxis()->SetBinLabel(9,"M_T > 1400");
+  h_cutFlow->SetBinContent(10, n_transverse);
+  h_cutFlow->GetXaxis()->SetBinLabel(10, "MET/M_{T} > 0.25"); 
+  h_cutFlow->SetBinContent(11, n_dPhi);
+  h_cutFlow->GetXaxis()->SetBinLabel(11,"#Delta#Phi < 0.75");
+  h_cutFlow->SetBinContent(12, n_METfilters);
+  h_cutFlow->GetXaxis()->SetBinLabel(12,"MET filters");
+  h_cutFlow->SetBinContent(13, n_BDT);
+  h_cutFlow->GetXaxis()->SetBinLabel(13,"2 SVJ (BDTG>-0.14)");
  
 
   std::cout<<"===================="<<std::endl;
@@ -803,7 +813,7 @@ int main(int argc, char **argv) {
   std:: cout<<"MET/MT>0.25:    "<< n_transverse<<  "    "<< float(n_transverse/nEventsPrePres) * 100<< "    "<< float(n_transverse/n_MT) * 100<<std::endl;
   std:: cout<<"DeltaPhi<0.75:  "<<n_dPhi <<  "    "<< float(n_dPhi/nEventsPrePres) * 100<< "    "<< float(n_dPhi/n_transverse) * 100<<std::endl;
   std:: cout<<"MetFilters:     "<<n_METfilters <<  "    "<< float(n_METfilters/nEventsPrePres) * 100<< "    "<< float(n_METfilters/n_dPhi) * 100<<std::endl;
-  std:: cout<<"BDGT>-0.17 -at least 1: "<< n_BDT <<  "    "<< float(n_BDT/nEventsPrePres) * 100<< "    "<< float(n_BDT/n_METfilters) * 100<<std::endl;
+  std:: cout<<"2 SVJ, BDGT>-0.14: "<< n_BDT <<  "    "<< float(n_BDT/nEventsPrePres) * 100<< "    "<< float(n_BDT/n_METfilters) * 100<<std::endl;
 
 
   fout.cd();

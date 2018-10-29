@@ -3,7 +3,7 @@ from utils import *
 SVJ_mZprime1000_mDark20_rinv03_alpha02 = sample()
 SVJ_mZprime1000_mDark20_rinv03_alpha02.files = outlist (d,"SVJ_mZprime-1000_mDark-20_rinv-0.3_alpha-0.2")
 SVJ_mZprime1000_mDark20_rinv03_alpha02.skimEff = 1.
-SVJ_mZprime1000_mDark20_rinv03_alpha02.sigma = 1
+SVJ_mZprime1000_mDark20_rinv03_alpha02.sigma = 4.612
 SVJ_mZprime1000_mDark20_rinv03_alpha02.jpref = jetLabel
 SVJ_mZprime1000_mDark20_rinv03_alpha02.jp = jetLabel
 SVJ_mZprime1000_mDark20_rinv03_alpha02.color =  ROOT.kRed 
