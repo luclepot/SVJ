@@ -22,22 +22,18 @@ splitDescriptionFile = 'description.pkl'
 resDirs = ['res','trees','txt']
 hline = '-'*80
 
-#localPath = "/t3home/decosa/SVJ/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
 localPath = "/mnt/t3nfs01/data01/shome/grauco/SVJAnalysis/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
-#localPath = "/mnt/t3nfs01/data01/shome/grauco/SVJAnalysis/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
-#t3Path = '//pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/v0/'
-t3Path = '/pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/dijetmthad/'
-#t3Path = '/pnfs/psi.ch/cms/trivcat/store/user/decosa/SVJ/dijetmtdetahadfull2/'
+
+t3Path = '/pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/v16/Skims_METFilters/noSys/2017/'
 
 t3Ls = 'xrdfs t3dcachedb03.psi.ch ls -u'
 
 samples = []
-
-#samples.append("SVJ_mZprime-1000_mDark-20_rinv-0.3_alpha-0.2")
+samples.append("SVJ_mZprime2600_mDark20_rinv03_alphapeak")
 '''
 samples.append("QCD_Pt_1000to1400")
 samples.append("QCD_Pt_120to170")
-samples.append("QCD_Pt_170to300")   
+samples.append("QCD_Pt_170to300")  
 samples.append("QCD_Pt_1400to1800")
 samples.append("QCD_Pt_1800to2400")
 samples.append("QCD_Pt_2400to3200")
@@ -47,10 +43,18 @@ samples.append("QCD_Pt_470to600")
 samples.append("QCD_Pt_600to800")
 samples.append("QCD_Pt_800to1000")
 samples.append("QCD_Pt_80to120")
-'''
-'''
-samples.append("TTJets")
 
+samples.append("TTJets")
+samples.append("TTJets_DiLept")
+samples.append("TTJets_DiLept_genMET-150")
+samples.append("TTJets_HT1200to2500")
+samples.append("TTJets_HT2500toInf")
+samples.append("TTJets_HT600to800")
+samples.append("TTJets_HT800to1200")
+samples.append("TTJets_SingleLeptFromT")
+samples.append("TTJets_SingleLeptFromT_genMET-150")
+samples.append("TTJets_SingleLeptFromTbar")
+samples.append("TTJets_SingleLeptFromTbar_genMET-150")
 samples.append("WJetsToLNu_HT100to200")
 samples.append("WJetsToLNu_HT1200to2500")
 samples.append("WJetsToLNu_HT200to400")
@@ -58,32 +62,107 @@ samples.append("WJetsToLNu_HT2500toInf")
 samples.append("WJetsToLNu_HT400to600")
 samples.append("WJetsToLNu_HT600to800")
 samples.append("WJetsToLNu_HT800to1200")
-samples.append("ZJetsToNuNu_Zpt100to200")
-samples.append("ZJetsToNuNu_Zpt200toInf")
-samples.append("SVJ_mZprime1000_mDark20_rinv03_alpha02")
-
-
-samples.append("SVJ_mZprime2000_mDark20_rinv03_alpha02")
-
-samples.append("SVJ_mZprime3000_mDark100_rinv03_alpha02")
-samples.append("SVJ_mZprime3000_mDark1_rinv03_alpha02")
-samples.append("SVJ_mZprime3000_mDark20_rinv01_alpha02")
-samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha01")
+samples.append("ZJetsToNuNu_HT100to200")
+samples.append("ZJetsToNuNu_HT1200to2500")
+samples.append("ZJetsToNuNu_HT200to400")
+samples.append("ZJetsToNuNu_HT2500toInf")
+samples.append("ZJetsToNuNu_HT400to600")
+samples.append("ZJetsToNuNu_HT600to800")
+samples.append("ZJetsToNuNu_HT800to1200")
 '''
+'''
+
+samples.append("Run2016B")
+samples.append("Run2016C")
+samples.append("Run2016D")
+samples.append("Run2016E")
+samples.append("Run2016F")
+samples.append("Run2016G")
+samples.append("Run2016H")
+
+'''
+'''
+samples.append("Run2017B")
+samples.append("Run2017C")
+samples.append("Run2017D")
+samples.append("Run2017E")
+samples.append("Run2017F")
+'''
+'''
+samples.append("SVJ_mZprime3000_mDark1_rinv03_alphapeak")
+samples.append("SVJ_mZprime3000_mDark5_rinv03_alphapeak")
+samples.append("SVJ_mZprime3000_mDark10_rinv03_alphapeak")
+samples.append("SVJ_mZprime3000_mDark30_rinv03_alphapeak")
+samples.append("SVJ_mZprime3000_mDark40_rinv03_alphapeak")
+samples.append("SVJ_mZprime3000_mDark50_rinv03_alphapeak")
+samples.append("SVJ_mZprime3000_mDark60_rinv03_alphapeak")
+samples.append("SVJ_mZprime3000_mDark70_rinv03_alphapeak")
+samples.append("SVJ_mZprime3000_mDark80_rinv03_alphapeak")
+samples.append("SVJ_mZprime3000_mDark90_rinv03_alphapeak")
+#samples.append("SVJ_mZprime3000_mDark100_rinv03_alphapeak")
+
+samples.append("SVJ_mZprime3000_mDark20_rinv0_alphapeak")
+samples.append("SVJ_mZprime3000_mDark20_rinv01_alphapeak")
+samples.append("SVJ_mZprime3000_mDark20_rinv02_alphapeak")
+samples.append("SVJ_mZprime3000_mDark20_rinv04_alphapeak")
+samples.append("SVJ_mZprime3000_mDark20_rinv05_alphapeak")
+samples.append("SVJ_mZprime3000_mDark20_rinv06_alphapeak")
+samples.append("SVJ_mZprime3000_mDark20_rinv07_alphapeak")
+samples.append("SVJ_mZprime3000_mDark20_rinv08_alphapeak")
+samples.append("SVJ_mZprime3000_mDark20_rinv09_alphapeak")
+samples.append("SVJ_mZprime3000_mDark20_rinv1_alphapeak")
+
+samples.append("SVJ_mZprime3000_mDark20_rinv03_alphalow")
 samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha02")
-'''
+samples.append("SVJ_mZprime3000_mDark20_rinv03_alphahigh")
 
-samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha05")
-samples.append("SVJ_mZprime3000_mDark20_rinv03_alpha1")
-samples.append("SVJ_mZprime3000_mDark20_rinv05_alpha02")
-samples.append("SVJ_mZprime3000_mDark20_rinv07_alpha02")
-samples.append("SVJ_mZprime3000_mDark50_rinv03_alpha02")
-samples.append("SVJ_mZprime4000_mDark20_rinv03_alpha02")
+samples.append("SVJ_mZprime500_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime600_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime700_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime800_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime900_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime1000_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime1100_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime1200_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime1300_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime1400_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime1500_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime1600_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime1700_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime1800_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime1900_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime2000_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime2100_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime2200_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime2300_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime2400_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime2500_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime2600_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime2700_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime2800_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime2900_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime3000_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime3100_mDark20_rinv03_alphapeak")
+
+samples.append("SVJ_mZprime3200_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime3300_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime3400_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime3500_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime3600_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime3700_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime3800_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime3900_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime4000_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime4100_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime4200_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime4300_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime4400_mDark20_rinv03_alphapeak")
+samples.append("SVJ_mZprime4500_mDark20_rinv03_alphapeak")
 '''
 
 splitMap = {}
-splitMap["TT"] = 30
 
+#splitMap["Run2016B"] = 20
 
 def makedirs(subdirs,base=None):
 
@@ -137,11 +216,11 @@ parser.add_option('--t3batch', dest='t3batch', action='store_true', default=Fals
 
 isData="MC"
 #isData="DATA"
+
 (opt, args) = parser.parse_args()
 
 if opt.sys not in systematics:
     parser.error('Please choose an allowed value for sys: "noSys", "jesUp", "jesDown", "jerUp", "jerDown", "jmsUp", "jmsDown", "jmrUp", "jmrDown"')
-
 
 # Create working area if it doesn't exist
 if not exists(fileListDir):
