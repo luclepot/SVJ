@@ -34,6 +34,7 @@
 #include "SVJ/SVJAnalysis/interface/Mt2Com_bisect.h"
 #include "DataFormats/Math/interface/deltaR.h"
 #include "SVJ/SVJAnalysis/interface/kFactors.h"
+#include "SVJ/SVJAnalysis/interface/TriggerFuncCorrector.h"
 
 using namespace std;
 
@@ -43,7 +44,7 @@ typedef vector<int> vint;
 typedef vector<bool> vbool;
 typedef vector<string> vstring;
 
-enum weightedSysts { NOSYST=0, PUUP=1, PUDOWN=2,MAXSYSTS=3};
+enum weightedSysts { NOSYST=0, PUUP=1, PUDOWN=2, TRIGUP=3, TRIGDOWN=4, MAXSYSTS=5};
 enum theoSysts {SCALEUP=101,SCALEDOWN=102, NNPDF1=100, NNPDF2=102};
 int wLimit =150;
 
@@ -116,6 +117,9 @@ int main(int argc, char **argv) {
   std::string outdir(argv[6]);
   std::cout<<"Output directory: "<<outdir<<endl;
 
+  std::string year(argv[7]);
+  std::cout<<"Year: "<<year<<endl;
+
   TString path_ = path ; 
   std::cout<<"File to open: "<<path_<<endl;
   
@@ -187,10 +191,11 @@ int main(int argc, char **argv) {
   bool addPDF=false,addQ2=false, addTopPt=false,addVHF=false/*,addWZNLO=false*/, addTTSplit=false;
 
   // change in true
-  addPDF=false;
+  addPDF=true;
   addQ2=false;
 
-  int nPDF=102;
+  int nPDF=100;
+
   if(isData=="DATA"){addPDF=false, addQ2=false;}
   systZero.prepareDefault(true, addQ2, addPDF, addTopPt,addVHF,addTTSplit);
   
@@ -277,7 +282,7 @@ int main(int argc, char **argv) {
   }
   
   double PDFsplittedWeight[nPDF];
-
+  // double normzero = 0.;
   if(addPDF){
       for (int i = 1 ; i <= nPDF ; ++i) 
 	{
@@ -289,10 +294,15 @@ int main(int argc, char **argv) {
 	    pdfss<<(i);
 	    string pstr=(pdfss.str());
 	    TH1D splittedWeightPDF("w_pdf_splitted","PDF splitting: overall sample weight",2000,0,2.0);
+	    TH1D splittedWeightPDF0("w_pdf_0_splitted","PDF splitting: overall sample weight 0",2000,0,2.0);
 	    //chain.Project("w_pdf_splitted",(("Event_LHEWeight"+pstr+"/Event_LHEWeight0").c_str())); 
-	    chain.Project("w_pdf_splitted",(("PDFweights["+pstr + "] / PDFweights[0]").c_str())); 
-	    PDFsplittedWeight[i]=splittedWeightPDF.GetMean();
-	    cout << "PDFSplittedWeight " << i << " is " << PDFsplittedWeight[i]<<endl;
+	    chain.Project("w_pdf_splitted",(("PDFweights["+pstr + "]").c_str())); 
+	    chain.Project("w_pdf_0_splitted",("PDFweights[0]")); 
+	    //normzero = splittedWeightPDF0.GetMean()/chain.GetEntries();
+
+	    //std::cout<<"Norm zero "<<normzero<<std::endl;
+	    PDFsplittedWeight[i]=splittedWeightPDF.GetMean()/splittedWeightPDF0.GetMean() ;
+	    //cout << "PDFSplittedWeight " << i << " is " << PDFsplittedWeight[i]<<endl;
 	  }
 	  
     }
@@ -634,13 +644,24 @@ int main(int argc, char **argv) {
   //  LumiWeightsDown_ = edm::LumiReWeighting("data_Mo17/puMC.root", "data_Mo17/MyDataPileupHistogramDOWN.root","MC_pu","pileup");
   // }
 
-  //nEvents = 1000;
+  nEvents = 100;
   for(Int_t i=0; i<nEvents; i++ )
     {
 
       chain.GetEntry(i);
       w = 1;
       w_zero = 1;
+
+
+
+      /* TRIGGER SFs*/
+      TriggerFuncCorrector tfc;
+      string trig_filename = cmssw_base + std::string("/src/SVJ/SVJAnalysis/data/trigEffFit_SingleMuon_"+ year +"_DetaHLTmatch.root");
+      tfc.SetFunc(trig_filename,"fit_MTAK8","err_MTAK8");
+      double trig_central = tfc.GetCorrection(MT,0);
+      
+
+
 
       if(isData=="MC"){ 
 
@@ -664,8 +685,17 @@ int main(int argc, char **argv) {
 	  }
 	}
 	
-	w_pu = 1.;//puWeight; //LumiWeights_.weight(NumInteractions);
-	w = w_pu;
+	
+
+	
+
+	//	if (isData=="MC"){
+
+	  w_pu = 1.;//puWeight; //LumiWeights_.weight(NumInteractions);
+	  w *= w_pu;
+	  w *= trig_central;
+	  //}
+	
 
 	std::vector<TLorentzVector> GenElectrons = *GenElectronsPtr;
 	std::vector<TLorentzVector> GenMuons = *GenMuonsPtr;
@@ -694,33 +724,46 @@ int main(int argc, char **argv) {
 	systZero.setWeight(0,1.);
 	systZero.setWeight("puDown",1.);
 	systZero.setWeight("puUp",1.);
+	systZero.setWeight("trigDown",1.);
+	systZero.setWeight("trigUp",1.);
 
 	systSVJ.copySysts(systZero);
 	systSVJ.setWeight(0,1.);
 	systSVJ.setWeight("puDown",1.);
 	systSVJ.setWeight("puUp",1.);
+	systSVJ.setWeight("trigDown",1.);
+	systSVJ.setWeight("trigUp",1.);
 
-	systWeightsSVJ[NOSYST]=1.;
-        systWeightsSVJ[PUUP]=1.;
-        systWeightsSVJ[PUDOWN]=1.;
+	systWeightsSVJ[NOSYST]= 1.;
+        systWeightsSVJ[PUUP]= 1.;
+        systWeightsSVJ[PUDOWN]= 1.;
+	systWeightsSVJ[TRIGUP]= 1.;
+	systWeightsSVJ[TRIGDOWN]= 1.;
       }
 
       if(isData=="MC"){
 	//double puUpFact=(LumiWeightsUp_.weight(NumInteractions))/(LumiWeights_.weight(NumInteractions));
 	//double puDownFact=(LumiWeightsDown_.weight(NumInteractions))/(LumiWeights_.weight(NumInteractions));
 
-	double puUpFact = puSysUp;
-	double puDownFact = puSysDown;
+	double puUpFact = puSysUp / puWeight;
+	double puDownFact = puSysDown / puWeight;
 	
+	double trig_up = tfc.GetCorrection(MT,1);
+	double trig_down = tfc.GetCorrection(MT,-1);
+
+
 	if(NumInteractions>75){
 	  //cout << " --> NumInteractions very high!!" << endl;
 	  puUpFact =0;
 	  puDownFact=0;
 	}
 	
-	systZero.setWeight(0,1.);
+	systZero.setWeight(0, 1.);
 	systZero.setWeight("puUp",1.);
 	systZero.setWeight("puDown",1.);
+	systZero.setWeight("trigUp",1.);
+	systZero.setWeight("trigDown",1.);
+
 
 	if(addPDF)systZero.setPDFWeights(w_pdfs, PDFsplittedWeight, nPDF,w_zero, true);
 	if(addQ2)systZero.setQ2Weights(w_q2up,w_q2down,w_zero,true);
@@ -729,6 +772,8 @@ int main(int argc, char **argv) {
 	systSVJ.setWeight(0, 1.);
 	systSVJ.setWeight("puUp", puUpFact);
 	systSVJ.setWeight("puDown", puDownFact);
+	systSVJ.setWeight("trigUp", trig_up / trig_central);
+	systSVJ.setWeight("trigDown", trig_down / trig_central);
 
 	if(addPDF)systSVJ.setPDFWeights(w_pdfs, PDFsplittedWeight, nPDF,w_zero,true);
 	if(addQ2)systSVJ.setQ2Weights(w_q2up,w_q2down,w_zero,true);
@@ -736,6 +781,8 @@ int main(int argc, char **argv) {
 	systWeightsSVJ[NOSYST]=1.;
 	systWeightsSVJ[PUUP]= puUpFact;
 	systWeightsSVJ[PUDOWN]= puDownFact;
+	systWeightsSVJ[TRIGUP]= trig_up / trig_central;
+	systWeightsSVJ[TRIGDOWN]= trig_down / trig_central;
       }
       //JET                
       std::vector<int> mult = *multPtr;
@@ -1476,10 +1523,10 @@ void systWeights::prepareDefault(bool addDefault, bool addQ2, bool addPDF, bool 
     this->weightedNames[0]="";
     this->weightedNames[1]="puUp";
     this->weightedNames[2]="puDown";
-    //this->weightedNames[11]="trigUp";
-    //this->weightedNames[12]="trigDown";
-    this->setMax(3);
-    this->setMaxNonPDF(3);
+    this->weightedNames[3]="trigUp";
+    this->weightedNames[4]="trigDown";
+    this->setMax(5);
+    this->setMaxNonPDF(5);
     this->weightedNames[this->maxSysts]="";
   }
   if(addQ2){
@@ -1596,7 +1643,53 @@ void systWeights::setkFact(string name, float kfact_nom, float kfact_up,float kf
 }
 
 void systWeights::setPDFWeights(float * wpdfs, double * xsections, int numPDFs, float wzero, bool mult){
-  float zerofact=1.0;
+  
+float zerofact=1.0;
+  if(mult)zerofact=this->weightedSysts[0];
+  float rms=0,mean=0;
+  for (int i = 1; i <= numPDFs; ++i){
+    //cout << " setting pdf systs zerofact "<< zerofact << " wi "<<  wpdfs[i]<< " xseci " << xsections[i]<<" wzero "<<wzero<<endl;
+    if(wzero!=0  &&xsections[i]!=0){
+      float pvalue= wpdfs[i]/(wzero*xsections[i]);
+      if (isnan(pvalue)) pvalue=1.;
+      this->setPDFValue(i,zerofact*wpdfs[i]/(wzero*xsections[i]));
+      mean+=pvalue;
+    }
+    else {
+      mean+=1.;
+      this->setPDFValue(i,wzero);
+    }
+  }
+  mean = mean/numPDFs;
+  for (int i = 1; i <= numPDFs; ++i){
+    if(wzero!=0  &&xsections[i]!=0){
+      float pvalue= wpdfs[i]/(wzero*xsections[i]);
+      if (isnan(pvalue)) pvalue=1.;
+      rms+=(mean-pvalue)*(mean-pvalue);
+    }
+    else{
+      rms+=0;
+    }
+    rms = sqrt(rms/numPDFs);
+  }
+
+  /*  if(!this->shortPDFFiles){
+    this->setSystValue("pdf_asUp", this->getPDFValue(this->nPDF-2)/wzero);
+    this->setSystValue("pdf_asDown", zerofact);
+    this->setSystValue("pdf_zmUp", this->getPDFValue(this->nPDF-1)/wzero);
+    this->setSystValue("pdf_zmDown", zerofact);
+    }*/
+
+
+  if(isnan(rms))rms=0.;
+  this->setSystValue("pdf_totalUp", zerofact*(1+rms));
+  this->setSystValue("pdf_totalDown", zerofact*(1-rms));
+
+}
+
+/*
+
+float zerofact=1.0;
   if(mult)zerofact=this->weightedSysts[0];
   for (int i = 1; i <= numPDFs; ++i){
     this->setPDFValue(i,zerofact*wpdfs[i]/(wzero*xsections[i]));
@@ -1608,6 +1701,8 @@ void systWeights::setPDFWeights(float * wpdfs, double * xsections, int numPDFs, 
   this->setSystValue("pdf_totalUp", zerofact);
   this->setSystValue("pdf_totalDown", zerofact);
 }
+*/
+
 
 //void systWeights::setTWeight(float tweight, float totalweight){
 void systWeights::setTWeight(float tweight, float wtotsample,bool mult){
@@ -1835,11 +1930,11 @@ void systWeights::writeHistogramsSysts(TH1F** histo, TFile **filesout){
       if(!(!useOnlyNominal || sy==0)) continue;
       
       filesout[(int)sy+(MAX+1)*(c)]->cd();
-      if(this->addPDF){
-	if(this->weightedNames[sy]=="pdf_totalUp")calcPDFHisto(histo, histo[sy+(MAXTOT+1)*(c)],1.0,c);
-	if(this->weightedNames[sy]=="pdf_totalDown")calcPDFHisto(histo, histo[sy+(MAXTOT+1)*(c)],-1.0,c);
-	;      //this->
-      }
+      //if(this->addPDF){
+	//if(this->weightedNames[sy]=="pdf_totalUp")calcPDFHisto(histo, histo[sy+(MAXTOT+1)*(c)],1.0,c);
+	//if(this->weightedNames[sy]=="pdf_totalDown")calcPDFHisto(histo, histo[sy+(MAXTOT+1)*(c)],-1.0,c);
+	//;      //this->
+      //}
       
       histo[sy+(MAXTOT+1)*c]->Write(histo[0]->GetName());
       //    histo[sy]=new TH1F(name+ns,name+ns,nbins,min,max);
@@ -1927,6 +2022,8 @@ TString  weightedSystsNames (weightedSysts sy){
   case NOSYST : return "";
   case PUUP : return "puUp";
   case PUDOWN : return "puDown";
+  case TRIGUP : return "trig_up/trig_central";
+  case TRIGDOWN : return "trig_down/trig_central";
   case MAXSYSTS : return "";
   }
   return "noSyst";

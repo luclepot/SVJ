@@ -24,7 +24,7 @@ hline = '-'*80
 
 localPath = "/mnt/t3nfs01/data01/shome/grauco/SVJAnalysis/CMSSW_8_0_20/src/SVJ/SVJAnalysis/"
 
-t3Path = '/pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/v16/Skims_METFilters/noSys/2017/'
+t3Path = '/pnfs/psi.ch/cms/trivcat/store/user/grauco/SVJ/v16/Skims_METFilters/JERup/2017'
 
 t3Ls = 'xrdfs t3dcachedb03.psi.ch ls -u'
 
@@ -209,6 +209,7 @@ parser = optparse.OptionParser(usage)
 
 parser.add_option('-s', '--sys', dest='sys', default = 'noSys', choices=systematics, help='Systematics: '+' '.join(systematics))
 parser.add_option('--sync', dest='sync', type='string', default = 'noSync', help='Synchro exercise')
+parser.add_option('-y', '--year', dest='year', type='string',  help='Year')
 parser.add_option('-g','--gdb', dest='gdb', action='store_true', default=False)
 parser.add_option('-n','--dryrun', dest='dryrun', action='store_true', default=False)
 parser.add_option('-m','--mode', dest='mode', default='t3se', choices=['local','t3se'])
@@ -272,7 +273,7 @@ for s in samples:
         cwd = os.getcwd()
 
         makedirs(resDirs,cwd)
-        cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  cwd
+        cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  cwd + ' ' + opt.year
         
         run(s,cmd,opt)
 
