@@ -33,7 +33,7 @@ class TriggerFuncCorrector {
     err = (KFitResult*)file->Get(errname.c_str());
     //restore base function to compute error (discarded by serialization)
     err->ResetModelFunction(func);
-    //file->Close();
+    file->Close();
   }
 
   //function
