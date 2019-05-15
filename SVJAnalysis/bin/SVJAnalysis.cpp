@@ -141,7 +141,7 @@ int main(int argc, char **argv) {
   
   string reportDir = outdir+"/txt";
   string reportName = reportDir+"/SelectedEvents_"+sample+syststrname+".txt";
-
+  
   const char* noTTlabel = "TT";
   const char* TTJetslabel = "TTJets";
   const char* TTJets_DiLeptlabel = "TTJets_DiLept";
@@ -351,7 +351,7 @@ int main(int argc, char **argv) {
 
   double Ht(0.), MT(0.);
   int nMuons=-1, nElectrons=-1;
-  ULong64_t EventNumber(0.);
+  // ULong64_t EventNumber(0.);
   
   bool BadChargedCandidateFilter = 0, BadPFMuonFilter = 0;
   int EcalDeadCellTriggerPrimitiveFilter = 0,   HBHEIsoNoiseFilter = 0,  HBHENoiseFilter = 0,  globalTightHalo2016Filter = 0, NVtx = 0;
@@ -374,15 +374,15 @@ int main(int argc, char **argv) {
 
   int NumInteractions =0;
   double puSysDown, puSysUp, puWeight;
-  chain.SetBranchAddress("NumInteractions", &NumInteractions);
+  // chain.SetBranchAddress("NumInteractions", &NumInteractions);
   chain.SetBranchAddress("puSysDown", &puSysDown);
   chain.SetBranchAddress("puSysUp", &puSysUp);
   chain.SetBranchAddress("puWeight", &puWeight);
 
-  chain.SetBranchAddress("TriggerPass", &triggerPassPtr);
+  // chain.SetBranchAddress("TriggerPass", &triggerPassPtr);
 
-  chain.SetBranchAddress("EvtNum", &EventNumber);
-  chain.SetBranchAddress("HT", &Ht);
+  // chain.SetBranchAddress("EvtNum", &EventNumber);
+  // chain.SetBranchAddress("HT", &Ht);
   chain.SetBranchAddress("MT_AK8", &MT);
 
   chain.SetBranchAddress("MET",&metFull_Pt);
@@ -390,11 +390,11 @@ int main(int argc, char **argv) {
   //chain.SetBranchAddress("MET",&metFull_Px);
   //chain.SetBranchAddress("MET",&metFull_Py);
   
-  if(isData=="MC"){
-    chain.SetBranchAddress("GenParticles", &genPartsPtr);
-    chain.SetBranchAddress("GenParticles_PdgId",&genPart_pdgId);
-    chain.SetBranchAddress("GenParticles_Status",&genPart_Status);
-  }
+  // if(isData=="MC"){
+  //   chain.SetBranchAddress("GenParticles", &genPartsPtr);
+  //   chain.SetBranchAddress("GenParticles_PdgId",&genPart_pdgId);
+  //   chain.SetBranchAddress("GenParticles_Status",&genPart_Status);
+  // }
   
   chain.SetBranchAddress("JetsAK8",&jetsAK8CHSPtr);
   chain.SetBranchAddress("Muons",&MuonsPtr);
@@ -404,16 +404,16 @@ int main(int argc, char **argv) {
   chain.SetBranchAddress("JetsAK8_neutralHadronEnergyFraction", &JetsAK8_NHFPtr);
   chain.SetBranchAddress("JetsAK8_chargedHadronEnergyFraction", &JetsAK8_CHFPtr);
 
-  chain.SetBranchAddress("NMuons",&nMuons);
-  chain.SetBranchAddress("NElectrons",&nElectrons);
+  // chain.SetBranchAddress("NMuons",&nMuons);
+  // chain.SetBranchAddress("NElectrons",&nElectrons);
 
-  chain.SetBranchAddress("BadChargedCandidateFilter", &BadChargedCandidateFilter);
-  chain.SetBranchAddress("BadPFMuonFilter", &BadPFMuonFilter);
-  chain.SetBranchAddress("EcalDeadCellTriggerPrimitiveFilter", &EcalDeadCellTriggerPrimitiveFilter);
-  chain.SetBranchAddress("HBHEIsoNoiseFilter", &HBHEIsoNoiseFilter);
-  chain.SetBranchAddress("HBHENoiseFilter", &HBHENoiseFilter);  
-  chain.SetBranchAddress("globalTightHalo2016Filter", &globalTightHalo2016Filter);
-  chain.SetBranchAddress("NVtx", &NVtx);
+  // chain.SetBranchAddress("BadChargedCandidateFilter", &BadChargedCandidateFilter);
+  // chain.SetBranchAddress("BadPFMuonFilter", &BadPFMuonFilter);
+  // chain.SetBranchAddress("EcalDeadCellTriggerPrimitiveFilter", &EcalDeadCellTriggerPrimitiveFilter);
+  // chain.SetBranchAddress("HBHEIsoNoiseFilter", &HBHEIsoNoiseFilter);
+  // chain.SetBranchAddress("HBHENoiseFilter", &HBHENoiseFilter);  
+  // chain.SetBranchAddress("globalTightHalo2016Filter", &globalTightHalo2016Filter);
+  // chain.SetBranchAddress("NVtx", &NVtx);
   
   chain.SetBranchAddress("DeltaPhiMin_AK8", &DeltaPhiMin);
   chain.SetBranchAddress("JetsAK8_ID", &jetsIDPtr);
@@ -428,12 +428,15 @@ int main(int argc, char **argv) {
   chain.SetBranchAddress("DeltaPhi1_AK8", &deltaphi1);
   chain.SetBranchAddress("DeltaPhi2_AK8", &deltaphi2);
 
-  chain.SetBranchAddress("GenMET", &GenMET);
-  chain.SetBranchAddress("madHT", &madHT);
+  // chain.SetBranchAddress("GenMET", &GenMET);
+  // chain.SetBranchAddress("madHT", &madHT);
+  
+  // caused segfaults (all three) 
   chain.SetBranchAddress("GenElectrons",&GenElectronsPtr);
   chain.SetBranchAddress("GenMuons",&GenMuonsPtr);
   chain.SetBranchAddress("GenTaus",&GenTausPtr);
 
+  // caused segfault 
   if(isData=="MC") chain.SetBranchAddress("PDFweights", &PDFweightsPtr);
 
   //if(isData=="MC") chain.SetBranchAddress("PDFWeights", &w_zero);
