@@ -51,8 +51,8 @@ int wLimit =150;
 struct systWeights{
   void initHistogramsSysts(TH1F** histo, TString name, TString, int, float, float);
   void createFilesSysts(TFile ** allFiles, TString basename, TString opt="RECREATE");
-  void fillHistogramsSysts(TH1F** histo, float v, float W, double *wcats= NULL,bool verbose=false);
-  void fillHistogramsSysts(TH1F** histo, float v, float W,  float *systWeights, int nFirstSysts=(int)MAXSYSTS, double *wcats=NULL, bool verbose=false);
+  void fillHistogramsSysts(TH1F* histo, float v, float W, double *wcats= NULL,bool verbose=false);
+  void fillHistogramsSysts(TH1F* histo, float v, float W,  float *systWeights, int nFirstSysts=(int)MAXSYSTS, double *wcats=NULL, bool verbose=false);
   void writeHistogramsSysts(TH1F** histo, TFile ** allFiles );
   void writeSingleHistogramSysts(TH1F* histo,TFile ** allMyFiles);
   void setMax(int max);
@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
   const char* data2017label = "Run2017";
 
   bool isData2017 = false;
-  bool isData2016 = false;   
+  bool isData2016 = false; 
       
   if( !strncmp(sample.c_str(), data2016label , strlen(data2016label))) {isData2016=true;}
   if( !strncmp(sample.c_str(), data2017label , strlen(data2017label))) {isData2017=true;}
@@ -187,7 +187,7 @@ int main(int argc, char **argv) {
   void writeSingleHistogramSysts(TH1F* histo,TFile * allMyFiles[(int)MAXSYSTS],bool useOnlyNominal=false);
 
   systWeights systZero, systSVJ;
-  int maxSysts=0;
+  int maxSysts=1;
   bool addPDF=false,addQ2=false, addTopPt=false,addVHF=false/*,addWZNLO=false*/, addTTSplit=false;
 
   // change in true
@@ -195,18 +195,16 @@ int main(int argc, char **argv) {
   addQ2=false;
 
   int nPDF=100;
+  double w = 1.0;
 
   if(isData=="DATA"){addPDF=false, addQ2=false;}
   systZero.prepareDefault(true, addQ2, addPDF, addTopPt,addVHF,addTTSplit);
   
-  maxSysts= systZero.maxSysts;
-
   ofstream fileout;
   fileout.open(reportName.c_str(),ios::in | ios::out | ios::trunc);
   fileout<<"RunNumber EvtNumber Lumi "<<std::endl;
 
   float systWeightsSVJ[maxSysts];
-  float w_pdfs[nPDF], w, w_pu, w_q2up,w_q2down, w_zero;
 
   TFile * allMyFiles[maxSysts];
   TString outfile = outdir + "/res/"+sample + ".root";
@@ -224,7 +222,6 @@ int main(int argc, char **argv) {
   */
   
   TString treePath = "tree";
-  TString treePathNEvents = "tree";
 
   //TString treePath = "TreeMaker2/PreSelection";
   //TString treePathNEvents = "TreeMaker2/PreSelection";
@@ -240,9 +237,9 @@ int main(int argc, char **argv) {
 
   bench.Start("NEvents");
   //  TChain chainNEvents(treePathNEvents);
-  TChain chainNEvents(treePath);
-  chainNEvents.AddFileInfoList(fc.GetList());
-  Int_t nEvents = (Int_t)chainNEvents.GetEntries();
+  TChain chain(treePath);
+  chain.AddFileInfoList(fc.GetList());
+  Int_t nEvents = (Int_t)chain.GetEntries();
   bench.Stop("NEvents");
   bench.Print("NEvents");
 
@@ -252,20 +249,6 @@ int main(int argc, char **argv) {
   cout << "totaltopweight is "<< topWeight<<endl;
   if(topWeight==0)topWeight=1;
 
-  //bench.Start("NEventsPrePres");
-  TChain chain(treePath);
-  chain.AddFileInfoList(fc.GetList());
-
-  Int_t nEventsPrePres = -1;
-  TH1F * h_nEventProc = new TH1F("h_nEventProc", "h_nEventProc", 1, 0, 1);
-  h_nEventProc = (TH1F*)chain.GetFile()->Get("nEventProc");
-  nEventsPrePres = h_nEventProc->Integral();
-  
-  //nEventsPrePres = (Int_t)chain.GetEntries();
-  
-  std::cout<<"--> --> Number of Events: "<<nEvents<< " after preselection "<< nEventsPrePres << endl;
-  bench.Stop("NEventsPrePres");
-  bench.Print("NEventsPrePres");
   
   std::string samplestr(sample.c_str());
   
@@ -281,30 +264,24 @@ int main(int argc, char **argv) {
     cout << "q2SplittedWeight is "<< q2SplittedWeight<<endl;
   }
   
-  double PDFsplittedWeight[nPDF];
   // double normzero = 0.;
   if(addPDF){
-      for (int i = 1 ; i <= nPDF ; ++i) 
-	{
-	  PDFsplittedWeight[i]=1.;
-	  
-	    if((samplestr).find("SVJ") != std::string::npos){
-	    stringstream pdfss;
-	    //pdfss<<(i+8);
-	    pdfss<<(i);
-	    string pstr=(pdfss.str());
-	    TH1D splittedWeightPDF("w_pdf_splitted","PDF splitting: overall sample weight",2000,0,2.0);
-	    TH1D splittedWeightPDF0("w_pdf_0_splitted","PDF splitting: overall sample weight 0",2000,0,2.0);
-	    //chain.Project("w_pdf_splitted",(("Event_LHEWeight"+pstr+"/Event_LHEWeight0").c_str())); 
-	    chain.Project("w_pdf_splitted",(("PDFweights["+pstr + "]").c_str())); 
-	    chain.Project("w_pdf_0_splitted",("PDFweights[0]")); 
-	    //normzero = splittedWeightPDF0.GetMean()/chain.GetEntries();
+      for (int i = 1 ; i <= nPDF ; ++i){
+      
+        if((samplestr).find("SVJ") != std::string::npos){
+        stringstream pdfss;
+        //pdfss<<(i+8);
+        pdfss<<(i);
+        string pstr=(pdfss.str());
+        TH1D splittedWeightPDF("w_pdf_splitted","PDF splitting: overall sample weight",2000,0,2.0);
+        TH1D splittedWeightPDF0("w_pdf_0_splitted","PDF splitting: overall sample weight 0",2000,0,2.0);
+        //chain.Project("w_pdf_splitted",(("Event_LHEWeight"+pstr+"/Event_LHEWeight0").c_str())); 
+        chain.Project("w_pdf_splitted",(("PDFweights["+pstr + "]").c_str())); 
+        chain.Project("w_pdf_0_splitted",("PDFweights[0]")); 
+        //normzero = splittedWeightPDF0.GetMean()/chain.GetEntries();
 
-	    //std::cout<<"Norm zero "<<normzero<<std::endl;
-	    PDFsplittedWeight[i]=splittedWeightPDF.GetMean()/splittedWeightPDF0.GetMean() ;
-	    //cout << "PDFSplittedWeight " << i << " is " << PDFsplittedWeight[i]<<endl;
-	  }
-	  
+        //std::cout<<"Norm zero "<<normzero<<std::endl;
+      }
     }
   }
 
@@ -515,124 +492,123 @@ int main(int argc, char **argv) {
   TH2F *h_AK8jet_etaphi_sublead_newID = new TH2F("h_AK8jet_etaphi_sublead_newID", "h_AK8jet_etaphi_sublead_newID", 24, -2.4, +2.4, 35, -3.5, +3.5);
 
   TH1F *h_cutFlow  = new TH1F("h_cutFlow","cutFlow",13,-0.5,12.5);
-  //TH1F *h_cutFlow  [maxSysts] ;systZero.initHistogramsSysts(h_cutFlow, "h_cutFlow","cutFlow",13,-0.5,12.5);
-  TH1F *h_nPV   [maxSysts] ;systZero.initHistogramsSysts(h_nPV,"h_nPV","nPV",70,0,70);
-  TH1F *h_nPV_w   [maxSysts] ;systZero.initHistogramsSysts(h_nPV_w,"h_nPV_w","nPV",70,0,70);
+  //TH1F *h_cutFlow   ; h_cutFlow = new TH1F("h_cutFlow","cutFlow",13,-0.5,12.5);
+  TH1F *h_nPV = new TH1F("h_nPV", "nPV", 70, 0, 70); 
+  TH1F *h_nPV_w = new TH1F("h_nPV_w","nPV",70,0,70);
 
   //Plots with no selectiona applied
-  TH1F *h_AK8jetsmult_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetsmult_presel, "h_AK8jetsmult_presel", "AK8 jets multiplicity", 10, -0.5, 9.5);  
-  TH1F *h_Muonsmult_presel [maxSysts] ;systZero.initHistogramsSysts(h_Muonsmult_presel,"h_Muonsmult_presel", " muons multiplicity", 10, -0.5, 9.5);
-  TH1F *h_Electronsmult_presel [maxSysts] ;systZero.initHistogramsSysts(h_Electronsmult_presel,"h_Electronsmult_presel", " electrons multiplicity", 10, -0.5, 9.5);
-  TH1F *h_METPt_presel [maxSysts] ;systZero.initHistogramsSysts(h_METPt_presel,"h_METPt_presel", "MET_{p_{T}}", 100, 0, 5000);
-  TH1F *h_Ht_presel [maxSysts] ;systZero.initHistogramsSysts(h_Ht_presel,"h_Ht_presel", "{H_{T}}", 100, 0, 5000);
-  TH1F *h_AK8jetPt_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetPt_presel,"h_AK8jetPt_presel", "gen-level HV semi-visible jet p_{T}", 60, 0, 3000);
-  TH1F *h_AK8jetPhi_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetPhi_presel,"h_AK8jetPhi_presel", "gen-level HV semi-visible jet #Phi", 100, -5, 5);  
-  TH1F *h_AK8jetEta_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetEta_presel,"h_AK8jetEta_presel", "gen-level HV semi-visible jet #eta", 100, -6, 6);
-  TH1F *h_AK8jetE_lead_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetE_lead_presel,"h_AK8jetE_lead_presel", "AK8 jet E", 100, 0, 3000);
-  TH1F *h_AK8jetPt_lead_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetPt_lead_presel,"h_AK8jetPt_lead_presel", "AK8 jet p_{T}", 60, 0, 3000);
-  TH1F *h_AK8jetPhi_lead_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetPhi_lead_presel,"h_AK8jetPhi_lead_presel", "AK8 jet #Phi", 100, -5, 5);
-  TH1F *h_AK8jetEta_lead_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetEta_lead_presel,"h_AK8jetEta_lead_presel", "AK8 jet #eta", 100, -6, 6);
-  TH1F *h_AK8jetE_sublead_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetE_sublead_presel,"h_AK8jetE_sublead_presel", "AK8 jet E", 100, 0, 3000);
-  TH1F *h_AK8jetPt_sublead_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetPt_sublead_presel,"h_AK8jetPt_sublead_presel", "AK8 jet p_{T}", 60, 0, 3000);
-  TH1F *h_AK8jetPhi_sublead_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetPhi_sublead_presel,"h_AK8jetPhi_sublead_presel", "AK8 jet #Phi", 100, -5, 5);
-  TH1F *h_AK8jetEta_sublead_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetEta_sublead_presel,"h_AK8jetEta_sublead_presel", "AK8 jet #eta", 100, -6, 6);
-  TH1F *h_AK8jetdR_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetdR_presel,"h_AK8jetdR_presel", "#DeltaR(j0,j1)", 100, 0, 5);
-  TH1F *h_AK8jetdP_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetdP_presel,"h_AK8jetdP_presel", "#Delta#Phi(j0,j1)", 100, 0, 5);
-  TH1F *h_AK8jetdE_presel [maxSysts] ;systZero.initHistogramsSysts(h_AK8jetdE_presel,"h_AK8jetdE_presel", "#Delta#Eta(j0,j1)", 100, 0, 5);
-  TH1F *h_Mmc_presel [maxSysts] ;systZero.initHistogramsSysts(h_Mmc_presel,"h_Mmc_presel", "m_{MC}", 750, 0, 7500);
-  TH1F *h_Mjj_presel [maxSysts] ;systZero.initHistogramsSysts(h_Mjj_presel,"h_Mjj_presel", "m_{JJ}", 750, 0, 7500);
-  TH1F *h_Mt_presel [maxSysts] ;systZero.initHistogramsSysts(h_Mt_presel,"h_Mt_presel", "m_{T}", 750, 0, 7500);
+  TH1F *h_AK8jetsmult_presel = new TH1F("h_AK8jetsmult_presel", "AK8 jets multiplicity", 10, -0.5, 9.5);  
+  TH1F *h_Muonsmult_presel = new TH1F("h_Muonsmult_presel", " muons multiplicity", 10, -0.5, 9.5);
+  TH1F *h_Electronsmult_presel = new TH1F("h_Electronsmult_presel", " electrons multiplicity", 10, -0.5, 9.5);
+  TH1F *h_METPt_presel = new TH1F("h_METPt_presel", "MET_{p_{T}}", 100, 0, 5000);
+  TH1F *h_Ht_presel = new TH1F("h_Ht_presel", "{H_{T}}", 100, 0, 5000);
+  TH1F *h_AK8jetPt_presel = new TH1F("h_AK8jetPt_presel", "gen-level HV semi-visible jet p_{T}", 60, 0, 3000);
+  TH1F *h_AK8jetPhi_presel = new TH1F("h_AK8jetPhi_presel", "gen-level HV semi-visible jet #Phi", 100, -5, 5);  
+  TH1F *h_AK8jetEta_presel = new TH1F("h_AK8jetEta_presel", "gen-level HV semi-visible jet #eta", 100, -6, 6);
+  TH1F *h_AK8jetE_lead_presel = new TH1F("h_AK8jetE_lead_presel", "AK8 jet E", 100, 0, 3000);
+  TH1F *h_AK8jetPt_lead_presel = new TH1F("h_AK8jetPt_lead_presel", "AK8 jet p_{T}", 60, 0, 3000);
+  TH1F *h_AK8jetPhi_lead_presel = new TH1F("h_AK8jetPhi_lead_presel", "AK8 jet #Phi", 100, -5, 5);
+  TH1F *h_AK8jetEta_lead_presel = new TH1F("h_AK8jetEta_lead_presel", "AK8 jet #eta", 100, -6, 6);
+  TH1F *h_AK8jetE_sublead_presel = new TH1F("h_AK8jetE_sublead_presel", "AK8 jet E", 100, 0, 3000);
+  TH1F *h_AK8jetPt_sublead_presel = new TH1F("h_AK8jetPt_sublead_presel", "AK8 jet p_{T}", 60, 0, 3000);
+  TH1F *h_AK8jetPhi_sublead_presel = new TH1F("h_AK8jetPhi_sublead_presel", "AK8 jet #Phi", 100, -5, 5);
+  TH1F *h_AK8jetEta_sublead_presel = new TH1F("h_AK8jetEta_sublead_presel", "AK8 jet #eta", 100, -6, 6);
+  TH1F *h_AK8jetdR_presel = new TH1F("h_AK8jetdR_presel", "#DeltaR(j0,j1)", 100, 0, 5);
+  TH1F *h_AK8jetdP_presel = new TH1F("h_AK8jetdP_presel", "#Delta#Phi(j0,j1)", 100, 0, 5);
+  TH1F *h_AK8jetdE_presel = new TH1F("h_AK8jetdE_presel", "#Delta#Eta(j0,j1)", 100, 0, 5);
+  TH1F *h_Mmc_presel = new TH1F("h_Mmc_presel", "m_{MC}", 750, 0, 7500);
+  TH1F *h_Mjj_presel = new TH1F("h_Mjj_presel", "m_{JJ}", 750, 0, 7500);
+  TH1F *h_Mt_presel = new TH1F("h_Mt_presel", "m_{T}", 750, 0, 7500);
 
-  TH1F *h_Mt_presel_1 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_presel_1,"h_Mt_presel_1", "m_{T}", 750, 0, 7500);
-  TH1F *h_METPt_presel_1 [maxSysts] ;systZero.initHistogramsSysts(h_METPt_presel_1,"h_METPt_presel_1", "MET_{p_{T}}", 100, 0, 5000);
-  TH1F *h_Mt_presel_2 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_presel_2,"h_Mt_presel_2", "m_{T}", 750, 0, 7500);
-  TH1F *h_METPt_presel_2 [maxSysts] ;systZero.initHistogramsSysts(h_METPt_presel_2,"h_METPt_presel_2", "MET_{p_{T}}", 100, 0, 5000);
-  TH1F *h_Mt_presel_3 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_presel_3,"h_Mt_presel_3", "m_{T}", 750, 0, 7500);
-  TH1F *h_METPt_presel_3 [maxSysts] ;systZero.initHistogramsSysts(h_METPt_presel_3,"h_METPt_presel_3", "MET_{p_{T}}", 100, 0, 5000);
-  TH1F *h_Mt_presel_4 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_presel_4,"h_Mt_presel_4", "m_{T}", 750, 0, 7500);
-  TH1F *h_METPt_presel_4 [maxSysts] ;systZero.initHistogramsSysts(h_METPt_presel_4,"h_METPt_presel_4", "MET_{p_{T}}", 100, 0, 5000);
-  TH1F *h_Mt_presel_5 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_presel_5,"h_Mt_presel_5", "m_{T}", 750, 0, 7500);
-  TH1F *h_METPt_presel_5 [maxSysts] ;systZero.initHistogramsSysts(h_METPt_presel_5,"h_METPt_presel_5", "MET_{p_{T}}", 100, 0, 5000);
-  TH1F *h_Mt_presel_6 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_presel_6,"h_Mt_presel_6", "m_{T}", 750, 0, 7500);
-  TH1F *h_METPt_presel_6 [maxSysts] ;systZero.initHistogramsSysts(h_METPt_presel_6,"h_METPt_presel_6", "MET_{p_{T}}", 100, 0, 5000);
-  TH1F *h_Mt_presel_7 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_presel_7,"h_Mt_presel_7", "m_{T}", 750, 0, 7500);
-  TH1F *h_METPt_presel_7 [maxSysts] ;systZero.initHistogramsSysts(h_METPt_presel_7,"h_METPt_presel_7", "MET_{p_{T}}", 100, 0, 5000);
+  TH1F *h_Mt_presel_1 = new TH1F("h_Mt_presel_1", "m_{T}", 750, 0, 7500);
+  TH1F *h_METPt_presel_1 = new TH1F("h_METPt_presel_1", "MET_{p_{T}}", 100, 0, 5000);
+  TH1F *h_Mt_presel_2 = new TH1F("h_Mt_presel_2", "m_{T}", 750, 0, 7500);
+  TH1F *h_METPt_presel_2 = new TH1F("h_METPt_presel_2", "MET_{p_{T}}", 100, 0, 5000);
+  TH1F *h_Mt_presel_3 = new TH1F("h_Mt_presel_3", "m_{T}", 750, 0, 7500);
+  TH1F *h_METPt_presel_3 = new TH1F("h_METPt_presel_3", "MET_{p_{T}}", 100, 0, 5000);
+  TH1F *h_Mt_presel_4 = new TH1F("h_Mt_presel_4", "m_{T}", 750, 0, 7500);
+  TH1F *h_METPt_presel_4 = new TH1F("h_METPt_presel_4", "MET_{p_{T}}", 100, 0, 5000);
+  TH1F *h_Mt_presel_5 = new TH1F("h_Mt_presel_5", "m_{T}", 750, 0, 7500);
+  TH1F *h_METPt_presel_5 = new TH1F("h_METPt_presel_5", "MET_{p_{T}}", 100, 0, 5000);
+  TH1F *h_Mt_presel_6 = new TH1F("h_Mt_presel_6", "m_{T}", 750, 0, 7500);
+  TH1F *h_METPt_presel_6 = new TH1F("h_METPt_presel_6", "MET_{p_{T}}", 100, 0, 5000);
+  TH1F *h_Mt_presel_7 = new TH1F("h_Mt_presel_7", "m_{T}", 750, 0, 7500);
+  TH1F *h_METPt_presel_7 = new TH1F("h_METPt_presel_7", "MET_{p_{T}}", 100, 0, 5000);
 
-  TH1F *h_dPhimin_presel [maxSysts] ;systZero.initHistogramsSysts(h_dPhimin_presel,"h_dPhimin_presel", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
-  TH1F *h_dPhi1_presel [maxSysts] ;systZero.initHistogramsSysts(h_dPhi1_presel,"h_dPhi1_presel", "min(MET,j1)", 100, 0, 3.5);
-  TH1F *h_dPhi2_presel [maxSysts] ;systZero.initHistogramsSysts(h_dPhi2_presel,"h_dPhi2_presel", "min(MET,j2)", 100, 0, 3.5);
-  TH1F *h_transverseratio_presel [maxSysts] ;systZero.initHistogramsSysts(h_transverseratio_presel,"h_transverseratio_presel", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_dPhimin_presel = new TH1F("h_dPhimin_presel", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
+  TH1F *h_dPhi1_presel = new TH1F("h_dPhi1_presel", "min(MET,j1)", 100, 0, 3.5);
+  TH1F *h_dPhi2_presel = new TH1F("h_dPhi2_presel", "min(MET,j2)", 100, 0, 3.5);
+  TH1F *h_transverseratio_presel = new TH1F("h_transverseratio_presel", "MET/M_{T}", 100, 0, 1);
   
   //Plots after full-selection
-  TH1F *h_dEta [maxSysts] ;systZero.initHistogramsSysts(h_dEta, "h_dEta", "#Delta#eta(j0,j1)", 100, 0, 10);
-  TH1F *h_dPhimin [maxSysts] ;systZero.initHistogramsSysts(h_dPhimin,"h_dPhimin", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
-  TH1F *h_transverseratio [maxSysts] ;systZero.initHistogramsSysts(h_transverseratio, "h_transverseratio", "MET/M_{T}", 100, 0, 1);
-  TH1F *h_Mt [maxSysts] ;systZero.initHistogramsSysts(h_Mt,"h_Mt", "m_{T}", 750, 0, 7500);
-  TH1F *h_Mmc [maxSysts] ;systZero.initHistogramsSysts(h_Mmc,"h_Mmc", "m_{MC}", 750, 0, 7500);
-  TH1F *h_Mjj [maxSysts] ;systZero.initHistogramsSysts(h_Mjj,"h_Mjj", "m_{JJ}", 750, 0, 7500);
-  TH1F *h_METPt [maxSysts] ;systZero.initHistogramsSysts(h_METPt,"h_METPt", "MET_{p_{T}}", 100, 0, 2000);
-  TH1F *h_dPhi [maxSysts] ;systZero.initHistogramsSysts(h_dPhi,"h_dPhi", "#Delta#Phi(j0,j1)", 100, 0, 5);
+  TH1F *h_dEta = new TH1F( "h_dEta", "#Delta#eta(j0,j1)", 100, 0, 10);
+  TH1F *h_dPhimin = new TH1F("h_dPhimin", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
+  TH1F *h_transverseratio = new TH1F( "h_transverseratio", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt = new TH1F("h_Mt", "m_{T}", 750, 0, 7500);
+  TH1F *h_Mmc = new TH1F("h_Mmc", "m_{MC}", 750, 0, 7500);
+  TH1F *h_Mjj = new TH1F("h_Mjj", "m_{JJ}", 750, 0, 7500);
+  TH1F *h_METPt = new TH1F("h_METPt", "MET_{p_{T}}", 100, 0, 2000);
+  TH1F *h_dPhi = new TH1F("h_dPhi", "#Delta#Phi(j0,j1)", 100, 0, 5);
 
-  TH1F *h_dEta_CR [maxSysts] ;systZero.initHistogramsSysts(h_dEta_CR,"h_dEta_CR", "#Delta#eta(j0,j1)", 100, 0, 10);
-  TH1F *h_dPhimin_CR [maxSysts] ;systZero.initHistogramsSysts(h_dPhimin_CR,"h_dPhimin_CR", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
-  TH1F *h_transverseratio_CR [maxSysts] ;systZero.initHistogramsSysts(h_transverseratio_CR,"h_transverseratio_CR", "MET/M_{T}", 100, 0, 1);
-  TH1F *h_Mt_CR [maxSysts] ;systZero.initHistogramsSysts(h_Mt_CR,"h_Mt_CR", "m_{T}", 750, 0, 7500);
-  TH1F *h_Mmc_CR [maxSysts] ;systZero.initHistogramsSysts(h_Mmc_CR,"h_Mmc_CR", "m_{MC}", 750, 0, 7500);
-  TH1F *h_Mjj_CR [maxSysts] ;systZero.initHistogramsSysts(h_Mjj_CR,"h_Mjj_CR", "m_{JJ}", 750, 0, 7500);
-  TH1F *h_METPt_CR [maxSysts] ;systZero.initHistogramsSysts(h_METPt_CR,"h_METPt_CR", "MET_{p_{T}}", 100, 0, 2000);
-  TH1F *h_dPhi_CR [maxSysts] ;systZero.initHistogramsSysts(h_dPhi_CR,"h_dPhi_CR", "#Delta#Phi(j0,j1)", 100, 0, 5);
+  TH1F *h_dEta_CR = new TH1F("h_dEta_CR", "#Delta#eta(j0,j1)", 100, 0, 10);
+  TH1F *h_dPhimin_CR = new TH1F("h_dPhimin_CR", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
+  TH1F *h_transverseratio_CR = new TH1F("h_transverseratio_CR", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt_CR = new TH1F("h_Mt_CR", "m_{T}", 750, 0, 7500);
+  TH1F *h_Mmc_CR = new TH1F("h_Mmc_CR", "m_{MC}", 750, 0, 7500);
+  TH1F *h_Mjj_CR = new TH1F("h_Mjj_CR", "m_{JJ}", 750, 0, 7500);
+  TH1F *h_METPt_CR = new TH1F("h_METPt_CR", "MET_{p_{T}}", 100, 0, 2000);
+  TH1F *h_dPhi_CR = new TH1F("h_dPhi_CR", "#Delta#Phi(j0,j1)", 100, 0, 5);
 
-  TH1F *h_dEta_BDT [maxSysts] ;systZero.initHistogramsSysts(h_dEta_BDT,"h_dEta_BDT", "#Delta#eta(j0,j1)", 100, 0, 10);
-  TH1F *h_dPhimin_BDT [maxSysts] ;systZero.initHistogramsSysts(h_dPhimin_BDT,"h_dPhimin_BDT", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
-  TH1F *h_transverseratio_BDT [maxSysts] ;systZero.initHistogramsSysts(h_transverseratio_BDT,"h_transverseratio_BDT", "MET/M_{T}", 100, 0, 1);
-  TH1F *h_Mt_BDT [maxSysts] ;systZero.initHistogramsSysts(h_Mt_BDT,"h_Mt_BDT", "m_{T}", 750, 0, 7500);
-  TH1F *h_Mmc_BDT [maxSysts] ;systZero.initHistogramsSysts(h_Mmc_BDT,"h_Mmc_BDT", "m_{MC}", 750, 0, 7500);
-  TH1F *h_Mjj_BDT [maxSysts] ;systZero.initHistogramsSysts(h_Mjj_BDT,"h_Mjj_BDT", "m_{JJ}", 750, 0, 7500);
-  TH1F *h_METPt_BDT [maxSysts] ;systZero.initHistogramsSysts(h_METPt_BDT,"h_METPt_BDT", "MET_{p_{T}}", 100, 0, 2000);
-  TH1F *h_dPhi_BDT [maxSysts] ;systZero.initHistogramsSysts(h_dPhi_BDT,"h_dPhi_BDT", "#Delta#Phi(j0,j1)", 100, 0, 5);
+  TH1F *h_dEta_BDT = new TH1F("h_dEta_BDT", "#Delta#eta(j0,j1)", 100, 0, 10);
+  TH1F *h_dPhimin_BDT = new TH1F("h_dPhimin_BDT", "min(#Delta#Phi_{1},#Delta#Phi_{2})", 100, 0, 3.5);
+  TH1F *h_transverseratio_BDT = new TH1F("h_transverseratio_BDT", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt_BDT = new TH1F("h_Mt_BDT", "m_{T}", 750, 0, 7500);
+  TH1F *h_Mmc_BDT = new TH1F("h_Mmc_BDT", "m_{MC}", 750, 0, 7500);
+  TH1F *h_Mjj_BDT = new TH1F("h_Mjj_BDT", "m_{JJ}", 750, 0, 7500);
+  TH1F *h_METPt_BDT = new TH1F("h_METPt_BDT", "MET_{p_{T}}", 100, 0, 2000);
+  TH1F *h_dPhi_BDT = new TH1F("h_dPhi_BDT", "#Delta#Phi(j0,j1)", 100, 0, 5);
 
-  TH1F *h_transverseratio_BDT0 [maxSysts] ;systZero.initHistogramsSysts(h_transverseratio_BDT0,"h_transverseratio_BDT0", "MET/M_{T}", 100, 0, 1);
-  TH1F *h_Mt_BDT0 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_BDT0,"h_Mt_BDT0", "m_{T}", 750, 0, 7500);
-  TH1F *h_Mmc_BDT0 [maxSysts] ;systZero.initHistogramsSysts(h_Mmc_BDT0,"h_Mmc_BDT0", "m_{MC}", 750, 0, 7500);
-  TH1F *h_Mjj_BDT0 [maxSysts] ;systZero.initHistogramsSysts(h_Mjj_BDT0,"h_Mjj_BDT0", "m_{JJ}", 750, 0, 7500);
-  TH1F *h_METPt_BDT0 [maxSysts] ;systZero.initHistogramsSysts(h_METPt_BDT0,"h_METPt_BDT0", "MET_{p_{T}}", 100, 0, 2000);
+  TH1F *h_transverseratio_BDT0 = new TH1F("h_transverseratio_BDT0", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt_BDT0 = new TH1F("h_Mt_BDT0", "m_{T}", 750, 0, 7500);
+  TH1F *h_Mmc_BDT0 = new TH1F("h_Mmc_BDT0", "m_{MC}", 750, 0, 7500);
+  TH1F *h_Mjj_BDT0 = new TH1F("h_Mjj_BDT0", "m_{JJ}", 750, 0, 7500);
+  TH1F *h_METPt_BDT0 = new TH1F("h_METPt_BDT0", "MET_{p_{T}}", 100, 0, 2000);
 
-  TH1F *h_transverseratio_BDT1 [maxSysts] ;systZero.initHistogramsSysts(h_transverseratio_BDT1,"h_transverseratio_BDT1", "MET/M_{T}", 100, 0, 1);
-  TH1F *h_Mt_BDT1 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_BDT1,"h_Mt_BDT1", "m_{T}", 750, 0, 7500);
-  TH1F *h_Mmc_BDT1 [maxSysts] ;systZero.initHistogramsSysts(h_Mmc_BDT1,"h_Mmc_BDT1", "m_{MC}", 750, 0, 7500);
-  TH1F *h_Mjj_BDT1 [maxSysts] ;systZero.initHistogramsSysts(h_Mjj_BDT1,"h_Mjj_BDT1", "m_{JJ}", 750, 0, 7500);
-  TH1F *h_METPt_BDT1 [maxSysts] ;systZero.initHistogramsSysts(h_METPt_BDT1,"h_METPt_BDT1", "MET_{p_{T}}", 100, 0, 2000);
+  TH1F *h_transverseratio_BDT1 = new TH1F("h_transverseratio_BDT1", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt_BDT1 = new TH1F("h_Mt_BDT1", "m_{T}", 750, 0, 7500);
+  TH1F *h_Mmc_BDT1 = new TH1F("h_Mmc_BDT1", "m_{MC}", 750, 0, 7500);
+  TH1F *h_Mjj_BDT1 = new TH1F("h_Mjj_BDT1", "m_{JJ}", 750, 0, 7500);
+  TH1F *h_METPt_BDT1 = new TH1F("h_METPt_BDT1", "MET_{p_{T}}", 100, 0, 2000);
 
-  TH1F *h_transverseratio_BDT2 [maxSysts] ;systZero.initHistogramsSysts(h_transverseratio_BDT2,"h_transverseratio_BDT2", "MET/M_{T}", 100, 0, 1);
-  TH1F *h_Mt_BDT2 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_BDT2,"h_Mt_BDT2", "m_{T}", 750, 0, 7500);
-  TH1F *h_Mmc_BDT2 [maxSysts] ;systZero.initHistogramsSysts(h_Mmc_BDT2,"h_Mmc_BDT2", "m_{MC}", 750, 0, 7500);
-  TH1F *h_Mjj_BDT2 [maxSysts] ;systZero.initHistogramsSysts(h_Mjj_BDT2,"h_Mjj_BDT2", "m_{JJ}", 750, 0, 7500);
-  TH1F *h_METPt_BDT2 [maxSysts] ;systZero.initHistogramsSysts(h_METPt_BDT2,"h_METPt_BDT2", "MET_{p_{T}}", 100, 0, 2000);
+  TH1F *h_transverseratio_BDT2 = new TH1F("h_transverseratio_BDT2", "MET/M_{T}", 100, 0, 1);
+  TH1F *h_Mt_BDT2 = new TH1F("h_Mt_BDT2", "m_{T}", 750, 0, 7500);
+  TH1F *h_Mmc_BDT2 = new TH1F("h_Mmc_BDT2", "m_{MC}", 750, 0, 7500);
+  TH1F *h_Mjj_BDT2 = new TH1F("h_Mjj_BDT2", "m_{JJ}", 750, 0, 7500);
+  TH1F *h_METPt_BDT2 = new TH1F("h_METPt_BDT2", "MET_{p_{T}}", 100, 0, 2000);
 
-  TH1F *h_Mt_CRBDT0 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_CRBDT0,"h_Mt_CRBDT0", "m_{T}", 750, 0, 7500);
-  TH1F *h_Mt_CRBDT1 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_CRBDT1, "h_Mt_CRBDT1", "m_{T}", 750, 0, 7500);
-  TH1F *h_Mt_CRBDT2 [maxSysts] ;systZero.initHistogramsSysts(h_Mt_CRBDT2, "h_Mt_CRBDT2", "m_{T}", 750, 0, 7500);
+  TH1F *h_Mt_CRBDT0 = new TH1F("h_Mt_CRBDT0", "m_{T}", 750, 0, 7500);
+  TH1F *h_Mt_CRBDT1 = new TH1F( "h_Mt_CRBDT1", "m_{T}", 750, 0, 7500);
+  TH1F *h_Mt_CRBDT2 = new TH1F( "h_Mt_CRBDT2", "m_{T}", 750, 0, 7500);
 
-  TH1F *h_bdt_mult_0_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_mult_0_presel, "h_bdt_mult_0_presel", "mult jet 0", 500, 0, 500);
-  TH1F *h_bdt_mult_1_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_mult_1_presel, "h_bdt_mult_1_presel", "mult jet 1", 500, 0, 500);
-  TH1F *h_bdt_axisminor_0_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_axisminor_0_presel, "h_bdt_axisminor_0_presel", "axisminor jet 0", 100, 0, 0.2);
-  TH1F *h_bdt_axisminor_1_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_axisminor_1_presel, "h_bdt_axisminor_1_presel", "axisminor jet 1", 100, 0, 0.2);
-  TH1F *h_bdt_girth_0_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_girth_0_presel, "h_bdt_girth_0_presel", "girth jet 0", 100, 0, 0.7);
-  TH1F *h_bdt_girth_1_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_girth_1_presel, "h_bdt_girth_1_presel", "girth jet 1", 100, 0, 0.7);
-  TH1F *h_bdt_tau21_0_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_tau21_0_presel, "h_bdt_tau21_0_presel", "tau21 jet 0", 100, 0, 1);
-  TH1F *h_bdt_tau21_1_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_tau21_1_presel, "h_bdt_tau21_1_presel", "tau21 jet 1", 100, 0, 1.4);
-  TH1F *h_bdt_tau32_0_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_tau32_0_presel, "h_bdt_tau32_0_presel", "tau32 jet 0", 100, 0, 1.4);
-  TH1F *h_bdt_tau32_1_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_tau32_1_presel, "h_bdt_tau32_1_presel", "tau32 jet 1", 100, 0, 1);
-  TH1F *h_bdt_deltaphi_0_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_deltaphi_0_presel, "h_bdt_deltaphi_0_presel", "deltaphi jet 0", 100, 0, 3.5);
-  TH1F *h_bdt_deltaphi_1_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_deltaphi_1_presel, "h_bdt_deltaphi_1_presel", "deltaphi jet 1", 100, 0, 3.5);
-  TH1F *h_bdt_msd_0_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_msd_0_presel, "h_bdt_msd_0_presel", "msd jet 0", 120, 0, 600);
-  TH1F *h_bdt_msd_1_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_msd_1_presel, "h_bdt_msd_1_presel", "msd jet 1", 120, 0, 600);
-  TH1F *h_bdt_mva_0_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_mva_0_presel, "h_bdt_mva_0_presel", "mva jet 0", 100, -1, 1);
-  TH1F *h_bdt_mva_1_presel [maxSysts] ;systZero.initHistogramsSysts(h_bdt_mva_1_presel, "h_bdt_mva_1_presel", "mva jet 0", 100, -1, 1);
+  TH1F *h_bdt_mult_0_presel = new TH1F( "h_bdt_mult_0_presel", "mult jet 0", 500, 0, 500);
+  TH1F *h_bdt_mult_1_presel = new TH1F( "h_bdt_mult_1_presel", "mult jet 1", 500, 0, 500);
+  TH1F *h_bdt_axisminor_0_presel = new TH1F( "h_bdt_axisminor_0_presel", "axisminor jet 0", 100, 0, 0.2);
+  TH1F *h_bdt_axisminor_1_presel = new TH1F( "h_bdt_axisminor_1_presel", "axisminor jet 1", 100, 0, 0.2);
+  TH1F *h_bdt_girth_0_presel = new TH1F( "h_bdt_girth_0_presel", "girth jet 0", 100, 0, 0.7);
+  TH1F *h_bdt_girth_1_presel = new TH1F( "h_bdt_girth_1_presel", "girth jet 1", 100, 0, 0.7);
+  TH1F *h_bdt_tau21_0_presel = new TH1F( "h_bdt_tau21_0_presel", "tau21 jet 0", 100, 0, 1);
+  TH1F *h_bdt_tau21_1_presel = new TH1F( "h_bdt_tau21_1_presel", "tau21 jet 1", 100, 0, 1.4);
+  TH1F *h_bdt_tau32_0_presel = new TH1F( "h_bdt_tau32_0_presel", "tau32 jet 0", 100, 0, 1.4);
+  TH1F *h_bdt_tau32_1_presel = new TH1F( "h_bdt_tau32_1_presel", "tau32 jet 1", 100, 0, 1);
+  TH1F *h_bdt_deltaphi_0_presel = new TH1F( "h_bdt_deltaphi_0_presel", "deltaphi jet 0", 100, 0, 3.5);
+  TH1F *h_bdt_deltaphi_1_presel = new TH1F( "h_bdt_deltaphi_1_presel", "deltaphi jet 1", 100, 0, 3.5);
+  TH1F *h_bdt_msd_0_presel = new TH1F( "h_bdt_msd_0_presel", "msd jet 0", 120, 0, 600);
+  TH1F *h_bdt_msd_1_presel = new TH1F( "h_bdt_msd_1_presel", "msd jet 1", 120, 0, 600);
+  TH1F *h_bdt_mva_0_presel = new TH1F( "h_bdt_mva_0_presel", "mva jet 0", 100, -1, 1);
+  TH1F *h_bdt_mva_1_presel = new TH1F( "h_bdt_mva_1_presel", "mva jet 0", 100, -1, 1);
 
   float n_twojets(0.), n_prejetspt(0.), n_pretrigplateau(0.),  n_transratio(0.), n_MT(0.), n_METfilters(0.), n_dPhi(0.), n_transverse(0.);
   float  n_muonveto(0.), n_electronveto(0.), n_BDT(0.) ;
-  std::cout<< "===> Number of Processed Events: "<<nEventsPrePres << " ===> Number of Skimmed Events: "<<nEvents <<std::endl;
 
 
   systZero.createFilesSysts(allMyFiles,outdir+"/res/"+sample +syststr);
@@ -652,8 +628,7 @@ int main(int argc, char **argv) {
     {
 
       chain.GetEntry(i);
-      w = 1;
-      w_zero = 1;
+      w = 1.0;
 
 
 
@@ -661,131 +636,58 @@ int main(int argc, char **argv) {
       TriggerFuncCorrector tfc;
       string trig_filename = cmssw_base + std::string("/src/SVJ/SVJAnalysis/data/trigEffFit_SingleMuon_"+ year +"_DetaHLTmatch.root");
       tfc.SetFunc(trig_filename,"fit_MTAK8","err_MTAK8");
-      double trig_central = tfc.GetCorrection(MT,0);
       
-
-
 
       if(isData=="MC"){ 
 
-	std::vector<double> PDFweights = *PDFweightsPtr;
-	w_zero = PDFweights[0];
+        std::vector<TLorentzVector> GenElectrons = *GenElectronsPtr;
+        std::vector<TLorentzVector> GenMuons = *GenMuonsPtr;
+        std::vector<TLorentzVector> GenTaus = *GenTausPtr;
+        
+        bool tt_stitching=false;
+        
+        if(madHT < 600 && GenElectrons.size()==0 && GenMuons.size()==0 && GenTaus.size()==0 && tt_stitching_TTJets==true) tt_stitching=true;
+        else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_DiLept==true) tt_stitching=true;
+        else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_DiLept_genMET150==true) tt_stitching=true;
+        else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromT==true) tt_stitching=true;
+        else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromT_genMET150==true) tt_stitching=true;
+        else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromTbar==true) tt_stitching=true;
+        else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromTbar_genMET150==true) tt_stitching=true;
+        else if(madHT >= 600 && tt_stitching_TTJets_HT600to800==true) tt_stitching=true;
+        else if(madHT >= 600 && tt_stitching_TTJets_HT800to1200==true) tt_stitching=true;
+        else if(madHT >= 600 && tt_stitching_TTJets_HT1200to2500==true) tt_stitching=true;
+        else if(madHT >= 600 && tt_stitching_TTJets_HT2500toInf==true) tt_stitching=true;
+        
+        else if(tt_stitching_noTT==true) tt_stitching=true;
 
-	if(addQ2){
-	  w_q2up = PDFweights[4];
-	  w_q2down = PDFweights[8];
-	}
-
-	if(addPDF){
-	  for (int p = 1; p <= nPDF;++p){
-	    stringstream pdfss;
-	    //pdfss<<(p+8);
-	    pdfss<<(p);
-	    //string pstr =(pdfss.str());
-	    //w_pdfs[p-1] = PDFweights[p+8];
-	    w_pdfs[p-1] = PDFweights[p];
-	    //chain.SetBranchAddress(("Event_LHEWeight"+pstr).c_str(), &w_pdfs[p-1]);
-	  }
-	}
-	
-	
-
-	
-
-	//	if (isData=="MC"){
-
-	  w_pu = 1.;//puWeight; //LumiWeights_.weight(NumInteractions);
-	  w *= w_pu;
-	  w *= trig_central;
-	  //}
-	
-
-	std::vector<TLorentzVector> GenElectrons = *GenElectronsPtr;
-	std::vector<TLorentzVector> GenMuons = *GenMuonsPtr;
-	std::vector<TLorentzVector> GenTaus = *GenTausPtr;
-	
-	bool tt_stitching=false;
-	
-	if(madHT < 600 && GenElectrons.size()==0 && GenMuons.size()==0 && GenTaus.size()==0 && tt_stitching_TTJets==true) tt_stitching=true;
-	else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_DiLept==true) tt_stitching=true;
-	else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_DiLept_genMET150==true) tt_stitching=true;
-	else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromT==true) tt_stitching=true;
-	else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromT_genMET150==true) tt_stitching=true;
-	else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromTbar==true) tt_stitching=true;
-	else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromTbar_genMET150==true) tt_stitching=true;
-	else if(madHT >= 600 && tt_stitching_TTJets_HT600to800==true) tt_stitching=true;
-	else if(madHT >= 600 && tt_stitching_TTJets_HT800to1200==true) tt_stitching=true;
-	else if(madHT >= 600 && tt_stitching_TTJets_HT1200to2500==true) tt_stitching=true;
-	else if(madHT >= 600 && tt_stitching_TTJets_HT2500toInf==true) tt_stitching=true;
-	
-	else if(tt_stitching_noTT==true) tt_stitching=true;
-
-	if(tt_stitching==false) continue;
+        if(tt_stitching==false) continue;
       }
+
       if(isData=="DATA"){
-	
-	systZero.setWeight(0,1.);
-	systZero.setWeight("puDown",1.);
-	systZero.setWeight("puUp",1.);
-	systZero.setWeight("trigDown",1.);
-	systZero.setWeight("trigUp",1.);
+        systZero.setWeight(0,1.);
+        systZero.setWeight("puDown",1.);
+        systZero.setWeight("puUp",1.);
+        systZero.setWeight("trigDown",1.);
+        systZero.setWeight("trigUp",1.);
 
-	systSVJ.copySysts(systZero);
-	systSVJ.setWeight(0,1.);
-	systSVJ.setWeight("puDown",1.);
-	systSVJ.setWeight("puUp",1.);
-	systSVJ.setWeight("trigDown",1.);
-	systSVJ.setWeight("trigUp",1.);
+        systSVJ.copySysts(systZero);
+        systSVJ.setWeight(0,1.);
+        systSVJ.setWeight("puDown",1.);
+        systSVJ.setWeight("puUp",1.);
+        systSVJ.setWeight("trigDown",1.);
+        systSVJ.setWeight("trigUp",1.);
 
-	systWeightsSVJ[NOSYST]= 1.;
-        systWeightsSVJ[PUUP]= 1.;
-        systWeightsSVJ[PUDOWN]= 1.;
-	systWeightsSVJ[TRIGUP]= 1.;
-	systWeightsSVJ[TRIGDOWN]= 1.;
+        systWeightsSVJ[NOSYST]= 1.;
+              systWeightsSVJ[PUUP]= 1.;
+              systWeightsSVJ[PUDOWN]= 1.;
+        systWeightsSVJ[TRIGUP]= 1.;
+        systWeightsSVJ[TRIGDOWN]= 1.;
       }
 
       if(isData=="MC"){
 	//double puUpFact=(LumiWeightsUp_.weight(NumInteractions))/(LumiWeights_.weight(NumInteractions));
 	//double puDownFact=(LumiWeightsDown_.weight(NumInteractions))/(LumiWeights_.weight(NumInteractions));
 
-	double puUpFact = puSysUp / puWeight;
-	double puDownFact = puSysDown / puWeight;
-	
-	double trig_up = tfc.GetCorrection(MT,1);
-	double trig_down = tfc.GetCorrection(MT,-1);
-
-
-	if(NumInteractions>75){
-	  //cout << " --> NumInteractions very high!!" << endl;
-	  puUpFact =0;
-	  puDownFact=0;
-	}
-	
-	systZero.setWeight(0, 1.);
-	systZero.setWeight("puUp",1.);
-	systZero.setWeight("puDown",1.);
-	systZero.setWeight("trigUp",1.);
-	systZero.setWeight("trigDown",1.);
-
-
-	if(addPDF)systZero.setPDFWeights(w_pdfs, PDFsplittedWeight, nPDF,w_zero, true);
-	if(addQ2)systZero.setQ2Weights(w_q2up,w_q2down,w_zero,true);
-
-	systSVJ.copySysts(systZero);
-	systSVJ.setWeight(0, 1.);
-	systSVJ.setWeight("puUp", puUpFact);
-	systSVJ.setWeight("puDown", puDownFact);
-	systSVJ.setWeight("trigUp", trig_up / trig_central);
-	systSVJ.setWeight("trigDown", trig_down / trig_central);
-
-	if(addPDF)systSVJ.setPDFWeights(w_pdfs, PDFsplittedWeight, nPDF,w_zero,true);
-	if(addQ2)systSVJ.setQ2Weights(w_q2up,w_q2down,w_zero,true);
-
-	systWeightsSVJ[NOSYST]=1.;
-	systWeightsSVJ[PUUP]= puUpFact;
-	systWeightsSVJ[PUDOWN]= puDownFact;
-	systWeightsSVJ[TRIGUP]= trig_up / trig_central;
-	systWeightsSVJ[TRIGDOWN]= trig_down / trig_central;
       }
       //JET                
       std::vector<int> mult = *multPtr;
@@ -1183,7 +1085,7 @@ int main(int argc, char **argv) {
     }//end of loop over events
 
   
-  h_cutFlow->SetBinContent(1,nEventsPrePres);
+  h_cutFlow->SetBinContent(1,nEvents);
   h_cutFlow->GetXaxis()->SetBinLabel(1,"no selection");
   h_cutFlow->SetBinContent(2,nEvents);
   h_cutFlow->GetXaxis()->SetBinLabel(2,"ntuples skimming");
@@ -1212,136 +1114,136 @@ int main(int argc, char **argv) {
  
   std::cout<<"===================="<<std::endl;
   std:: cout<<"Cutflow"<<"Raw events  Abs Eff (%)     Rel Eff (%)"<<std::endl;
-  std:: cout<<"Dijet:          "<<n_prejetspt <<   "    "<< float(n_prejetspt/nEventsPrePres) * 100 << "    "<< float(n_prejetspt/nEventsPrePres) * 100.<< std::endl;
-  std:: cout<<"MET/MT>0.15:    "<<n_transratio <<   "    "<< float(n_transratio/nEventsPrePres) * 100<< "    "<< float(n_transratio/n_prejetspt) * 100.<< std::endl;
-  std:: cout<<"Muon Veto:      "<< n_muonveto<<   "    "<< float(n_muonveto/nEventsPrePres) * 100<< "    "<< float(n_muonveto/n_transratio) * 100<<std::endl;
-  std:: cout<<"Electron Veto:  "<< n_electronveto<<  "    "<< float(n_electronveto/nEventsPrePres) * 100<< "    "<< float(n_electronveto/n_muonveto) * 100<<std::endl;
-  std:: cout<<"DeltaEta < 1.5: "<<n_pretrigplateau <<   "    "<< float(n_pretrigplateau/nEventsPrePres) * 100<< "    "<<  float(n_pretrigplateau/n_electronveto) * 100<< std::endl;
-  std:: cout<<"MT>1500:        "<< n_MT<<  "    "<< float(n_MT/nEventsPrePres) * 100<< "    "<< float(n_MT/n_electronveto) * 100<<std::endl;
-  std:: cout<<"MET/MT>0.25:    "<< n_transverse<<  "    "<< float(n_transverse/nEventsPrePres) * 100<< "    "<< float(n_transverse/n_MT) * 100<<std::endl;
-  std:: cout<<"DeltaPhi<0.75:  "<<n_dPhi <<  "    "<< float(n_dPhi/nEventsPrePres) * 100<< "    "<< float(n_dPhi/n_transverse) * 100<<std::endl;
-  std:: cout<<"MetFilters:     "<<n_METfilters <<  "    "<< float(n_METfilters/nEventsPrePres) * 100<< "    "<< float(n_METfilters/n_dPhi) * 100<<std::endl;
-  std:: cout<<"2 SVJ, BDGT>-0.14: "<< n_BDT <<  "    "<< float(n_BDT/nEventsPrePres) * 100<< "    "<< float(n_BDT/n_METfilters) * 100<<std::endl;
+  std:: cout<<"Dijet:          "<<n_prejetspt <<   "    "<< float(n_prejetspt/nEvents) * 100 << "    "<< float(n_prejetspt/nEvents) * 100.<< std::endl;
+  std:: cout<<"MET/MT>0.15:    "<<n_transratio <<   "    "<< float(n_transratio/nEvents) * 100<< "    "<< float(n_transratio/n_prejetspt) * 100.<< std::endl;
+  std:: cout<<"Muon Veto:      "<< n_muonveto<<   "    "<< float(n_muonveto/nEvents) * 100<< "    "<< float(n_muonveto/n_transratio) * 100<<std::endl;
+  std:: cout<<"Electron Veto:  "<< n_electronveto<<  "    "<< float(n_electronveto/nEvents) * 100<< "    "<< float(n_electronveto/n_muonveto) * 100<<std::endl;
+  std:: cout<<"DeltaEta < 1.5: "<<n_pretrigplateau <<   "    "<< float(n_pretrigplateau/nEvents) * 100<< "    "<<  float(n_pretrigplateau/n_electronveto) * 100<< std::endl;
+  std:: cout<<"MT>1500:        "<< n_MT<<  "    "<< float(n_MT/nEvents) * 100<< "    "<< float(n_MT/n_electronveto) * 100<<std::endl;
+  std:: cout<<"MET/MT>0.25:    "<< n_transverse<<  "    "<< float(n_transverse/nEvents) * 100<< "    "<< float(n_transverse/n_MT) * 100<<std::endl;
+  std:: cout<<"DeltaPhi<0.75:  "<<n_dPhi <<  "    "<< float(n_dPhi/nEvents) * 100<< "    "<< float(n_dPhi/n_transverse) * 100<<std::endl;
+  std:: cout<<"MetFilters:     "<<n_METfilters <<  "    "<< float(n_METfilters/nEvents) * 100<< "    "<< float(n_METfilters/n_dPhi) * 100<<std::endl;
+  std:: cout<<"2 SVJ, BDGT>-0.14: "<< n_BDT <<  "    "<< float(n_BDT/nEvents) * 100<< "    "<< float(n_BDT/n_METfilters) * 100<<std::endl;
 
 
   fout.cd();
   
-  systSVJ.writeHistogramsSysts(h_nPV_w, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_nPV, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_nPV_w, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_nPV, allMyFiles);
 
   //h_cutFlow->Write();
-  //systSVJ.writeHistogramsSysts(h_cutFlow, allMyFiles);
+  //systSVJ.writeSingleHistogramSysts(h_cutFlow, allMyFiles);
   systZero.writeSingleHistogramSysts(h_cutFlow, allMyFiles);
 
-  systSVJ.writeHistogramsSysts(h_AK8jetsmult_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Muonsmult_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Electronsmult_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Ht_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetPt_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetPhi_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetEta_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetE_lead_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetPt_lead_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetPhi_lead_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetEta_lead_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetE_sublead_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetPt_sublead_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetPhi_sublead_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetEta_sublead_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetdR_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetdE_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_AK8jetdP_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetsmult_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Muonsmult_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Electronsmult_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Ht_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetPt_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetPhi_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetEta_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetE_lead_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetPt_lead_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetPhi_lead_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetEta_lead_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetE_sublead_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetPt_sublead_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetPhi_sublead_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetEta_sublead_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetdR_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetdE_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_AK8jetdP_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_presel, allMyFiles);
   
-  systSVJ.writeHistogramsSysts(h_Mt_presel_1, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_presel_1, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_presel_2, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_presel_2, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_presel_3, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_presel_3, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_presel_4, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_presel_4, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_presel_5, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_presel_5, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_presel_6, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_presel_6, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_presel_7, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_presel_7, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_presel_1, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_presel_1, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_presel_2, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_presel_2, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_presel_3, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_presel_3, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_presel_4, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_presel_4, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_presel_5, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_presel_5, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_presel_6, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_presel_6, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_presel_7, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_presel_7, allMyFiles);
   
   
-  systSVJ.writeHistogramsSysts(h_Mjj_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mmc_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_dPhimin_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_dPhi1_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_dPhi2_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_transverseratio_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mjj_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mmc_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dPhimin_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dPhi1_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dPhi2_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_transverseratio_presel, allMyFiles);
   
-  systSVJ.writeHistogramsSysts(h_bdt_mult_0_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_mult_1_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_axisminor_0_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_axisminor_1_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_girth_0_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_girth_1_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_tau21_0_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_tau21_1_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_tau32_0_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_tau32_1_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_deltaphi_0_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_deltaphi_1_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_msd_0_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_msd_1_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_mva_0_presel, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_bdt_mva_1_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_mult_0_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_mult_1_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_axisminor_0_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_axisminor_1_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_girth_0_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_girth_1_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_tau21_0_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_tau21_1_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_tau32_0_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_tau32_1_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_deltaphi_0_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_deltaphi_1_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_msd_0_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_msd_1_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_mva_0_presel, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_bdt_mva_1_presel, allMyFiles);
   
-  systSVJ.writeHistogramsSysts(h_dEta, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_dPhimin, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_transverseratio, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mjj, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mmc, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_dPhi, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dEta, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dPhimin, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_transverseratio, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mjj, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mmc, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dPhi, allMyFiles);
   
-  systSVJ.writeHistogramsSysts(h_dEta_CR, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_dPhimin_CR, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_transverseratio_CR, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_CR, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mjj_CR, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mmc_CR, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_CR, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_dPhi_CR, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dEta_CR, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dPhimin_CR, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_transverseratio_CR, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_CR, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mjj_CR, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mmc_CR, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_CR, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dPhi_CR, allMyFiles);
   
-  systSVJ.writeHistogramsSysts(h_dEta_BDT, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_dPhi_BDT, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_dPhimin_BDT, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_transverseratio_BDT, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_BDT, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mjj_BDT, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mmc_BDT, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_BDT, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dEta_BDT, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dPhi_BDT, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_dPhimin_BDT, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_transverseratio_BDT, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_BDT, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mjj_BDT, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mmc_BDT, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_BDT, allMyFiles);
   
-  systSVJ.writeHistogramsSysts(h_transverseratio_BDT0, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_BDT0, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mjj_BDT0, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mmc_BDT0, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_BDT0, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_transverseratio_BDT0, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_BDT0, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mjj_BDT0, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mmc_BDT0, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_BDT0, allMyFiles);
   
-  systSVJ.writeHistogramsSysts(h_transverseratio_BDT1, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_BDT1, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mjj_BDT1, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mmc_BDT1, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_BDT1, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_transverseratio_BDT1, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_BDT1, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mjj_BDT1, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mmc_BDT1, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_BDT1, allMyFiles);
   
-  systSVJ.writeHistogramsSysts(h_transverseratio_BDT2, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_BDT2, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mjj_BDT2, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mmc_BDT2, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_METPt_BDT2, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_transverseratio_BDT2, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_BDT2, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mjj_BDT2, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mmc_BDT2, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_METPt_BDT2, allMyFiles);
   
-  systSVJ.writeHistogramsSysts(h_Mt_CRBDT0, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_CRBDT1, allMyFiles);
-  systSVJ.writeHistogramsSysts(h_Mt_CRBDT2, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_CRBDT0, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_CRBDT1, allMyFiles);
+  systSVJ.writeSingleHistogramSysts(h_Mt_CRBDT2, allMyFiles);
   
   fileout.close();
   
@@ -1814,70 +1716,31 @@ void systWeights::setWCats(double * wcats){
  
 }
 
-void systWeights::fillHistogramsSysts(TH1F** histo, float v, float w,  float *systWeights, int nFirstSysts, double * wcats, bool verbose){
+void systWeights::fillHistogramsSysts(TH1F* histo, float v, float w,  float *systWeights, int nFirstSysts, double * wcats, bool verbose){
   if(wcats== NULL){
     wcats = this->wCats;
   }
   //cout << *wcats << endl;
+  float ws = 1.0; 
   for (int c = 0; c < this->nCategories; c++){
     int MAX = this->maxSysts;
     bool useOnlyNominal = this->onlyNominal;
     //cout << " filling histo " << histo[0+(MAX+1)*(c)]->GetName()<< endl;
     //cout << "MAX " << MAX <<endl;
     //cout << " filling histo " << histo[0+(MAX+1)*(c)]->GetName()<< " MAX "<<MAX*(1+c)<<" nFirstSysts"<< nFirstSysts<< endl;
-    //    cout << "weight 0 "<< systWeights[0]<< " weighted syst 0 "<< this->weightedSysts[0]<<endl;
-    for(int sy=0;sy<(int)MAX;++sy){
-      //cout << wcats[c] << endl;
-      //cout << "sy" << sy << endl;
-      //cout << "filling histo " << histo[(int)sy]->GetName()<<endl;
-      if(sy!=0 && useOnlyNominal)continue;
-      float ws=1.0;
-      if(sy<nFirstSysts){
-	//cout << "wcats" << "\t" << wcats[c] << endl;
-	wcats[c] =1.0;
-	//ws=systWeights[sy];
-	ws=systWeights[sy]*wcats[c];
-	//cout << "wc" << wcats[c] << endl;
-	//cout << sy<<"\t"<<systWeights[sy] << endl; 
-	//cout << "ws" << ws << endl;
-	//cout << sy<<"\t"<<systWeights[sy] << endl;
-      }
-      else {
-	//cout << "wcats" << "\t" << wcats[c] << endl;
-	wcats[c] =1.0;
-	ws = (this->weightedSysts[(int)sy]*wcats[c]);
-	//ws = (this->weightedSysts[(int)sy]);
-	//cout << "ws" << ws << endl;
-	//cout << this->weightedSysts[(int)sy] << endl;
-      }
-      //cout << ws << endl;
-      //cout << "filling histo " << histo[sy+1]->GetName()<<" value "<< v << " wevt "<< w << " syst number "<< sy<< " name "<< weightedNames[sy]<<" ws value " <<ws<< " wcats" << wcats[c] << endl;    
-      //cout <</* "filling histo "<< histo[sy+((MAX+1)*(c))]->GetName()<<*/" value "<< v << " wevt "<< w << " syst number "<< sy<< " name "<< weightedNames[sy]<<" ws value " <<ws<<endl;
-      //cout << "c\t" << c << endl;
-      //cout << MAX << endl;
-      //cout << sy << endl;
-      //cout <<sy+((MAX+1)*(c)) << endl;
-      //cout << "filling histo " << histo[sy]->GetName()<<endl;
-      //histo[1]->Fill(v);
-      histo[sy+(MAX+1)*(c)]->Fill(v, w * ws);
+    histo->Fill(v, w * ws);
       //cout << histo[sy+(MAX+1)*(c)]->Integral() << " " << v << " " << w << " " << ws << endl;
-    }
   }
 }
 
-void systWeights::fillHistogramsSysts(TH1F** histo, float v, float w, double * wcats, bool verbose ){
+void systWeights::fillHistogramsSysts(TH1F* histo, float v, float w, double * wcats, bool verbose ){
   if(wcats==NULL){
     wcats=this->wCats;
   }
   for (int c = 0; c < this->nCategories; c++){
-    int MAX = this->maxSysts;
-    bool useOnlyNominal = this->onlyNominal;
-    for(int sy=0;sy<(int)MAX;++sy){
-      if(sy!=0 && useOnlyNominal)continue;
-      float ws = (this->weightedSysts[(int)sy])*wcats[c];
+    float ws = 1.0;
       // cout << " filling histogram "<< histo[(int)sy]->GetName() << " with value "<< v <<" and weight "<< w <<" ws "<< ws<<endl;
-      histo[sy+(MAX+1)*(c)]->Fill(v, w*ws);
-    }
+    histo->Fill(v, w*ws);
   }
 }
 
@@ -1963,29 +1826,8 @@ void systWeights::writeHistogramsSysts(TH1F** histo, TFile **filesout){
 void systWeights::writeSingleHistogramSysts(TH1F* histo, TFile **filesout){  
   int MAX= this->maxSystsNonPDF;
   bool useOnlyNominal = this->onlyNominal;
-  for (int c = 0; c < this->nCategories; c++){
-    TString cname= (this->categoriesNames[c]).c_str();
-    cout << c << " " << cname << endl;
-    if (c!=0) cname= "_"+cname;
-    for(int sy=0;sy<(int)MAX;++sy){
-      if(!(!useOnlyNominal || sy==0)) continue;
-      cout << " writing histo "<< histo->GetName()<< " in file "<< filesout[(int)sy]->GetName()<<endl;;
-      filesout[(int)sy+(MAX+1)*c]->cd();
-      histo->Write();
-      //histo[sy]=new TH1F(name+ns,name+ns,nbins,min,max);
-    }
-    if(this->addPDF){
-      if(!useOnlyNominal){
-	filesout[MAX+(MAX+1)*c]->cd();
-	int MAXPDF=this->maxSysts;
-	for(int sy=MAX;sy<MAXPDF;++sy){
-	  //      cout << " writing sy "<< histo[sy]->GetName()<<endl;
-	  histo->Write();
-	  //      cout << " written sy "<< histo[sy]->GetName()<<endl;
-	}
-      }
-    }
-  }
+  filesout[0]->cd();
+  histo->Write();
 }
 
 
@@ -2060,24 +1902,20 @@ void createFilesSysts(  TFile * allFiles[(int)MAXSYSTS], TString basename, bool 
   //return allFiles;
 }
 
-void writeHistogramsSysts(TH1F* histo[(int)MAXSYSTS], TFile *filesout[(int)MAXSYSTS], bool useOnlyNominal=false){  
-  for(int sy=0;sy<(int)MAXSYSTS;++sy){
+void writeHistogramsSysts(TH1F* histo, TFile *filesout[1], bool useOnlyNominal=false){  
     //cout << " writing histo "<< histo[(int)sy]->GetName()<< " in file "<< filesout[(int)sy]->GetName()<<endl;;
     //TString ns= weightedSystsNames((weightedSysts)sy);
-    filesout[(int)sy]->cd();
-    histo[sy]->Write(histo[0]->GetName());
+  filesout[0]->cd();
+  histo->Write(histo->GetName());
     //    histo[sy]=new TH1F(name+ns,name+ns,nbins,min,max);
-  }
+  
 }
 
-void writeSingleHistogramSysts(TH1F* histo, TFile *filesout[(int)MAXSYSTS], bool useOnlyNominal=false){  
-  for(int sy=0;sy<(int)MAXSYSTS;++sy){
-    cout << " writing histo "<< histo->GetName()<< " in file "<< filesout[(int)sy]->GetName()<<endl;;
-    //TString ns= weightedSystsNames((weightedSysts)sy);
-    filesout[(int)sy]->cd();
-    histo->Write();
-    //    histo[sy]=new TH1F(name+ns,name+ns,nbins,min,max);
-  }
+void writeSingleHistogramSysts(TH1F* histo, TFile *filesout[1], bool useOnlyNominal=false){  
+
+  //TString ns= weightedSystsNames((weightedSysts)sy);
+  filesout[0]->cd();
+  histo->Write();
 }
 
 TH1F * makeproduct(TH2F * h){
