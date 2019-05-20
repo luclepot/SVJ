@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
 
   std::cout<<"Let's start"<<endl;
 
-  string sample(argv[1]) ;
+  string sample(argv[1]);
   std::cout<<"sample: "<<sample<<endl;
 
   string path(argv[2]);
@@ -189,66 +189,52 @@ int main(int argc, char **argv) {
 
   int sizeMax_gen=50000;
 
-  std::cout << std::endl << std::endl << "HEY" << std::endl << std::endl;
-
-
+  // std::cout << std::endl << std::endl << "HEY HEY YOU YOU" << std::endl << std::endl;
 
   std::vector<TLorentzVector>* jetsAK8CHSPtr(0x0);
   std::vector<TLorentzVector>* MuonsPtr(0x0);
   std::vector<TLorentzVector>* ElectronsPtr(0x0);
-
-  std::vector<TLorentzVector>* GenElectronsPtr(0x0);
-  std::vector<TLorentzVector>* GenMuonsPtr(0x0);
-
-
-
-
-  std::vector<double>* JetsAK8_NHFPtr(0x0);
-  std::vector<double>* JetsAK8_CHFPtr(0x0);
+  // std::vector<TLorentzVector>* GenElectronsPtr(0x0);
+  // std::vector<TLorentzVector>* GenMuonsPtr(0x0);
+  // std::vector<double>* JetsAK8_NHFPtr(0x0);
+  // std::vector<double>* JetsAK8_CHFPtr(0x0);
+  // std::vector<int>* multPtr(0x0);
+  // std::vector<double>* axisminorPtr(0x0);
+  // std::vector<double>* girthPtr(0x0);
+  // std::vector<double>* msdPtr(0x0);
+  // std::vector<bool>* jetsIDPtr(0x0);
+  // std::vector<double>* muMiniIsoPtr(0x0);
 
   double Ht(0.), MT(0.);
   int nMuons=-1, nElectrons=-1;
-
-
   bool BadChargedCandidateFilter = 0, BadPFMuonFilter = 0;
   int EcalDeadCellTriggerPrimitiveFilter = 0, HBHEIsoNoiseFilter = 0, HBHENoiseFilter = 0, globalTightHalo2016Filter = 0, NVtx = 0;
-
-  std::vector<int>* multPtr(0x0);
-  std::vector<double>* axisminorPtr(0x0);
-  std::vector<double>* girthPtr(0x0);
+  // double deltaphi1, deltaphi2;
+  // double DeltaPhiMin;
 
 
 
-  std::vector<double>* msdPtr(0x0);
-  std::vector<bool>* jetsIDPtr(0x0);
-  std::vector<double>* muMiniIsoPtr(0x0);
+  // chain.SetBranchAddress("MT_AK8", &MT);
 
 
-  double deltaphi1, deltaphi2;
-  double DeltaPhiMin;
-
-
-
-  chain.SetBranchAddress("MT_AK8", &MT);
   chain.SetBranchAddress("MET",&metFull_Pt);
   chain.SetBranchAddress("METPhi",&metFull_Phi);
   chain.SetBranchAddress("JetsAK8",&jetsAK8CHSPtr);
-
   chain.SetBranchAddress("Muons",&MuonsPtr);
-  chain.SetBranchAddress("Muons_MiniIso",&muMiniIsoPtr);
   chain.SetBranchAddress("Electrons",&ElectronsPtr);
 
-  chain.SetBranchAddress("JetsAK8_neutralHadronEnergyFraction", &JetsAK8_NHFPtr);
-  chain.SetBranchAddress("JetsAK8_chargedHadronEnergyFraction", &JetsAK8_CHFPtr);
-  chain.SetBranchAddress("DeltaPhiMin_AK8", &DeltaPhiMin);
+  // chain.SetBranchAddress("JetsAK8_neutralHadronEnergyFraction", &JetsAK8_NHFPtr);
+  // chain.SetBranchAddress("JetsAK8_chargedHadronEnergyFraction", &JetsAK8_CHFPtr);
+  // chain.SetBranchAddress("DeltaPhiMin_AK8", &DeltaPhiMin);
 
-  chain.SetBranchAddress("JetsAK8_ID", &jetsIDPtr);
-  chain.SetBranchAddress("JetsAK8_multiplicity", &multPtr);
-  chain.SetBranchAddress("JetsAK8_axisminor", &axisminorPtr);
-  chain.SetBranchAddress("JetsAK8_girth", &girthPtr);
-  chain.SetBranchAddress("JetsAK8_softDropMass", &msdPtr);
-  chain.SetBranchAddress("DeltaPhi1_AK8", &deltaphi1);
-  chain.SetBranchAddress("DeltaPhi2_AK8", &deltaphi2);
+  // chain.SetBranchAddress("JetsAK8_ID", &jetsIDPtr);
+  // chain.SetBranchAddress("JetsAK8_multiplicity", &multPtr);
+  // chain.SetBranchAddress("JetsAK8_axisminor", &axisminorPtr);
+  // chain.SetBranchAddress("JetsAK8_girth", &girthPtr);
+  // chain.SetBranchAddress("JetsAK8_softDropMass", &msdPtr);
+  // chain.SetBranchAddress("DeltaPhi1_AK8", &deltaphi1);
+  // chain.SetBranchAddress("DeltaPhi2_AK8", &deltaphi2);
+
   float p=1;
 
   float x=0.;
@@ -315,8 +301,8 @@ int main(int argc, char **argv) {
 
   TH2F *h_AK8jet_etaphi_lead = new TH2F("h_AK8jet_etaphi_lead", "h_AK8jet_etaphi_lead", 24, -2.4, +2.4, 35, -3.5, +3.5);
   TH2F *h_AK8jet_etaphi_sublead = new TH2F("h_AK8jet_etaphi_sublead", "h_AK8jet_etaphi_sublead", 24, -2.4, +2.4, 35, -3.5, +3.5);
-  TH2F *h_AK8jet_etaphi_lead_newID = new TH2F("h_AK8jet_etaphi_lead_newID", "h_AK8jet_etaphi_lead_newID", 24, -2.4, +2.4, 35, -3.5, +3.5);
-  TH2F *h_AK8jet_etaphi_sublead_newID = new TH2F("h_AK8jet_etaphi_sublead_newID", "h_AK8jet_etaphi_sublead_newID", 24, -2.4, +2.4, 35, -3.5, +3.5);
+  // TH2F *h_AK8jet_etaphi_lead_newID = new TH2F("h_AK8jet_etaphi_lead_newID", "h_AK8jet_etaphi_lead_newID", 24, -2.4, +2.4, 35, -3.5, +3.5);
+  // TH2F *h_AK8jet_etaphi_sublead_newID = new TH2F("h_AK8jet_etaphi_sublead_newID", "h_AK8jet_etaphi_sublead_newID", 24, -2.4, +2.4, 35, -3.5, +3.5);
 
   TH1F *h_cutFlow = new TH1F("h_cutFlow","cutFlow",13,-0.5,12.5);
 
@@ -474,18 +460,18 @@ int main(int argc, char **argv) {
       systWeightsSVJ[TRIGDOWN]= 1.;
     }
 
-    std::vector<int> mult = *multPtr;
-    std::vector<double> axisminor = *axisminorPtr;
-    std::vector<double> girth = *girthPtr;
+    // std::vector<int> mult = *multPtr;
+    // std::vector<double> axisminor = *axisminorPtr;
+    // std::vector<double> girth = *girthPtr;
 
 
 
-    std::vector<double> msd = *msdPtr;
-    std::vector<double> muMiniIso = *muMiniIsoPtr;
-    std::vector<bool> jetsID = *jetsIDPtr;
+    // std::vector<double> msd = *msdPtr;
+    // // std::vector<double> muMiniIso = *muMiniIsoPtr;
+    // std::vector<bool> jetsID = *jetsIDPtr;
 
-    std::vector<double> NHF = *JetsAK8_NHFPtr;
-    std::vector<double> CHF = *JetsAK8_CHFPtr;
+    // std::vector<double> NHF = *JetsAK8_NHFPtr;
+    // std::vector<double> CHF = *JetsAK8_CHFPtr;
 
     std::vector<TLorentzVector> AK8Jets = *jetsAK8CHSPtr;
 
@@ -567,11 +553,7 @@ int main(int argc, char **argv) {
       Mmc = vmc.M();
 
       MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*metFull_Pt - ptMet) );
-
-
-
-      MT2 = MT;
-
+      // MT2 = MT;
 
       bool preselection_jetseta = 0, preselection_jetsID = 0, preselection_trigplateau=0, preselection_deltaeta=0, preselection_transratio = 0, preselection_leptonveto = 0 , preselection_jetspt = 0, preselection = 0;
       bool preselection_dijet(0), preselection_muonveto(0), preselection_muonLooseveto(1), preselection_electronveto(0);
@@ -579,12 +561,12 @@ int main(int argc, char **argv) {
 
       int sizeMax_muons=muons.size();
 
-      for(int j=0; j< sizeMax_muons; j++){
-        if (muMiniIso[j]<0.4){preselection_muonLooseveto = 0;}
-      }
+      // for(int j=0; j< sizeMax_muons; j++){
+      //   if (muMiniIso[j]<0.4){ preselection_muonLooseveto = 0; }
+      // }
 
       preselection_jetseta = (std::abs((AK8Jets.at(0)).Eta()) < 2.5 && std::abs((AK8Jets.at(1)).Eta()) < 2.5);
-      preselection_jetsID = jetsID.at(0) == 1 && jetsID.at(1)==1;
+      preselection_jetsID = true; // jetsID.at(0) == 1 && jetsID.at(1)==1;
       preselection_deltaeta = std::abs(AK8Jets.at(0).Eta() - AK8Jets.at(1).Eta()) < 1.5;
       preselection_trigplateau = preselection_deltaeta;
       preselection_transratio = metFull_Pt/MT2 > 0.15;
@@ -596,9 +578,6 @@ int main(int argc, char **argv) {
 
       preselection_trigger = 1;
 
-
-
-
       bool selection_transverseratio_window=0;
       selection_transverseratio_window = (metFull_Pt/MT2)> 0.15 && (metFull_Pt/MT2) < 0.25 ;
 
@@ -608,7 +587,7 @@ int main(int argc, char **argv) {
       preselection = preselection_muonveto && preselection_jetseta && preselection_jetsID && preselection_deltaeta && preselection_transratio && preselection_leptonveto && preselection_trigger && MT2 > 1500 && preselection_metfilters;
 
       bool selection_dPhi = 0, selection_transverseratio = 0, selection_mt = 0, selection = 0;
-      selection_dPhi = DeltaPhiMin < 0.75;
+      selection_dPhi = true; //DeltaPhiMin < 0.75;
       selection_mt = MT2 > 1500;
       selection_transverseratio = (metFull_Pt/MT2) > 0.25;
 
@@ -659,11 +638,13 @@ int main(int argc, char **argv) {
       }
 
       if(preselection){
-        if(metFull_Pt>300){
+        if(metFull_Pt>300) {
           h_AK8jet_etaphi_lead->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
           h_AK8jet_etaphi_sublead->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
-          if(NHF.at(0) < 0.8 && CHF.at(0) > 0.1) h_AK8jet_etaphi_lead_newID->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
-          if(NHF.at(1) < 0.8 && CHF.at(1) > 0.1) h_AK8jet_etaphi_sublead_newID->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
+          // if(NHF.at(0) < 0.8 && CHF.at(0) > 0.1) 
+          //   h_AK8jet_etaphi_lead_newID->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
+          // if(NHF.at(1) < 0.8 && CHF.at(1) > 0.1)
+          //   h_AK8jet_etaphi_sublead_newID->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
         }
 
         systSVJ.fillHistogramsSysts(h_nPV,NVtx,1.,systWeightsSVJ);
@@ -702,25 +683,25 @@ int main(int argc, char **argv) {
         systSVJ.fillHistogramsSysts(h_Mmc_presel,Mmc,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_Mjj_presel,Mjj,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_Mt_presel,MT2,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_dPhimin_presel,DeltaPhiMin,w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_dPhimin_presel,DeltaPhiMin,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_transverseratio_presel,metFull_Pt/MT2,w,systWeightsSVJ);
 
         // systSVJ.fillHistogramsSysts(h_bdt_mult_0_presel,mult.at(0),w,systWeightsSVJ);
         // systSVJ.fillHistogramsSysts(h_bdt_mult_1_presel,mult.at(1),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_axisminor_0_presel,axisminor.at(0),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_axisminor_1_presel,axisminor.at(1),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_girth_0_presel,girth.at(0),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_girth_1_presel,girth.at(1),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_axisminor_0_presel,axisminor.at(0),w,systWeightsSVJ);
+        // // systSVJ.fillHistogramsSysts(h_bdt_axisminor_1_presel,axisminor.at(1),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_girth_0_presel,girth.at(0),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_girth_1_presel,girth.at(1),w,systWeightsSVJ);
 
 
 
 
 
 
-        systSVJ.fillHistogramsSysts(h_bdt_msd_0_presel,msd.at(0),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_msd_1_presel,msd.at(1),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_deltaphi_0_presel,deltaphi1,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_deltaphi_1_presel,deltaphi2,w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_msd_0_presel,msd.at(0),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_msd_1_presel,msd.at(1),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_deltaphi_0_presel,deltaphi1,w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_deltaphi_1_presel,deltaphi2,w,systWeightsSVJ);
         // systSVJ.fillHistogramsSysts(h_bdt_mva_0_presel,mva1_,w,systWeightsSVJ);
         // systSVJ.fillHistogramsSysts(h_bdt_mva_1_presel,mva2_,w,systWeightsSVJ);
 
@@ -740,7 +721,7 @@ int main(int argc, char **argv) {
 
         systSVJ.fillHistogramsSysts(h_dEta,dEta,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_dPhi,dPhi,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_dPhimin,DeltaPhiMin,w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_dPhimin,DeltaPhiMin,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_transverseratio,metFull_Pt/MT2,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_Mt,MT2,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_Mjj,Mjj,w,systWeightsSVJ);
@@ -753,7 +734,7 @@ int main(int argc, char **argv) {
 
         systSVJ.fillHistogramsSysts(h_dEta_BDT,dEta,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_dPhi_BDT,dPhi,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_dPhimin_BDT,DeltaPhiMin,w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_dPhimin_BDT,DeltaPhiMin,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_transverseratio_BDT,metFull_Pt/MT2,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_Mt_BDT,MT2,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_Mjj_BDT,Mjj,w,systWeightsSVJ);
@@ -800,7 +781,7 @@ int main(int argc, char **argv) {
 
         systSVJ.fillHistogramsSysts(h_dEta_CR,dEta,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_dPhi_CR,dPhi,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_dPhimin_CR,DeltaPhiMin,w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_dPhimin_CR,DeltaPhiMin,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_transverseratio_CR,metFull_Pt/MT2,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_Mt_CR,MT2,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_Mjj_CR,Mjj,w,systWeightsSVJ);
@@ -1010,8 +991,8 @@ int main(int argc, char **argv) {
   TFile *myfile = new TFile(outfile_hotspot, "RECREATE");
   h_AK8jet_etaphi_lead->Write();
   h_AK8jet_etaphi_sublead->Write();
-  h_AK8jet_etaphi_lead_newID->Write();
-  h_AK8jet_etaphi_sublead_newID->Write();
+  // h_AK8jet_etaphi_lead_newID->Write();
+  // h_AK8jet_etaphi_sublead_newID->Write();
   myfile->Close();
 
 }
