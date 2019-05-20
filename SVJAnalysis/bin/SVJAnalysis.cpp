@@ -336,9 +336,9 @@ int main(int argc, char **argv) {
   std::vector<int>* multPtr(0x0);
   std::vector<double>* axisminorPtr(0x0);
   std::vector<double>* girthPtr(0x0);
-  std::vector<double>* tau1Ptr(0x0); 
-  std::vector<double>* tau2Ptr(0x0); 
-  std::vector<double>* tau3Ptr(0x0); 
+  // std::vector<double>* tau1Ptr(0x0); 
+  // std::vector<double>* tau2Ptr(0x0); 
+  // std::vector<double>* tau3Ptr(0x0); 
   std::vector<double>* msdPtr(0x0);
   std::vector<bool>* jetsIDPtr(0x0);
   std::vector<double>* muMiniIsoPtr(0x0);
@@ -398,9 +398,9 @@ int main(int argc, char **argv) {
   chain.SetBranchAddress("JetsAK8_multiplicity", &multPtr);
   chain.SetBranchAddress("JetsAK8_axisminor", &axisminorPtr);
   chain.SetBranchAddress("JetsAK8_girth", &girthPtr);
-  chain.SetBranchAddress("JetsAK8_NsubjettinessTau1", &tau1Ptr);
-  chain.SetBranchAddress("JetsAK8_NsubjettinessTau2", &tau2Ptr);
-  chain.SetBranchAddress("JetsAK8_NsubjettinessTau3", &tau3Ptr);
+  // chain.SetBranchAddress("JetsAK8_NsubjettinessTau1", &tau1Ptr);
+  // chain.SetBranchAddress("JetsAK8_NsubjettinessTau2", &tau2Ptr);
+  // chain.SetBranchAddress("JetsAK8_NsubjettinessTau3", &tau3Ptr);
 
   chain.SetBranchAddress("JetsAK8_softDropMass", &msdPtr);
   chain.SetBranchAddress("DeltaPhi1_AK8", &deltaphi1);
@@ -597,10 +597,10 @@ int main(int argc, char **argv) {
   TH1F *h_bdt_axisminor_1_presel = new TH1F( "h_bdt_axisminor_1_presel", "axisminor jet 1", 100, 0, 0.2);
   TH1F *h_bdt_girth_0_presel = new TH1F( "h_bdt_girth_0_presel", "girth jet 0", 100, 0, 0.7);
   TH1F *h_bdt_girth_1_presel = new TH1F( "h_bdt_girth_1_presel", "girth jet 1", 100, 0, 0.7);
-  TH1F *h_bdt_tau21_0_presel = new TH1F( "h_bdt_tau21_0_presel", "tau21 jet 0", 100, 0, 1);
-  TH1F *h_bdt_tau21_1_presel = new TH1F( "h_bdt_tau21_1_presel", "tau21 jet 1", 100, 0, 1.4);
-  TH1F *h_bdt_tau32_0_presel = new TH1F( "h_bdt_tau32_0_presel", "tau32 jet 0", 100, 0, 1.4);
-  TH1F *h_bdt_tau32_1_presel = new TH1F( "h_bdt_tau32_1_presel", "tau32 jet 1", 100, 0, 1);
+  // TH1F *h_bdt_tau21_0_presel = new TH1F( "h_bdt_tau21_0_presel", "tau21 jet 0", 100, 0, 1);
+  // TH1F *h_bdt_tau21_1_presel = new TH1F( "h_bdt_tau21_1_presel", "tau21 jet 1", 100, 0, 1.4);
+  // TH1F *h_bdt_tau32_0_presel = new TH1F( "h_bdt_tau32_0_presel", "tau32 jet 0", 100, 0, 1.4);
+  // TH1F *h_bdt_tau32_1_presel = new TH1F( "h_bdt_tau32_1_presel", "tau32 jet 1", 100, 0, 1);
   TH1F *h_bdt_deltaphi_0_presel = new TH1F( "h_bdt_deltaphi_0_presel", "deltaphi jet 0", 100, 0, 3.5);
   TH1F *h_bdt_deltaphi_1_presel = new TH1F( "h_bdt_deltaphi_1_presel", "deltaphi jet 1", 100, 0, 3.5);
   TH1F *h_bdt_msd_0_presel = new TH1F( "h_bdt_msd_0_presel", "msd jet 0", 120, 0, 600);
@@ -694,9 +694,9 @@ int main(int argc, char **argv) {
     std::vector<int> mult = *multPtr;
     std::vector<double> axisminor = *axisminorPtr;
     std::vector<double> girth = *girthPtr;
-    std::vector<double> tau1 = *tau1Ptr;
-    std::vector<double> tau2 = *tau2Ptr;
-    std::vector<double> tau3 = *tau3Ptr;
+    // std::vector<double> tau1 = *tau1Ptr;
+    // std::vector<double> tau2 = *tau2Ptr;
+    // std::vector<double> tau3 = *tau3Ptr;
     std::vector<double> msd = *msdPtr;
     std::vector<double> muMiniIso = *muMiniIsoPtr;
     std::vector<bool> jetsID = *jetsIDPtr;
@@ -858,11 +858,11 @@ int main(int argc, char **argv) {
 
       double mva1_(0.), mva2_(0.);
 
-      bdt_mult= mult.at(0); bdt_axisminor = axisminor.at(0); bdt_girth = girth.at(0); bdt_tau21 = tau2.at(0)/tau1.at(0);  bdt_tau32 = tau3.at(0)/tau1.at(0);
+      bdt_mult= mult.at(0); bdt_axisminor = axisminor.at(0); bdt_girth = girth.at(0); // bdt_tau21 = tau2.at(0bdt_tau)/tau1.at(0);  bdt_tau32 = tau3.at(0)/tau1.at(0);
       bdt_msd = msd.at(0); bdt_deltaphi = deltaphi1;  bdt_pt = AK8Jets.at(0).Pt();  bdt_eta =  AK8Jets.at(0).Eta(); bdt_mt =  MT2;
 
       mva1_ = reader.EvaluateMVA("BDTG");
-      bdt_mult= mult.at(1); bdt_axisminor = axisminor.at(1); bdt_girth = girth.at(1); bdt_tau21 = tau2.at(1)/tau1.at(1);  bdt_tau32 = tau3.at(1)/tau1.at(1);
+      bdt_mult= mult.at(1); bdt_axisminor = axisminor.at(1); bdt_girth = girth.at(1); // bdt_tau21 = tau2.at(1)/tau1.at(1);  bdt_tau32 = tau3.at(1)/tau1.at(1);
       bdt_msd = msd.at(1); bdt_deltaphi = deltaphi2;  bdt_pt = AK8Jets.at(1).Pt();  bdt_eta = AK8Jets.at(1).Eta(); bdt_mt = MT2;
 
       mva2_ = reader.EvaluateMVA("BDTG");
@@ -951,12 +951,12 @@ int main(int argc, char **argv) {
         systSVJ.fillHistogramsSysts(h_bdt_axisminor_1_presel,axisminor.at(1),w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_bdt_girth_0_presel,girth.at(0),w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_bdt_girth_1_presel,girth.at(1),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_tau21_0_presel,tau2.at(0)/tau1.at(0),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_tau21_1_presel,tau2.at(1)/tau1.at(1),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_tau32_0_presel,tau3.at(0)/tau2.at(0),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_tau32_1_presel,tau3.at(1)/tau2.at(1),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_tau32_0_presel,tau3.at(0)/tau2.at(0),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_tau32_1_presel,tau3.at(1)/tau2.at(1),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_tau21_0_presel,tau2.at(0)/tau1.at(0),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_tau21_1_presel,tau2.at(1)/tau1.at(1),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_tau32_0_presel,tau3.at(0)/tau2.at(0),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_tau32_1_presel,tau3.at(1)/tau2.at(1),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_tau32_0_presel,tau3.at(0)/tau2.at(0),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_tau32_1_presel,tau3.at(1)/tau2.at(1),w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_bdt_msd_0_presel,msd.at(0),w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_bdt_msd_1_presel,msd.at(1),w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_bdt_deltaphi_0_presel,deltaphi1,w,systWeightsSVJ);
@@ -1185,10 +1185,10 @@ int main(int argc, char **argv) {
   systSVJ.writeSingleHistogramSysts(h_bdt_axisminor_1_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_bdt_girth_0_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_bdt_girth_1_presel, allMyFiles);
-  systSVJ.writeSingleHistogramSysts(h_bdt_tau21_0_presel, allMyFiles);
-  systSVJ.writeSingleHistogramSysts(h_bdt_tau21_1_presel, allMyFiles);
-  systSVJ.writeSingleHistogramSysts(h_bdt_tau32_0_presel, allMyFiles);
-  systSVJ.writeSingleHistogramSysts(h_bdt_tau32_1_presel, allMyFiles);
+  // systSVJ.writeSingleHistogramSysts(h_bdt_tau21_0_presel, allMyFiles);
+  // systSVJ.writeSingleHistogramSysts(h_bdt_tau21_1_presel, allMyFiles);
+  // systSVJ.writeSingleHistogramSysts(h_bdt_tau32_0_presel, allMyFiles);
+  // systSVJ.writeSingleHistogramSysts(h_bdt_tau32_1_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_bdt_deltaphi_0_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_bdt_deltaphi_1_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_bdt_msd_0_presel, allMyFiles);
