@@ -67,35 +67,42 @@ struct systWeights{
   string categoriesNames[10];
 };
 
+
 int main(int argc, char **argv) {
 
   TBenchmark bench;
 
-  std::cout<<"Let's start"<<endl;
+  std::cout << "Let's start" << endl;
 
   string sample(argv[1]);
-  std::cout<<"sample: "<<sample<<endl;
+  std::cout << "sample: " << sample << endl;
 
   string path(argv[2]);
-  std::cout<<"File list to open: "<<path<<endl;
+  std::cout << "File list to open: " << path << endl;
 
   string sys(argv[3]);
-  std::cout<<"systematics: "<<sys<<endl;
+  std::cout << "systematics: " << sys << endl;
 
   string sync(argv[4]);
-  std::cout<<"synchro: "<<sync<<endl;
+  std::cout << "synchro: " << sync << endl;
 
   string isData(argv[5]);
-  std::cout<<"isData: "<<isData<<endl;
+  std::cout << "isData: " << isData << endl;
 
   std::string outdir(argv[6]);
-  std::cout<<"Output directory: "<<outdir<<endl;
+  std::cout << "Output directory: " << outdir << endl;
 
   std::string year(argv[7]);
-  std::cout<<"Year: "<<year<<endl;
+  std::cout << "Year: " << year << endl;
+
+  std::string treename(argv[8]);
+  std::cout << "Tree name: " << treename << endl; 
+
+  std::string fileformat(argv[9]);
+  std::cout << "File format: " << fileformat << endl; 
 
   TString path_ = path ;
-  std::cout<<"File to open: "<<path_<<endl;
+  std::cout << "File to open: " << path_ << endl;
 
   std::cout << "Loading file collection from " << path << std::endl;
   TFileCollection fc(sample.c_str(),sample.c_str(),path.c_str());
@@ -135,7 +142,7 @@ int main(int argc, char **argv) {
 
   ofstream fileout;
   fileout.open(reportName.c_str(),ios::in | ios::out | ios::trunc);
-  fileout<<"RunNumber EvtNumber Lumi "<<std::endl;
+  fileout << "RunNumber EvtNumber Lumi " << std::endl;
 
   float systWeightsSVJ[maxSysts];
 
@@ -144,8 +151,8 @@ int main(int argc, char **argv) {
   TString outfile_hotspot = outdir + "/res_hotspot/"+sample + ".root";
   TFile fout(outfile, "recreate");
   cout << "output file name: " << outfile << endl;
-  std::cout<<"File to open: "<<path_<<endl;
-  TString treePath = "tree";
+  std::cout << "File to open: " << path_ << endl;
+  TString treePath = treename;
   bench.Start("NEvents");
 
   TChain chain(treePath);
@@ -157,7 +164,7 @@ int main(int argc, char **argv) {
   TH1D totalWeightTop("w_top_total","Top pt reweighting: overall sample weight",2000,0,2.0);
 
   double topWeight=totalWeightTop.GetMean();
-  cout << "totaltopweight is "<< topWeight<<endl;
+  cout << "totaltopweight is " << topWeight << endl;
   if(topWeight==0)topWeight=1;
 
 
@@ -185,16 +192,13 @@ int main(int argc, char **argv) {
   const std::string weightsfile = cmssw_base + std::string("/src/SVJ/SVJAnalysis/mZ3000/TMVAClassification_BDTG.weights.xml");
   // reader.BookMVA("BDTG", weightsfile.c_str() );
 
-  double metFull_Pt=0., metFull_Phi=0.;
 
   int sizeMax_gen=50000;
 
   // std::cout << std::endl << std::endl << "HEY HEY YOU YOU" << std::endl << std::endl;
 
-  std::vector<TLorentzVector>* jetsAK8CHSPtr(0x0);
-  std::vector<TLorentzVector>* MuonsPtr(0x0);
-  std::vector<TLorentzVector>* ElectronsPtr(0x0);
-  
+
+
   // std::vector<TLorentzVector>* GenElectronsPtr(0x0);
   // std::vector<TLorentzVector>* GenMuonsPtr(0x0);
   // std::vector<double>* JetsAK8_NHFPtr(0x0);
@@ -213,16 +217,35 @@ int main(int argc, char **argv) {
   // double deltaphi1, deltaphi2;
   // double DeltaPhiMin;
 
-
+  bool new_format = fileformat=="NEW"; 
 
   // chain.SetBranchAddress("MT_AK8", &MT);
 
+  std::vector<TLorentzVector>* jetsAK8CHSPtr(0x0);
+  std::vector<TLorentzVector>* MuonsPtr(0x0);
+  std::vector<TLorentzVector>* ElectronsPtr(0x0);
+  double jet_pt, jet_eta, jet_phi, jet_M;
+  double metFull_Pt, metFull_Phi;
+  float metFull_Pt_new, metFull_Phi_new;
 
-  chain.SetBranchAddress("MET",&metFull_Pt);
-  chain.SetBranchAddress("METPhi",&metFull_Phi);
-  chain.SetBranchAddress("JetsAK8",&jetsAK8CHSPtr);
-  chain.SetBranchAddress("Muons",&MuonsPtr);
-  chain.SetBranchAddress("Electrons",&ElectronsPtr);
+  if (new_format) {
+    cout << endl << endl << "NEW FORMAT" << endl << endl; 
+    chain.SetBranchAddress("MissingET.MET",&metFull_Pt_new);
+    chain.SetBranchAddress("MissingET.Phi",&metFull_Phi_new);
+    chain.SetBranchAddress("Jet.PT", &jet_pt);
+    chain.SetBranchAddress("Jet.Eta", &jet_eta);
+    chain.SetBranchAddress("Jet.Phi", &jet_phi);
+    chain.SetBranchAddress("Jet.Mass", &jet_M);
+  }
+  else {
+    cout << endl << endl << "OLD FORMAT" << endl << endl; 
+    chain.SetBranchAddress("MET",&metFull_Pt);
+    chain.SetBranchAddress("METPhi",&metFull_Phi);
+    chain.SetBranchAddress("JetsAK8", &jetsAK8CHSPtr);
+    chain.SetBranchAddress("Muons", &MuonsPtr);
+    chain.SetBranchAddress("Electrons",&ElectronsPtr);
+  }
+
 
   // chain.SetBranchAddress("JetsAK8_neutralHadronEnergyFraction", &JetsAK8_NHFPtr);
   // chain.SetBranchAddress("JetsAK8_chargedHadronEnergyFraction", &JetsAK8_CHFPtr);
@@ -410,14 +433,21 @@ int main(int argc, char **argv) {
     // std::vector<double> NHF = *JetsAK8_NHFPtr;
     // std::vector<double> CHF = *JetsAK8_CHFPtr;
 
-    std::vector<TLorentzVector> AK8Jets = *jetsAK8CHSPtr;
+    std::vector<TLorentzVector> AK8Jets, Electrons, muons, electrons; 
+    TLorentzVector Electron; 
+
+    if (new_format) {
+      // AK8Jets.SetPtEtaPhiM(jet_pt, jet_eta, jet_phi, jet_M);
+      muons = *MuonsPtr;
+      electrons = *ElectronsPtr;
+    } 
+    else {
+      AK8Jets = *jetsAK8CHSPtr;
+      muons = *MuonsPtr;
+      electrons = *ElectronsPtr;
+    }
 
 
-    TLorentzVector Muon;
-    std::vector<TLorentzVector> Electrons;
-    TLorentzVector Electron;
-    std::vector<TLorentzVector> muons = *MuonsPtr;
-    std::vector<TLorentzVector> electrons = *ElectronsPtr;
 
 
 
@@ -469,7 +499,7 @@ int main(int argc, char **argv) {
         merge = (AK8Jets.at(1).DeltaR(AK8Jets.at(2))<1.4 ) || (AK8Jets.at(0).DeltaR(AK8Jets.at(2))<1.4 );
         merge = false;
         if(merge) {
-          std::cout<<"==========> We found a third jet"<<std::endl;
+          std::cout << "==========> We found a third jet" << std::endl;
           vjj += AK8Jets.at(2);
         }
       }
@@ -786,18 +816,18 @@ int main(int argc, char **argv) {
   h_cutFlow->SetBinContent(13, n_BDT);
   h_cutFlow->GetXaxis()->SetBinLabel(13,"2 SVJ (BDTG>-0.14)");
 
-  std::cout<<"===================="<<std::endl;
-  std:: cout<<"Cutflow"<<"Raw events  Abs Eff (%)     Rel Eff (%)"<<std::endl;
-  std:: cout<<"Dijet:          "<<n_prejetspt << "    "<< float(n_prejetspt/nEvents) * 100 << "    "<< float(n_prejetspt/nEvents) * 100.<< std::endl;
-  std:: cout<<"MET/MT>0.15:    "<<n_transratio << "    "<< float(n_transratio/nEvents) * 100<< "    "<< float(n_transratio/n_prejetspt) * 100.<< std::endl;
-  std:: cout<<"Muon Veto:      "<< n_muonveto<< "    "<< float(n_muonveto/nEvents) * 100<< "    "<< float(n_muonveto/n_transratio) * 100<<std::endl;
-  std:: cout<<"Electron Veto:  "<< n_electronveto<< "    "<< float(n_electronveto/nEvents) * 100<< "    "<< float(n_electronveto/n_muonveto) * 100<<std::endl;
-  std:: cout<<"DeltaEta < 1.5: "<<n_pretrigplateau << "    "<< float(n_pretrigplateau/nEvents) * 100<< "    "<< float(n_pretrigplateau/n_electronveto) * 100<< std::endl;
-  std:: cout<<"MT>1500:        "<< n_MT<< "    "<< float(n_MT/nEvents) * 100<< "    "<< float(n_MT/n_electronveto) * 100<<std::endl;
-  std:: cout<<"MET/MT>0.25:    "<< n_transverse<< "    "<< float(n_transverse/nEvents) * 100<< "    "<< float(n_transverse/n_MT) * 100<<std::endl;
-  std:: cout<<"DeltaPhi<0.75:  "<<n_dPhi << "    "<< float(n_dPhi/nEvents) * 100<< "    "<< float(n_dPhi/n_transverse) * 100<<std::endl;
-  std:: cout<<"MetFilters:     "<<n_METfilters << "    "<< float(n_METfilters/nEvents) * 100<< "    "<< float(n_METfilters/n_dPhi) * 100<<std::endl;
-  std:: cout<<"2 SVJ, BDGT>-0.14: "<< n_BDT << "    "<< float(n_BDT/nEvents) * 100<< "    "<< float(n_BDT/n_METfilters) * 100<<std::endl;
+  std::cout << "====================" << std::endl;
+  std:: cout << "Cutflow" << "Raw events  Abs Eff (%)     Rel Eff (%)" << std::endl;
+  std:: cout << "Dijet:          " << n_prejetspt << "    " << float(n_prejetspt/nEvents) * 100 << "    " << float(n_prejetspt/nEvents) * 100. << std::endl;
+  std:: cout << "MET/MT>0.15:    " << n_transratio << "    " << float(n_transratio/nEvents) * 100 << "    " << float(n_transratio/n_prejetspt) * 100. << std::endl;
+  std:: cout << "Muon Veto:      " << n_muonveto << "    " << float(n_muonveto/nEvents) * 100 << "    " << float(n_muonveto/n_transratio) * 100 << std::endl;
+  std:: cout << "Electron Veto:  " << n_electronveto << "    " << float(n_electronveto/nEvents) * 100 << "    " << float(n_electronveto/n_muonveto) * 100 << std::endl;
+  std:: cout << "DeltaEta < 1.5: " << n_pretrigplateau << "    " << float(n_pretrigplateau/nEvents) * 100 << "    " << float(n_pretrigplateau/n_electronveto) * 100 << std::endl;
+  std:: cout << "MT>1500:        " << n_MT << "    " << float(n_MT/nEvents) * 100 << "    " << float(n_MT/n_electronveto) * 100 << std::endl;
+  std:: cout << "MET/MT>0.25:    " << n_transverse << "    " << float(n_transverse/nEvents) * 100 << "    " << float(n_transverse/n_MT) * 100 << std::endl;
+  std:: cout << "DeltaPhi<0.75:  " << n_dPhi << "    " << float(n_dPhi/nEvents) * 100 << "    " << float(n_dPhi/n_transverse) * 100 << std::endl;
+  std:: cout << "MetFilters:     " << n_METfilters << "    " << float(n_METfilters/nEvents) * 100 << "    " << float(n_METfilters/n_dPhi) * 100 << std::endl;
+  std:: cout << "2 SVJ, BDGT>-0.14: " << n_BDT << "    " << float(n_BDT/nEvents) * 100 << "    " << float(n_BDT/n_METfilters) * 100 << std::endl;
 
 
   fout.cd();
@@ -1021,7 +1051,7 @@ void systWeights::prepareDefault(bool addDefault, bool addQ2, bool addPDF, bool 
     int nPDF=this->nPDF;
     for(int i =0; i < nPDF;++i){
       stringstream ss;
-      ss<< i+1;
+      ss << i+1;
       this->weightedNames[i+this->maxSysts]= "pdf"+ss.str();
     }
     this->setMax(maxSysts+nPDF);
@@ -1092,8 +1122,8 @@ void systWeights::createFilesSysts( TFile ** allFiles, TString basename, TString
     if (c!=0) cname= "_"+cname;
     for(int sy=0;sy<(int)MAX;++sy){
       TString ns= (this->weightedNames[(int)sy]);
-      cout << " creating file for syst "<< ns<<endl;
-      if (c!=0) cout << " category is "<< c<<endl;
+      cout << " creating file for syst " << ns << endl;
+      if (c!=0) cout << " category is " << c << endl;
 
 
 
@@ -1114,7 +1144,7 @@ void systWeights::createFilesSysts( TFile ** allFiles, TString basename, TString
     if(this->addPDF){
       if(!useOnlyNominal)allFiles[MAX+((MAX+1)*c)]= TFile::Open((basename+"_pdf"+cname+".root"), opt);
 
-      cout<< " fname "<<allFiles[MAX+(MAXTOT+1)*c]->GetName()<<endl;
+      cout << " fname " << allFiles[MAX+(MAXTOT+1)*c]->GetName() << endl;
     }
   }
 
