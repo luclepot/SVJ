@@ -198,10 +198,10 @@ def run(sample, cmd, opt):
 
     print hline
     if opt.gdb:
-        cmd = 'gdb --args '+cmd
+        cmd = 'gdb --args ' + cmd
     elif opt.t3batch:
         jid = '%s_%s' % (sample,opt.sys)
-        cmd = 'qexe.py -w '+workDir+' '+jid+' -- '+cmd
+        cmd = 'qexe.py -w '+workDir+' '+jid+' -- ' + cmd
     print cmd
 
     if opt.dryrun:
@@ -222,6 +222,8 @@ parser.add_option('-g','--gdb', dest='gdb', action='store_true', default=False)
 parser.add_option('-n','--dryrun', dest='dryrun', action='store_true', default=False)
 parser.add_option('-m','--mode', dest='mode', default='t3se', choices=['local','t3se'])
 parser.add_option('--t3batch', dest='t3batch', action='store_true', default=False)
+parser.add_option('-t', '--tree-name', dest='tree_name', action='store', type='string', help='name of tree to run', default='tree')
+parser.add_option('-f', '--filter', dest='filter', action='store', type='string', help='filter for root files', default='*')
 
 isData="MC"
 #isData="DATA"
@@ -249,13 +251,13 @@ for s in samples:
     ## os.system(cmd)
 
     if opt.mode == 'local':
-        sPath = join(localPath,s,'*.root')
+
+        sPath = join(localPath,s,opt.filter)
         
+        allFiles = glob.glob(sPath)
         # print ' '.join([lLs,sPath])
         # Get the complete list of files
         # listing = subprocess.check_output(lLs.split()+[sPath])
-
-        allFiles = glob.glob(sPath)
 
         print 'Sample',s,'Files found',len(allFiles)
 
@@ -288,7 +290,7 @@ for s in samples:
         cwd = os.getcwd()
 
         makedirs(resDirs,cwd)
-        cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  cwd + ' ' + opt.year
+        cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  cwd + ' ' + opt.year + ' ' + opt.tree_name
         
         run(s,cmd,opt)
 
@@ -351,6 +353,6 @@ for s in samples:
 
             sampleFileList = writeFileList(ss, files,opt)
 
-            cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  wd
+            cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  wd + ' ' + opt.tree_name
 
             run(ss,cmd,opt)
