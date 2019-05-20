@@ -166,24 +166,24 @@ int main(int argc, char **argv) {
 
   double q2SplittedWeight=1.;
   
-  Float_t bdt_mult, bdt_axisminor, bdt_girth, bdt_tau21, bdt_tau32, bdt_msd, bdt_deltaphi, bdt_pt, bdt_eta, bdt_mt;
+  // Float_t bdt_mult, bdt_axisminor, bdt_girth, bdt_tau21, bdt_tau32, bdt_msd, bdt_deltaphi, bdt_pt, bdt_eta, bdt_mt;
 
-  TMVA::Reader reader( "!Color:!Silent" );
-  reader.AddVariable( "mult", &bdt_mult );
-  reader.AddVariable( "axisminor", &bdt_axisminor );
-  reader.AddVariable( "girth", &bdt_girth );
-  reader.AddVariable( "tau21", &bdt_tau21 );
-  reader.AddVariable( "tau32", &bdt_tau32 );
-  reader.AddVariable( "msd", &bdt_msd );
-  reader.AddVariable( "deltaphi", &bdt_deltaphi );
-  reader.AddSpectator( "spec1 := pt", &bdt_pt);
-  reader.AddSpectator( "spec1 := eta", &bdt_eta);
-  reader.AddSpectator( "spec1 := mt", &bdt_mt);
+  // TMVA::Reader reader( "!Color:!Silent" );
+  // reader.AddVariable( "mult", &bdt_mult );
+  // reader.AddVariable( "axisminor", &bdt_axisminor );
+  // reader.AddVariable( "girth", &bdt_girth );
+  // reader.AddVariable( "tau21", &bdt_tau21 );
+  // reader.AddVariable( "tau32", &bdt_tau32 );
+  // reader.AddVariable( "msd", &bdt_msd );
+  // reader.AddVariable( "deltaphi", &bdt_deltaphi );
+  // reader.AddSpectator( "spec1 := pt", &bdt_pt);
+  // reader.AddSpectator( "spec1 := eta", &bdt_eta);
+  // reader.AddSpectator( "spec1 := mt", &bdt_mt);
 
   const std::string cmssw_base = getenv("CMSSW_BASE");
 
   const std::string weightsfile = cmssw_base + std::string("/src/SVJ/SVJAnalysis/mZ3000/TMVAClassification_BDTG.weights.xml");
-  reader.BookMVA("BDTG", weightsfile.c_str() );
+  // reader.BookMVA("BDTG", weightsfile.c_str() );
 
   double metFull_Pt=0., metFull_Phi=0.;
 
@@ -417,8 +417,8 @@ int main(int argc, char **argv) {
   TH1F *h_Mt_CRBDT1 = new TH1F( "h_Mt_CRBDT1", "m_{T}", 750, 0, 7500);
   TH1F *h_Mt_CRBDT2 = new TH1F( "h_Mt_CRBDT2", "m_{T}", 750, 0, 7500);
 
-  TH1F *h_bdt_mult_0_presel = new TH1F( "h_bdt_mult_0_presel", "mult jet 0", 500, 0, 500);
-  TH1F *h_bdt_mult_1_presel = new TH1F( "h_bdt_mult_1_presel", "mult jet 1", 500, 0, 500);
+  // TH1F *h_bdt_mult_0_presel = new TH1F( "h_bdt_mult_0_presel", "mult jet 0", 500, 0, 500);
+  // TH1F *h_bdt_mult_1_presel = new TH1F( "h_bdt_mult_1_presel", "mult jet 1", 500, 0, 500);
   TH1F *h_bdt_axisminor_0_presel = new TH1F( "h_bdt_axisminor_0_presel", "axisminor jet 0", 100, 0, 0.2);
   TH1F *h_bdt_axisminor_1_presel = new TH1F( "h_bdt_axisminor_1_presel", "axisminor jet 1", 100, 0, 0.2);
   TH1F *h_bdt_girth_0_presel = new TH1F( "h_bdt_girth_0_presel", "girth jet 0", 100, 0, 0.7);
@@ -431,8 +431,8 @@ int main(int argc, char **argv) {
   TH1F *h_bdt_deltaphi_1_presel = new TH1F( "h_bdt_deltaphi_1_presel", "deltaphi jet 1", 100, 0, 3.5);
   TH1F *h_bdt_msd_0_presel = new TH1F( "h_bdt_msd_0_presel", "msd jet 0", 120, 0, 600);
   TH1F *h_bdt_msd_1_presel = new TH1F( "h_bdt_msd_1_presel", "msd jet 1", 120, 0, 600);
-  TH1F *h_bdt_mva_0_presel = new TH1F( "h_bdt_mva_0_presel", "mva jet 0", 100, -1, 1);
-  TH1F *h_bdt_mva_1_presel = new TH1F( "h_bdt_mva_1_presel", "mva jet 0", 100, -1, 1);
+  // TH1F *h_bdt_mva_0_presel = new TH1F( "h_bdt_mva_0_presel", "mva jet 0", 100, -1, 1);
+  // TH1F *h_bdt_mva_1_presel = new TH1F( "h_bdt_mva_1_presel", "mva jet 0", 100, -1, 1);
 
   float n_twojets(0.), n_prejetspt(0.), n_pretrigplateau(0.), n_transratio(0.), n_MT(0.), n_METfilters(0.), n_dPhi(0.), n_transverse(0.);
   float n_muonveto(0.), n_electronveto(0.), n_BDT(0.) ;
@@ -616,16 +616,16 @@ int main(int argc, char **argv) {
       bool selection_CR = 0;
       selection_CR = preselection_CR && selection_dPhi && selection_transverseratio_window && selection_mt;
 
-      double mva1_(0.), mva2_(0.);
+      // double mva1_(0.), mva2_(0.);
 
-      bdt_mult= mult.at(0); bdt_axisminor = axisminor.at(0); bdt_girth = girth.at(0);
-      bdt_msd = msd.at(0); bdt_deltaphi = deltaphi1; bdt_pt = AK8Jets.at(0).Pt(); bdt_eta = AK8Jets.at(0).Eta(); bdt_mt = MT2;
+      // bdt_mult= mult.at(0); bdt_axisminor = axisminor.at(0); bdt_girth = girth.at(0);
+      // bdt_msd = msd.at(0); bdt_deltaphi = deltaphi1; bdt_pt = AK8Jets.at(0).Pt(); bdt_eta = AK8Jets.at(0).Eta(); bdt_mt = MT2;
 
-      mva1_ = reader.EvaluateMVA("BDTG");
-      bdt_mult= mult.at(1); bdt_axisminor = axisminor.at(1); bdt_girth = girth.at(1);
-      bdt_msd = msd.at(1); bdt_deltaphi = deltaphi2; bdt_pt = AK8Jets.at(1).Pt(); bdt_eta = AK8Jets.at(1).Eta(); bdt_mt = MT2;
+      // // mva1_ = reader.EvaluateMVA("BDTG");
+      // bdt_mult= mult.at(1); bdt_axisminor = axisminor.at(1); bdt_girth = girth.at(1);
+      // bdt_msd = msd.at(1); bdt_deltaphi = deltaphi2; bdt_pt = AK8Jets.at(1).Pt(); bdt_eta = AK8Jets.at(1).Eta(); bdt_mt = MT2;
 
-      mva2_ = reader.EvaluateMVA("BDTG");
+      // mva2_ = reader.EvaluateMVA("BDTG");
 
       if(preselection){
         if(preselection_metfilters_1){
@@ -705,8 +705,8 @@ int main(int argc, char **argv) {
         systSVJ.fillHistogramsSysts(h_dPhimin_presel,DeltaPhiMin,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_transverseratio_presel,metFull_Pt/MT2,w,systWeightsSVJ);
 
-        systSVJ.fillHistogramsSysts(h_bdt_mult_0_presel,mult.at(0),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_mult_1_presel,mult.at(1),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_mult_0_presel,mult.at(0),w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_mult_1_presel,mult.at(1),w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_bdt_axisminor_0_presel,axisminor.at(0),w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_bdt_axisminor_1_presel,axisminor.at(1),w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_bdt_girth_0_presel,girth.at(0),w,systWeightsSVJ);
@@ -721,20 +721,20 @@ int main(int argc, char **argv) {
         systSVJ.fillHistogramsSysts(h_bdt_msd_1_presel,msd.at(1),w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_bdt_deltaphi_0_presel,deltaphi1,w,systWeightsSVJ);
         systSVJ.fillHistogramsSysts(h_bdt_deltaphi_1_presel,deltaphi2,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_mva_0_presel,mva1_,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_bdt_mva_1_presel,mva2_,w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_mva_0_presel,mva1_,w,systWeightsSVJ);
+        // systSVJ.fillHistogramsSysts(h_bdt_mva_1_presel,mva2_,w,systWeightsSVJ);
 
       }
 
-            double bdtCut = -0.14;
+          double bdtCut = -0.14;
       bool selection_BDT2(0), selection_BDT1(0), selection_BDT0(0);
-      selection_BDT2= selection && (mva1_>bdtCut) && (mva2_>bdtCut);
-      selection_BDT1= selection && (((mva1_>bdtCut) && (mva2_<bdtCut)) || ((mva1_<bdtCut) && (mva2_>bdtCut)));
-      selection_BDT0= selection && ((mva1_<bdtCut) && (mva2_<bdtCut));
+      selection_BDT2= selection; //&& (mva1_>bdtCut) && (mva2_>bdtCut);
+      selection_BDT1= selection; //&& (((mva1_>bdtCut) && (mva2_<bdtCut)) || ((mva1_<bdtCut) && (mva2_>bdtCut)));
+      selection_BDT0= selection; //&& ((mva1_<bdtCut) && (mva2_<bdtCut));
       bool selection_CRBDT2(0), selection_CRBDT1(0), selection_CRBDT0(0);
-      selection_CRBDT2= selection_CR && (mva1_>bdtCut) && (mva2_>bdtCut);
-      selection_CRBDT1= selection_CR && (((mva1_>bdtCut) && (mva2_<bdtCut)) || ((mva1_<bdtCut) && (mva2_>bdtCut)));
-      selection_CRBDT0= selection_CR && ((mva1_<bdtCut) && (mva2_<bdtCut));
+      selection_CRBDT2= selection_CR; //&& (mva1_>bdtCut) && (mva2_>bdtCut);
+      selection_CRBDT1= selection_CR; //&& (((mva1_>bdtCut) && (mva2_<bdtCut)) || ((mva1_<bdtCut) && (mva2_>bdtCut)));
+      selection_CRBDT0= selection_CR; //&& ((mva1_<bdtCut) && (mva2_<bdtCut));
 
       if(selection){
 
@@ -939,8 +939,8 @@ int main(int argc, char **argv) {
   systSVJ.writeSingleHistogramSysts(h_dPhi2_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_transverseratio_presel, allMyFiles);
 
-  systSVJ.writeSingleHistogramSysts(h_bdt_mult_0_presel, allMyFiles);
-  systSVJ.writeSingleHistogramSysts(h_bdt_mult_1_presel, allMyFiles);
+  // systSVJ.writeSingleHistogramSysts(h_bdt_mult_0_presel, allMyFiles);
+  // systSVJ.writeSingleHistogramSysts(h_bdt_mult_1_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_bdt_axisminor_0_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_bdt_axisminor_1_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_bdt_girth_0_presel, allMyFiles);
@@ -953,8 +953,8 @@ int main(int argc, char **argv) {
   systSVJ.writeSingleHistogramSysts(h_bdt_deltaphi_1_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_bdt_msd_0_presel, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_bdt_msd_1_presel, allMyFiles);
-  systSVJ.writeSingleHistogramSysts(h_bdt_mva_0_presel, allMyFiles);
-  systSVJ.writeSingleHistogramSysts(h_bdt_mva_1_presel, allMyFiles);
+  // systSVJ.writeSingleHistogramSysts(h_bdt_mva_0_presel, allMyFiles);
+  // systSVJ.writeSingleHistogramSysts(h_bdt_mva_1_presel, allMyFiles);
 
   systSVJ.writeSingleHistogramSysts(h_dEta, allMyFiles);
   systSVJ.writeSingleHistogramSysts(h_dPhimin, allMyFiles);
