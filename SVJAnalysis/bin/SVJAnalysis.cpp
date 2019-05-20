@@ -38,15 +38,7 @@
 
 using namespace std;
 
-typedef vector<double> vdouble;
-typedef vector<float> vfloat;
-typedef vector<int> vint;
-typedef vector<bool> vbool;
-typedef vector<string> vstring;
-
 enum weightedSysts { NOSYST=0, PUUP=1, PUDOWN=2, TRIGUP=3, TRIGDOWN=4, MAXSYSTS=5};
-enum theoSysts {SCALEUP=101,SCALEDOWN=102, NNPDF1=100, NNPDF2=102};
-int wLimit =150;
 
 struct systWeights{
   void initHistogramsSysts(TH1F** histo, TString name, TString, int, float, float);
@@ -74,10 +66,6 @@ struct systWeights{
   string weightedNames[150];
   string categoriesNames[10];
 };
-
-void callme(){
-  std::cout<<" NaN value"<<std::endl;
-}
 
 int main(int argc, char **argv) {
 
@@ -112,13 +100,6 @@ int main(int argc, char **argv) {
   std::cout << "Loading file collection from " << path << std::endl;
   TFileCollection fc(sample.c_str(),sample.c_str(),path.c_str());
   std::cout << "Files found : " << fc.GetNFiles() << std::endl;
-
-  TLorentzVector Rematch(TLorentzVector gp, std::vector<TLorentzVector> jet, float dR);
-  float check_match(TLorentzVector gp1, TLorentzVector gp2, std::vector<TLorentzVector> jet, float dR);
-
-  TH1F * initproduct(TH1F * h_A,TH1F* h_B, int rebinA = 1, int rebinB=1,double integral = -1.);
-  TH1F * makeproduct(TH1F * h_A,TH1F* h_B, int rebinA = 1, int rebinB=1,double integral = -1.);
-  TH1F * makeproduct(TH2F * h);
 
   TString syststr = "";
   string syststrname = "";
@@ -1035,133 +1016,6 @@ int main(int argc, char **argv) {
 
 }
 
-TLorentzVector Rematch(TLorentzVector gp, std::vector<TLorentzVector> jet, float dR){
-  float eta=0, pt=0, phi=0, e=0;
-  float hardestPt=-1.;
-
-  int sizeMax=jet.size();
-
-
-  for(int i=0; i<sizeMax;i++){
-
-
-
-    if (jet[i].DeltaR(gp) >dR) continue;
-    if ( hardestPt <0 or jet[i].Pt() > hardestPt)
-      {
- hardestPt = jet[i].Pt();
-
- pt = jet[i].Pt();
- phi = jet[i].Phi();
- eta = jet[i].Eta();
- e = jet[i].E();
-      }
-
-  }
-
-  TLorentzVector Matched_jet;
-  Matched_jet.SetPtEtaPhiE(pt, eta, phi, e);
-
-  return Matched_jet;
-}
-
-
-float check_match(TLorentzVector gp1, TLorentzVector gp2, std::vector<TLorentzVector> jet, float dR){
-
-  int sizeMax = jet.size();
-
-
-  int i_lead_Pt = 0;
-  int i_subl_Pt = 0;
-  float lead_Pt = -1.;
-  float subl_Pt = -1.;
-  for(int i=0; i<sizeMax; i++){
-    float tmp_Pt=jet[i].Pt();
-    if( tmp_Pt > subl_Pt ){
-      if( tmp_Pt < lead_Pt ){
-        subl_Pt = tmp_Pt;
-        i_subl_Pt = i;
-      } else {
-        subl_Pt = lead_Pt;
-        i_subl_Pt = i_lead_Pt;
-        lead_Pt = tmp_Pt;
-        i_lead_Pt = i;
-      }
-    }
-  }
-
-
-  int i_part_1 = -1;
-  int i_part_2 = -1;
-  float hardest_Pt_part_1 = -1;
-  float hardest_Pt_part_2 = -1;
-  for(int i=0; i<sizeMax; i++){
-
-    if(jet[i].DeltaR(gp1)<dR && (hardest_Pt_part_1<0 || jet[i].Pt()>hardest_Pt_part_1)){
-      i_part_1 = i;
-    } else if(jet[i].DeltaR(gp2)<dR && (hardest_Pt_part_2<0 || jet[i].Pt()>hardest_Pt_part_2)){
-      i_part_2 = i;
-    }
-
-
-
-
-  }
-
-
-  if(i_part_1==i_part_2){
-
-
-  }
-
-
-
-  float azzecched = 0;
-  if(i_part_1==i_lead_Pt || i_part_1==i_subl_Pt) azzecched += 0.5;
-  if(i_part_2==i_lead_Pt || i_part_2==i_subl_Pt) azzecched += 0.5;
-
-  return azzecched;
-
-}
-
-TH1F * initproduct(TH1F * hA,TH1F* hB, int rebinA = 1, int rebinB=1,double integral = -1.){
-  int nbinsA = hA->GetNbinsX();
-  int nbinsB = hA->GetNbinsX();
-  double min = hA->GetBinLowEdge(1)*hB->GetBinLowEdge(1);
-  double max = hA->GetBinLowEdge(nbinsA+1)*hB->GetBinLowEdge(nbinsB+1);
-
-  string name =(string)(hA->GetName()) +"_vs_"+ (string)(hB->GetName());
-
-
-  TH1F * result = new TH1F(name.c_str(),name.c_str(),nbinsA*nbinsB,min,max);
-  return result;
-}
-
-TH1F * makeproduct(TH1F * hA,TH1F* hB, int rebinA = 1, int rebinB=1,double integral = -1.){
-  int nbinsA = hA->GetNbinsX();
-  int nbinsB = hA->GetNbinsX();
-  double min = hA->GetBinLowEdge(1)*hB->GetBinLowEdge(1);
-  double max = hA->GetBinLowEdge(nbinsA+1)*hB->GetBinLowEdge(nbinsB+1);
-
-  string name =(string)(hA->GetName()) +"_vs_"+ (string)(hB->GetName());
-
-
-  TH1F * result = new TH1F(name.c_str(),name.c_str(),nbinsA*nbinsB,min,max);
-
-  for(int i =1; i<= nbinsA;++i){
-    for(int j =1; j<= nbinsB;++j){
-      double value = hA->GetBinContent(i)*hB->GetBinContent(j);
-      int k = ((i-1)*nbinsB)+j;
-      result->SetBinContent(k,value);
-    }
-  }
-  if( integral <= 0.)integral = hB->Integral()/result->Integral();
-  else integral = integral / result->Integral();
-  result->Scale(integral);
-  return result;
-
-}
-
 void systWeights::copySysts(systWeights sys){
   for(int i =0; i < sys.maxSysts;++i){
     this->weightedNames[i]=sys.weightedNames[i];
@@ -1262,7 +1116,6 @@ void systWeights::prepareDefault(bool addDefault, bool addQ2, bool addPDF, bool 
 
 }
 
-
 void systWeights::initHistogramsSysts(TH1F** histo,TString name, TString title, int nbins, float min, float max){
   for (int c = 0; c < this->nCategories; c++){
     int MAX = this->maxSysts;
@@ -1315,7 +1168,6 @@ void systWeights::fillHistogramsSysts(TH1F* histo, float v, float w, double * wc
     histo->Fill(v, w*ws);
   }
 }
-
 
 void systWeights::createFilesSysts( TFile ** allFiles, TString basename, TString opt){
   for (int c = 0; c < this->nCategories; c++){
@@ -1402,13 +1254,14 @@ void systWeights::writeSingleHistogramSysts(TH1F* histo, TFile **filesout){
   histo->Write();
 }
 
-
 void systWeights::setMax(int max){
   this->maxSysts = max;
 }
+
 void systWeights::setMaxNonPDF(int max){
   this->maxSystsNonPDF = max;
 }
+
 void systWeights::setSystValue(string name, double value, bool mult){
   float zerofact=1.0;
   if(mult)zerofact=this->weightedSysts[0];
@@ -1488,29 +1341,4 @@ void writeSingleHistogramSysts(TH1F* histo, TFile *filesout[1], bool useOnlyNomi
 
   filesout[0]->cd();
   histo->Write();
-}
-
-TH1F * makeproduct(TH2F * h){
-  int nbinsA = h->GetNbinsX();
-  int nbinsB = h->GetNbinsY();
-  double min = h->GetXaxis()->GetBinLowEdge(1)*h->GetYaxis()->GetBinLowEdge(1);
-  double max = h->GetXaxis()->GetBinLowEdge(nbinsA+1)*h->GetYaxis()->GetBinLowEdge(nbinsB+1);
-
-  string name = (string)(h->GetName()) + "_1D";
-
-
-  TH1F * result = new TH1F(name.c_str(),name.c_str(),nbinsA*nbinsB,min,max);
-
-  for(int i =1; i<= nbinsA;++i){
-    for(int j =1; j<= nbinsB;++j){
-      double value = h->GetBinContent(i,j);
-      int k = ((i-1)*nbinsB)+j;
-      result->SetBinContent(k,value);
-    }
-  }
-
-
-
-  return result;
-
 }
