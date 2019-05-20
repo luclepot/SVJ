@@ -62,12 +62,6 @@ struct systWeights{
   void setWeight(string name, double value, bool mult=false);
   void setWeight(int systPlace, double value, bool mult=false);
   void prepareDefault(bool addDefault, bool addPDF, bool addQ2, bool addTopPt, bool addVHF, bool addTTSplit, int numPDF=102);
-  void addSyst(string name);
-  void addSystNonPDF(string name);
-  void setWCats(double *wcats);
-
-  void addkFact(string name);
-
   void copySysts(systWeights sys);
   void setOnlyNominal(bool useOnlyNominal=false);
   bool onlyNominal;
@@ -1268,33 +1262,6 @@ void systWeights::prepareDefault(bool addDefault, bool addQ2, bool addPDF, bool 
 
 }
 
-void systWeights::addSyst(string name){
-  this->weightedNames[this->maxSysts]= name;
-  this->setMax(maxSysts+1);
-  if(name.find("pdf")!=std::string::npos)this->setMaxNonPDF(maxSysts+1);
-  this->weightedNames[this->maxSysts]= "";
-}
-
-void systWeights::addSystNonPDF(string name){
-  this->weightedNames[this->maxSystsNonPDF]= name;
-  this->setMaxNonPDF(maxSystsNonPDF+1);
-  int nPDF=this->nPDF;
-  for(int i =0; i < nPDF;++i){
-    stringstream ss;
-    ss<< i+1;
-    this->weightedNames[i+this->maxSystsNonPDF]= "pdf"+ss.str();
-  }
-  this->setMax(maxSystsNonPDF+nPDF);
-  this->weightedNames[this->maxSysts]= "";
-}
-
-void systWeights::addkFact(string name){
-  string up=name+"Up";
-  string down=name+"Down";
-  cout << " adding syst "<< up<<endl;
-  this->addSystNonPDF(up);
-  this->addSystNonPDF(down);
-}
 
 void systWeights::initHistogramsSysts(TH1F** histo,TString name, TString title, int nbins, float min, float max){
   for (int c = 0; c < this->nCategories; c++){
@@ -1319,14 +1286,6 @@ void systWeights::initHistogramsSysts(TH1F** histo,TString name, TString title, 
 
 void systWeights::setOnlyNominal(bool useOnlyNominal){
   this->onlyNominal=useOnlyNominal;
-}
-
-void systWeights::setWCats(double * wcats){
-  for(int i =0;i<this->nCategories;++i){
-
-    this->wCats[i]=wcats[i];
-  }
-
 }
 
 void systWeights::fillHistogramsSysts(TH1F* histo, float v, float w, float *systWeights, int nFirstSysts, double * wcats, bool verbose){
