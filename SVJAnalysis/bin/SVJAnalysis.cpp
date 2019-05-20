@@ -59,12 +59,6 @@ struct systWeights{
   void setMaxNonPDF(int max);
   void setSystValue(string name, double value, bool mult=false);
   void setSystValue(int systPlace, double value, bool mult=false);
-  void setPDFWeights(float * wpdfs, double * xsections, int numPDFs, float wzero=1.0, bool mult=true);
-  void setQ2Weights(float q2up, float q2down, float wzero=1.0,bool mult=true);
-  void setTWeight(float tweight, float wtotsample=1.0,bool mult=true);
-  void setVHFWeight(int vhf,bool mult=true, double shiftval=0.65);
-  void setPDFValue(int numPDF, double value);
-  double getPDFValue(int numPDF);
   void setWeight(string name, double value, bool mult=false);
   void setWeight(int systPlace, double value, bool mult=false);
   void prepareDefault(bool addDefault, bool addPDF, bool addQ2, bool addTopPt, bool addVHF, bool addTTSplit, int numPDF=102);
@@ -73,10 +67,8 @@ struct systWeights{
   void setWCats(double *wcats);
 
   void addkFact(string name);
-  void setkFact(string name,float kfact_nom, float kfact_up,float kfact_down, bool mult=true);
 
   void copySysts(systWeights sys);
-  void calcPDFHisto(TH1F** histos, TH1F* singleHisto, double scalefactor=1.0, int c = 0);
   void setOnlyNominal(bool useOnlyNominal=false);
   bool onlyNominal;
   bool addPDF, addQ2, addTopPt, addVHF, addTTSplit;
@@ -1176,8 +1168,6 @@ TH1F * makeproduct(TH1F * hA,TH1F* hB, int rebinA = 1, int rebinB=1,double integ
 
 }
 
-
-
 void systWeights::copySysts(systWeights sys){
   for(int i =0; i < sys.maxSysts;++i){
     this->weightedNames[i]=sys.weightedNames[i];
@@ -1194,7 +1184,6 @@ void systWeights::copySysts(systWeights sys){
   this->addVHF=sys.addVHF;
   this->addTTSplit=sys.addTTSplit;
 }
-
 
 void systWeights::prepareDefault(bool addDefault, bool addQ2, bool addPDF, bool addTopPt,bool addVHF, bool addTTSplit, int numPDF){
   this->addPDF=addPDF;
@@ -1278,6 +1267,7 @@ void systWeights::prepareDefault(bool addDefault, bool addQ2, bool addPDF, bool 
   }
 
 }
+
 void systWeights::addSyst(string name){
   this->weightedNames[this->maxSysts]= name;
   this->setMax(maxSysts+1);
@@ -1304,128 +1294,6 @@ void systWeights::addkFact(string name){
   cout << " adding syst "<< up<<endl;
   this->addSystNonPDF(up);
   this->addSystNonPDF(down);
-}
-
-void systWeights::setkFact(string name, float kfact_nom, float kfact_up,float kfact_down, bool mult){
-
-  float zerofact=1.0;
-  if(mult)zerofact=this->weightedSysts[0];
-  string up = name+"Up";
-  string down = name+"Down";
-  float valueup=kfact_up/kfact_nom;
-  float valuedown=kfact_down/kfact_nom;
-
-
-  this->setSystValue(up, valueup*zerofact);
-  this->setSystValue(down, valuedown*zerofact);
-}
-
-void systWeights::setPDFWeights(float * wpdfs, double * xsections, int numPDFs, float wzero, bool mult){
-
-float zerofact=1.0;
-  if(mult)zerofact=this->weightedSysts[0];
-  float rms=0,mean=0;
-  for (int i = 1; i <= numPDFs; ++i){
-
-    if(wzero!=0 &&xsections[i]!=0){
-      float pvalue= wpdfs[i]/(wzero*xsections[i]);
-      if (isnan(pvalue)) pvalue=1.;
-      this->setPDFValue(i,zerofact*wpdfs[i]/(wzero*xsections[i]));
-      mean+=pvalue;
-    }
-    else {
-      mean+=1.;
-      this->setPDFValue(i,wzero);
-    }
-  }
-  mean = mean/numPDFs;
-  for (int i = 1; i <= numPDFs; ++i){
-    if(wzero!=0 &&xsections[i]!=0){
-      float pvalue= wpdfs[i]/(wzero*xsections[i]);
-      if (isnan(pvalue)) pvalue=1.;
-      rms+=(mean-pvalue)*(mean-pvalue);
-    }
-    else{
-      rms+=0;
-    }
-    rms = sqrt(rms/numPDFs);
-  }
-  if(isnan(rms))rms=0.;
-  this->setSystValue("pdf_totalUp", zerofact*(1+rms));
-  this->setSystValue("pdf_totalDown", zerofact*(1-rms));
-
-}
-void systWeights::setTWeight(float tweight, float wtotsample,bool mult){
-  float zerofact=1.0;
-
-  if(mult)zerofact=this->weightedSysts[0];
-  this->setSystValue("topPtWeightUp", zerofact*tweight/wtotsample);
-  this->setSystValue("topPtWeightDown", zerofact/tweight*wtotsample);
-}
-
-void systWeights::setVHFWeight(int vhf,bool mult,double shiftval){
-  float zerofact=1.0;
-  double w_shift=0.0;
-
-  if (vhf>1)w_shift=shiftval;
-
-  if(mult)zerofact=this->weightedSysts[0];
-  this->setSystValue("VHFWeightUp", zerofact*(1+w_shift));
-  this->setSystValue("VHFWeightDown", zerofact*(1-w_shift));
-}
-
-
-void systWeights::setQ2Weights(float q2up, float q2down, float wzero, bool mult){
-  float zerofact=1.0;
-  if(mult){
-    zerofact=this->weightedSysts[0];
-
-  }
-
-
-  this->setSystValue("q2Up", zerofact*q2up/wzero);
-  this->setSystValue("q2Down", zerofact*q2down/wzero);
-}
-
-double systWeights::getPDFValue(int numPDF){
-  if(!addPDF){ cout << "error! No PDF used, this will do nothing."<<endl;return 0.;}
-  int MIN = this->maxSystsNonPDF;
-  return (double)this->weightedSysts[numPDF+MIN];
-
-}
-void systWeights::setPDFValue(int numPDF, double w){
-  if(!addPDF){ cout << "error! No PDF used, this will do nothing."<<endl;return;}
-  int MIN = this->maxSystsNonPDF;
-  this->weightedSysts[numPDF+MIN]=w;
-
-}
-
-void systWeights::calcPDFHisto(TH1F** histo, TH1F* singleHisto, double scalefactor, int c){
-  if(!addPDF){ cout << "error! No PDF used, this will do nothing."<<endl;return;}
-  int MAX = this->maxSysts;
-
-    int MIN = this->maxSystsNonPDF+(MAX+1)*c;
-    for(int b = 0; b< singleHisto->GetNbinsX();++b){
-      float val = singleHisto->GetBinContent(b);
-
-      float mean = 0, devst=0;
-
-      for(int i = 0; i<this->nPDF;++i ){
-
-
-
- mean = mean+ histo[i+MIN]->GetBinContent(b);
-      }
-      mean = mean/this->nPDF;
-
-      for(int i = 0; i<this->nPDF;++i ){
- devst+=(mean-histo[i+MIN]->GetBinContent(b))*(mean-histo[i+MIN]->GetBinContent(b));
-      }
-      devst= sqrt(devst/this->nPDF);
-      singleHisto->SetBinContent(b,val+devst*scalefactor);
-
-    }
-
 }
 
 void systWeights::initHistogramsSysts(TH1F** histo,TString name, TString title, int nbins, float min, float max){
