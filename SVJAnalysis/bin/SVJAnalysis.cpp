@@ -155,20 +155,20 @@ int main(int argc, char **argv) {
   const char* TTJets_HT1200to2500label = "TTJets_HT1200to2500";
   const char* TTJets_HT2500toInflabel = "TTJets_HT2500toInf";
   
-  bool tt_stitching_TTJets=false, tt_stitching_TTJets_DiLept=false, tt_stitching_TTJets_DiLept_genMET150=false, tt_stitching_TTJets_SingleLeptFromT=false, tt_stitching_TTJets_SingleLeptFromT_genMET150=false, tt_stitching_TTJets_SingleLeptFromTbar=false, tt_stitching_TTJets_SingleLeptFromTbar_genMET150=false, tt_stitching_TTJets_HT600to800=false, tt_stitching_TTJets_HT800to1200=false, tt_stitching_TTJets_HT1200to2500=false, tt_stitching_TTJets_HT2500toInf=false, tt_stitching_noTT=false;
+  // bool tt_stitching_TTJets=false, tt_stitching_TTJets_DiLept=false, tt_stitching_TTJets_DiLept_genMET150=false, tt_stitching_TTJets_SingleLeptFromT=false, tt_stitching_TTJets_SingleLeptFromT_genMET150=false, tt_stitching_TTJets_SingleLeptFromTbar=false, tt_stitching_TTJets_SingleLeptFromTbar_genMET150=false, tt_stitching_TTJets_HT600to800=false, tt_stitching_TTJets_HT800to1200=false, tt_stitching_TTJets_HT1200to2500=false, tt_stitching_TTJets_HT2500toInf=false, tt_stitching_noTT=false;
 
-  if( !strncmp(sample.c_str(), TTJetslabel , strlen(TTJetslabel))) {tt_stitching_TTJets=true;}
-  if( !strncmp(sample.c_str(), TTJets_DiLeptlabel , strlen(TTJets_DiLeptlabel))) {tt_stitching_TTJets_DiLept=true;}
-  if( !strncmp(sample.c_str(), TTJets_DiLept_genMET150label , strlen(TTJets_DiLept_genMET150label))) {tt_stitching_TTJets_DiLept_genMET150=true;}
-  if( !strncmp(sample.c_str(), TTJets_SingleLeptFromTlabel , strlen(TTJets_SingleLeptFromTlabel))) {tt_stitching_TTJets_SingleLeptFromT=true;}
-  if( !strncmp(sample.c_str(), TTJets_SingleLeptFromT_genMET150label , strlen(TTJets_SingleLeptFromT_genMET150label))) {tt_stitching_TTJets_SingleLeptFromT_genMET150=true;}
-  if( !strncmp(sample.c_str(), TTJets_SingleLeptFromTbarlabel , strlen(TTJets_SingleLeptFromTbarlabel))) {tt_stitching_TTJets_SingleLeptFromTbar=true;}
-  if( !strncmp(sample.c_str(), TTJets_SingleLeptFromTbar_genMET150label , strlen(TTJets_SingleLeptFromTbar_genMET150label))) {tt_stitching_TTJets_SingleLeptFromTbar_genMET150=true;}
-  if( !strncmp(sample.c_str(), TTJets_HT600to800label , strlen(TTJets_HT600to800label))) {tt_stitching_TTJets_HT600to800=true;}
-  if( !strncmp(sample.c_str(), TTJets_HT800to1200label , strlen(TTJets_HT800to1200label))) {tt_stitching_TTJets_HT800to1200=true;}
-  if( !strncmp(sample.c_str(), TTJets_HT1200to2500label , strlen(TTJets_HT1200to2500label))) {tt_stitching_TTJets_HT1200to2500=true;}
-  if( !strncmp(sample.c_str(), TTJets_HT2500toInflabel , strlen(TTJets_HT2500toInflabel))) {tt_stitching_TTJets_HT2500toInf=true;}
-  if( strncmp(sample.c_str(), noTTlabel, 2)!=0 ) {tt_stitching_noTT=true;}  
+  // if( !strncmp(sample.c_str(), TTJetslabel , strlen(TTJetslabel))) {tt_stitching_TTJets=true;}
+  // if( !strncmp(sample.c_str(), TTJets_DiLeptlabel , strlen(TTJets_DiLeptlabel))) {tt_stitching_TTJets_DiLept=true;}
+  // if( !strncmp(sample.c_str(), TTJets_DiLept_genMET150label , strlen(TTJets_DiLept_genMET150label))) {tt_stitching_TTJets_DiLept_genMET150=true;}
+  // if( !strncmp(sample.c_str(), TTJets_SingleLeptFromTlabel , strlen(TTJets_SingleLeptFromTlabel))) {tt_stitching_TTJets_SingleLeptFromT=true;}
+  // if( !strncmp(sample.c_str(), TTJets_SingleLeptFromT_genMET150label , strlen(TTJets_SingleLeptFromT_genMET150label))) {tt_stitching_TTJets_SingleLeptFromT_genMET150=true;}
+  // if( !strncmp(sample.c_str(), TTJets_SingleLeptFromTbarlabel , strlen(TTJets_SingleLeptFromTbarlabel))) {tt_stitching_TTJets_SingleLeptFromTbar=true;}
+  // if( !strncmp(sample.c_str(), TTJets_SingleLeptFromTbar_genMET150label , strlen(TTJets_SingleLeptFromTbar_genMET150label))) {tt_stitching_TTJets_SingleLeptFromTbar_genMET150=true;}
+  // if( !strncmp(sample.c_str(), TTJets_HT600to800label , strlen(TTJets_HT600to800label))) {tt_stitching_TTJets_HT600to800=true;}
+  // if( !strncmp(sample.c_str(), TTJets_HT800to1200label , strlen(TTJets_HT800to1200label))) {tt_stitching_TTJets_HT800to1200=true;}
+  // if( !strncmp(sample.c_str(), TTJets_HT1200to2500label , strlen(TTJets_HT1200to2500label))) {tt_stitching_TTJets_HT1200to2500=true;}
+  // if( !strncmp(sample.c_str(), TTJets_HT2500toInflabel , strlen(TTJets_HT2500toInflabel))) {tt_stitching_TTJets_HT2500toInf=true;}
+  // if( strncmp(sample.c_str(), noTTlabel, 2)!=0 ) {tt_stitching_noTT=true;}  
   
   const char* data2016label = "Run2016";
   const char* data2017label = "Run2017";
@@ -254,36 +254,36 @@ int main(int argc, char **argv) {
   
   //Q2 and PDF splitting                                                                                                                                                                                                    
   double q2SplittedWeight=1.;
-  if(addQ2){
-    if((samplestr).find("SVJ") != std::string::npos){
-      TH1D splittedWeightQ2("w_q2_splitted","Q2 splitting: overall sample weight",2000,0,2.0);
-      //chain.Project("w_q2_splitted","Event_LHEWeight4/Event_LHEWeight0");
-      chain.Project("w_q2_splitted","PDFweights[4]");
-      q2SplittedWeight=splittedWeightQ2.GetMean();
-    }
-    cout << "q2SplittedWeight is "<< q2SplittedWeight<<endl;
-  }
+  // if(addQ2){
+  //   if((samplestr).find("SVJ") != std::string::npos){
+  //     TH1D splittedWeightQ2("w_q2_splitted","Q2 splitting: overall sample weight",2000,0,2.0);
+  //     //chain.Project("w_q2_splitted","Event_LHEWeight4/Event_LHEWeight0");
+  //     chain.Project("w_q2_splitted","PDFweights[4]");
+  //     q2SplittedWeight=splittedWeightQ2.GetMean();
+  //   }
+  //   cout << "q2SplittedWeight is "<< q2SplittedWeight<<endl;
+  // }
   
   // double normzero = 0.;
-  if(addPDF){
-      for (int i = 1 ; i <= nPDF ; ++i){
+  // if(addPDF){
+  //     for (int i = 1 ; i <= nPDF ; ++i){
       
-        if((samplestr).find("SVJ") != std::string::npos){
-        stringstream pdfss;
-        //pdfss<<(i+8);
-        pdfss<<(i);
-        string pstr=(pdfss.str());
-        TH1D splittedWeightPDF("w_pdf_splitted","PDF splitting: overall sample weight",2000,0,2.0);
-        TH1D splittedWeightPDF0("w_pdf_0_splitted","PDF splitting: overall sample weight 0",2000,0,2.0);
-        //chain.Project("w_pdf_splitted",(("Event_LHEWeight"+pstr+"/Event_LHEWeight0").c_str())); 
-        chain.Project("w_pdf_splitted",(("PDFweights["+pstr + "]").c_str())); 
-        chain.Project("w_pdf_0_splitted",("PDFweights[0]")); 
-        //normzero = splittedWeightPDF0.GetMean()/chain.GetEntries();
+  //       if((samplestr).find("SVJ") != std::string::npos){
+  //       stringstream pdfss;
+  //       //pdfss<<(i+8);
+  //       pdfss<<(i);
+  //       string pstr=(pdfss.str());
+  //       TH1D splittedWeightPDF("w_pdf_splitted","PDF splitting: overall sample weight",2000,0,2.0);
+  //       TH1D splittedWeightPDF0("w_pdf_0_splitted","PDF splitting: overall sample weight 0",2000,0,2.0);
+  //       //chain.Project("w_pdf_splitted",(("Event_LHEWeight"+pstr+"/Event_LHEWeight0").c_str())); 
+  //       chain.Project("w_pdf_splitted",(("PDFweights["+pstr + "]").c_str())); 
+  //       chain.Project("w_pdf_0_splitted",("PDFweights[0]")); 
+  //       //normzero = splittedWeightPDF0.GetMean()/chain.GetEntries();
 
-        //std::cout<<"Norm zero "<<normzero<<std::endl;
-      }
-    }
-  }
+  //       //std::cout<<"Norm zero "<<normzero<<std::endl;
+  //     }
+  //   }
+  // }
 
   /* Configuring BDT */
   Float_t bdt_mult, bdt_axisminor, bdt_girth, bdt_tau21, bdt_tau32, bdt_msd, bdt_deltaphi, bdt_pt, bdt_eta, bdt_mt;
@@ -321,7 +321,7 @@ int main(int argc, char **argv) {
   std::vector<TLorentzVector>* GenMuonsPtr(0x0);
   // std::vector<TLorentzVector>* GenTausPtr(0x0);
 
-  double madHT=0, GenMET=0;
+  // double madHT=0, GenMET=0;
 
   std::vector<double>* JetsAK8_NHFPtr(0x0);
   std::vector<double>* JetsAK8_CHFPtr(0x0);
@@ -342,11 +342,39 @@ int main(int argc, char **argv) {
   std::vector<double>* msdPtr(0x0);
   std::vector<bool>* jetsIDPtr(0x0);
   std::vector<double>* muMiniIsoPtr(0x0);
-  std::vector<double>* PDFweightsPtr(0x0);
+  // std::vector<double>* PDFweightsPtr(0x0);
  
   double deltaphi1, deltaphi2;
   double DeltaPhiMin;
-  
+
+  // ALL BRANCH ADDRESSES
+
+  chain.SetBranchAddress("MT_AK8", &MT);
+  chain.SetBranchAddress("MET",&metFull_Pt);
+  chain.SetBranchAddress("METPhi",&metFull_Phi);
+  chain.SetBranchAddress("JetsAK8",&jetsAK8CHSPtr);
+
+  chain.SetBranchAddress("Muons",&MuonsPtr);
+  chain.SetBranchAddress("Muons_MiniIso",&muMiniIsoPtr);
+  chain.SetBranchAddress("Electrons",&ElectronsPtr);
+
+  chain.SetBranchAddress("JetsAK8_neutralHadronEnergyFraction", &JetsAK8_NHFPtr);
+  chain.SetBranchAddress("JetsAK8_chargedHadronEnergyFraction", &JetsAK8_CHFPtr);
+  chain.SetBranchAddress("DeltaPhiMin_AK8", &DeltaPhiMin);
+
+  chain.SetBranchAddress("JetsAK8_ID", &jetsIDPtr);
+  chain.SetBranchAddress("JetsAK8_multiplicity", &multPtr);
+  chain.SetBranchAddress("JetsAK8_axisminor", &axisminorPtr);
+  chain.SetBranchAddress("JetsAK8_girth", &girthPtr);
+  chain.SetBranchAddress("JetsAK8_softDropMass", &msdPtr);
+  chain.SetBranchAddress("DeltaPhi1_AK8", &deltaphi1);
+  chain.SetBranchAddress("DeltaPhi2_AK8", &deltaphi2);
+
+  // chain.SetBranchAddress("GenElectrons",&GenElectronsPtr);
+  // chain.SetBranchAddress("GenMuons",&GenMuonsPtr);
+
+  // if(isData=="MC") chain.SetBranchAddress("PDFweights", &PDFweightsPtr);  // chain.SetBranchAddress("GenTaus",&GenTausPtr);
+
   //float mult, axisminor, girth, tau21, tau32, msd, deltaphi;
 
   // int NumInteractions =0;
@@ -360,10 +388,7 @@ int main(int argc, char **argv) {
 
   // chain.SetBranchAddress("EvtNum", &EventNumber);
   // chain.SetBranchAddress("HT", &Ht);
-  chain.SetBranchAddress("MT_AK8", &MT);
 
-  chain.SetBranchAddress("MET",&metFull_Pt);
-  chain.SetBranchAddress("METPhi",&metFull_Phi);
   //chain.SetBranchAddress("MET",&metFull_Px);
   //chain.SetBranchAddress("MET",&metFull_Py);
   
@@ -374,13 +399,7 @@ int main(int argc, char **argv) {
   // }
   
   // instead of jets ak8
-  chain.SetBranchAddress("JetsAK8",&jetsAK8CHSPtr);
-  chain.SetBranchAddress("Muons",&MuonsPtr);
-  chain.SetBranchAddress("Muons_MiniIso",&muMiniIsoPtr);
-  chain.SetBranchAddress("Electrons",&ElectronsPtr);
 
-  chain.SetBranchAddress("JetsAK8_neutralHadronEnergyFraction", &JetsAK8_NHFPtr);
-  chain.SetBranchAddress("JetsAK8_chargedHadronEnergyFraction", &JetsAK8_CHFPtr);
 
   // chain.SetBranchAddress("NMuons",&nMuons);
   // chain.SetBranchAddress("NElectrons",&nElectrons);
@@ -393,29 +412,18 @@ int main(int argc, char **argv) {
   // chain.SetBranchAddress("globalTightHalo2016Filter", &globalTightHalo2016Filter);
   // chain.SetBranchAddress("NVtx", &NVtx);
   
-  chain.SetBranchAddress("DeltaPhiMin_AK8", &DeltaPhiMin);
-  chain.SetBranchAddress("JetsAK8_ID", &jetsIDPtr);
-  chain.SetBranchAddress("JetsAK8_multiplicity", &multPtr);
-  chain.SetBranchAddress("JetsAK8_axisminor", &axisminorPtr);
-  chain.SetBranchAddress("JetsAK8_girth", &girthPtr);
+
   // chain.SetBranchAddress("JetsAK8_NsubjettinessTau1", &tau1Ptr);
   // chain.SetBranchAddress("JetsAK8_NsubjettinessTau2", &tau2Ptr);
   // chain.SetBranchAddress("JetsAK8_NsubjettinessTau3", &tau3Ptr);
-
-  chain.SetBranchAddress("JetsAK8_softDropMass", &msdPtr);
-  chain.SetBranchAddress("DeltaPhi1_AK8", &deltaphi1);
-  chain.SetBranchAddress("DeltaPhi2_AK8", &deltaphi2);
 
   // chain.SetBranchAddress("GenMET", &GenMET);
   // chain.SetBranchAddress("madHT", &madHT);
   
   // caused segfaults (all three) 
-  chain.SetBranchAddress("GenElectrons",&GenElectronsPtr);
-  chain.SetBranchAddress("GenMuons",&GenMuonsPtr);
-  // chain.SetBranchAddress("GenTaus",&GenTausPtr);
 
   // caused segfault 
-  if(isData=="MC") chain.SetBranchAddress("PDFweights", &PDFweightsPtr);
+
 
   //if(isData=="MC") chain.SetBranchAddress("PDFWeights", &w_zero);
   
@@ -638,31 +646,31 @@ int main(int argc, char **argv) {
     tfc.SetFunc(trig_filename,"fit_MTAK8","err_MTAK8");
     
 
-    if(isData=="MC"){ 
+    // if(isData=="MC"){ 
 
-      std::vector<TLorentzVector> GenElectrons = *GenElectronsPtr;
-      std::vector<TLorentzVector> GenMuons = *GenMuonsPtr;
-      // std::vector<TLorentzVector> GenTaus = *GenTausPtr;
+    //   std::vector<TLorentzVector> GenElectrons = *GenElectronsPtr;
+    //   std::vector<TLorentzVector> GenMuons = *GenMuonsPtr;
+    //   // std::vector<TLorentzVector> GenTaus = *GenTausPtr;
       
-      bool tt_stitching=false;
+    //   bool tt_stitching=false;
       
-      // if(madHT < 600 && GenElectrons.size()==0 && GenMuons.size()==0 && GenTaus.size()==0 && tt_stitching_TTJets==true) tt_stitching=true;
-      if(madHT < 600 && GenElectrons.size()==0 && GenMuons.size()==0 && tt_stitching_TTJets==true) tt_stitching=true;
-      else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_DiLept==true) tt_stitching=true;
-      else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_DiLept_genMET150==true) tt_stitching=true;
-      else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromT==true) tt_stitching=true;
-      else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromT_genMET150==true) tt_stitching=true;
-      else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromTbar==true) tt_stitching=true;
-      else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromTbar_genMET150==true) tt_stitching=true;
-      else if(madHT >= 600 && tt_stitching_TTJets_HT600to800==true) tt_stitching=true;
-      else if(madHT >= 600 && tt_stitching_TTJets_HT800to1200==true) tt_stitching=true;
-      else if(madHT >= 600 && tt_stitching_TTJets_HT1200to2500==true) tt_stitching=true;
-      else if(madHT >= 600 && tt_stitching_TTJets_HT2500toInf==true) tt_stitching=true;
+    //   // if(madHT < 600 && GenElectrons.size()==0 && GenMuons.size()==0 && GenTaus.size()==0 && tt_stitching_TTJets==true) tt_stitching=true;
+    //   if(madHT < 600 && tt_stitching_TTJets==true) tt_stitching=true;
+    //   else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_DiLept==true) tt_stitching=true;
+    //   else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_DiLept_genMET150==true) tt_stitching=true;
+    //   else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromT==true) tt_stitching=true;
+    //   else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromT_genMET150==true) tt_stitching=true;
+    //   else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromTbar==true) tt_stitching=true;
+    //   else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromTbar_genMET150==true) tt_stitching=true;
+    //   else if(madHT >= 600 && tt_stitching_TTJets_HT600to800==true) tt_stitching=true;
+    //   else if(madHT >= 600 && tt_stitching_TTJets_HT800to1200==true) tt_stitching=true;
+    //   else if(madHT >= 600 && tt_stitching_TTJets_HT1200to2500==true) tt_stitching=true;
+    //   else if(madHT >= 600 && tt_stitching_TTJets_HT2500toInf==true) tt_stitching=true;
       
-      else if(tt_stitching_noTT==true) tt_stitching=true;
+    //   else if(tt_stitching_noTT==true) tt_stitching=true;
 
-      if(tt_stitching==false) continue;
-    }
+    //   if(tt_stitching==false) continue;
+    // }
 
     if(isData=="DATA"){
       systZero.setWeight(0,1.);
