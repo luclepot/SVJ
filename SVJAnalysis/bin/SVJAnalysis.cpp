@@ -173,11 +173,11 @@ int main(int argc, char **argv) {
   const char* data2016label = "Run2016";
   const char* data2017label = "Run2017";
 
-  bool isData2017 = false;
-  bool isData2016 = false; 
+  // bool isData2017 = false;
+  // bool isData2016 = false; 
       
-  if( !strncmp(sample.c_str(), data2016label , strlen(data2016label))) {isData2016=true;}
-  if( !strncmp(sample.c_str(), data2017label , strlen(data2017label))) {isData2017=true;}
+  // if( !strncmp(sample.c_str(), data2016label , strlen(data2016label))) {isData2016=true;}
+  // if( !strncmp(sample.c_str(), data2017label , strlen(data2017label))) {isData2017=true;}
 
   TString weightedSystsNames (weightedSysts sy);
   void initHistogramsSysts(TH1F* histo[(int)MAXSYSTS],TString, TString, int, float, float , bool useOnlyNominal=false);
@@ -308,10 +308,10 @@ int main(int argc, char **argv) {
   double metFull_Pt=0., metFull_Phi=0.;//, metFull_Px=0., metFull_Py=0.;
 
   int sizeMax_gen=50000;
-  std::vector<int>* triggerPassPtr(0x0);
-
-  std::vector<TLorentzVector>* genPartsPtr(0x0);
-  int genPart_pdgId[sizeMax_gen], genPart_Status[sizeMax_gen];
+  // std::vector<int>* triggerPassPtr(0x0);
+  std::cout << std::endl << std::endl << "HEY" << std::endl << std::endl;
+  // std::vector<TLorentzVector>* genPartsPtr(0x0);
+  // int genPart_pdgId[sizeMax_gen], genPart_Status[sizeMax_gen];
 
   std::vector<TLorentzVector>* jetsAK8CHSPtr(0x0);
   std::vector<TLorentzVector>* MuonsPtr(0x0); 
@@ -319,7 +319,7 @@ int main(int argc, char **argv) {
 
   std::vector<TLorentzVector>* GenElectronsPtr(0x0);
   std::vector<TLorentzVector>* GenMuonsPtr(0x0);
-  std::vector<TLorentzVector>* GenTausPtr(0x0);
+  // std::vector<TLorentzVector>* GenTausPtr(0x0);
 
   double madHT=0, GenMET=0;
 
@@ -349,12 +349,12 @@ int main(int argc, char **argv) {
   
   //float mult, axisminor, girth, tau21, tau32, msd, deltaphi;
 
-  int NumInteractions =0;
-  double puSysDown, puSysUp, puWeight;
-  // chain.SetBranchAddress("NumInteractions", &NumInteractions);
-  chain.SetBranchAddress("puSysDown", &puSysDown);
-  chain.SetBranchAddress("puSysUp", &puSysUp);
-  chain.SetBranchAddress("puWeight", &puWeight);
+  // int NumInteractions =0;
+  // double puSysDown, puSysUp, puWeight;
+  // // chain.SetBranchAddress("NumInteractions", &NumInteractions);
+  // chain.SetBranchAddress("puSysDown", &puSysDown);
+  // chain.SetBranchAddress("puSysUp", &puSysUp);
+  // chain.SetBranchAddress("puWeight", &puWeight);
 
   // chain.SetBranchAddress("TriggerPass", &triggerPassPtr);
 
@@ -373,6 +373,7 @@ int main(int argc, char **argv) {
   //   chain.SetBranchAddress("GenParticles_Status",&genPart_Status);
   // }
   
+  // instead of jets ak8
   chain.SetBranchAddress("JetsAK8",&jetsAK8CHSPtr);
   chain.SetBranchAddress("Muons",&MuonsPtr);
   chain.SetBranchAddress("Muons_MiniIso",&muMiniIsoPtr);
@@ -411,7 +412,7 @@ int main(int argc, char **argv) {
   // caused segfaults (all three) 
   chain.SetBranchAddress("GenElectrons",&GenElectronsPtr);
   chain.SetBranchAddress("GenMuons",&GenMuonsPtr);
-  chain.SetBranchAddress("GenTaus",&GenTausPtr);
+  // chain.SetBranchAddress("GenTaus",&GenTausPtr);
 
   // caused segfault 
   if(isData=="MC") chain.SetBranchAddress("PDFweights", &PDFweightsPtr);
@@ -624,467 +625,466 @@ int main(int argc, char **argv) {
   // }
 
   nEvents = 100;
-  for(Int_t i=0; i<nEvents; i++ )
-    {
+  for(Int_t i=0; i<nEvents; i++ ) {
 
-      chain.GetEntry(i);
-      w = 1.0;
-
+    chain.GetEntry(i);
+    w = 1.0;
 
 
-      /* TRIGGER SFs*/
-      TriggerFuncCorrector tfc;
-      string trig_filename = cmssw_base + std::string("/src/SVJ/SVJAnalysis/data/trigEffFit_SingleMuon_"+ year +"_DetaHLTmatch.root");
-      tfc.SetFunc(trig_filename,"fit_MTAK8","err_MTAK8");
+
+    /* TRIGGER SFs*/
+    TriggerFuncCorrector tfc;
+    string trig_filename = cmssw_base + std::string("/src/SVJ/SVJAnalysis/data/trigEffFit_SingleMuon_"+ year +"_DetaHLTmatch.root");
+    tfc.SetFunc(trig_filename,"fit_MTAK8","err_MTAK8");
+    
+
+    if(isData=="MC"){ 
+
+      std::vector<TLorentzVector> GenElectrons = *GenElectronsPtr;
+      std::vector<TLorentzVector> GenMuons = *GenMuonsPtr;
+      // std::vector<TLorentzVector> GenTaus = *GenTausPtr;
       
+      bool tt_stitching=false;
+      
+      // if(madHT < 600 && GenElectrons.size()==0 && GenMuons.size()==0 && GenTaus.size()==0 && tt_stitching_TTJets==true) tt_stitching=true;
+      if(madHT < 600 && GenElectrons.size()==0 && GenMuons.size()==0 && tt_stitching_TTJets==true) tt_stitching=true;
+      else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_DiLept==true) tt_stitching=true;
+      else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_DiLept_genMET150==true) tt_stitching=true;
+      else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromT==true) tt_stitching=true;
+      else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromT_genMET150==true) tt_stitching=true;
+      else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromTbar==true) tt_stitching=true;
+      else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromTbar_genMET150==true) tt_stitching=true;
+      else if(madHT >= 600 && tt_stitching_TTJets_HT600to800==true) tt_stitching=true;
+      else if(madHT >= 600 && tt_stitching_TTJets_HT800to1200==true) tt_stitching=true;
+      else if(madHT >= 600 && tt_stitching_TTJets_HT1200to2500==true) tt_stitching=true;
+      else if(madHT >= 600 && tt_stitching_TTJets_HT2500toInf==true) tt_stitching=true;
+      
+      else if(tt_stitching_noTT==true) tt_stitching=true;
 
-      if(isData=="MC"){ 
+      if(tt_stitching==false) continue;
+    }
 
-        std::vector<TLorentzVector> GenElectrons = *GenElectronsPtr;
-        std::vector<TLorentzVector> GenMuons = *GenMuonsPtr;
-        std::vector<TLorentzVector> GenTaus = *GenTausPtr;
-        
-        bool tt_stitching=false;
-        
-        if(madHT < 600 && GenElectrons.size()==0 && GenMuons.size()==0 && GenTaus.size()==0 && tt_stitching_TTJets==true) tt_stitching=true;
-        else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_DiLept==true) tt_stitching=true;
-        else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_DiLept_genMET150==true) tt_stitching=true;
-        else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromT==true) tt_stitching=true;
-        else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromT_genMET150==true) tt_stitching=true;
-        else if(madHT < 600 && GenMET < 150 && tt_stitching_TTJets_SingleLeptFromTbar==true) tt_stitching=true;
-        else if(madHT < 600 && GenMET >= 150 && tt_stitching_TTJets_SingleLeptFromTbar_genMET150==true) tt_stitching=true;
-        else if(madHT >= 600 && tt_stitching_TTJets_HT600to800==true) tt_stitching=true;
-        else if(madHT >= 600 && tt_stitching_TTJets_HT800to1200==true) tt_stitching=true;
-        else if(madHT >= 600 && tt_stitching_TTJets_HT1200to2500==true) tt_stitching=true;
-        else if(madHT >= 600 && tt_stitching_TTJets_HT2500toInf==true) tt_stitching=true;
-        
-        else if(tt_stitching_noTT==true) tt_stitching=true;
+    if(isData=="DATA"){
+      systZero.setWeight(0,1.);
+      systZero.setWeight("puDown",1.);
+      systZero.setWeight("puUp",1.);
+      systZero.setWeight("trigDown",1.);
+      systZero.setWeight("trigUp",1.);
 
-        if(tt_stitching==false) continue;
-      }
+      systSVJ.copySysts(systZero);
+      systSVJ.setWeight(0,1.);
+      systSVJ.setWeight("puDown",1.);
+      systSVJ.setWeight("puUp",1.);
+      systSVJ.setWeight("trigDown",1.);
+      systSVJ.setWeight("trigUp",1.);
 
-      if(isData=="DATA"){
-        systZero.setWeight(0,1.);
-        systZero.setWeight("puDown",1.);
-        systZero.setWeight("puUp",1.);
-        systZero.setWeight("trigDown",1.);
-        systZero.setWeight("trigUp",1.);
+      systWeightsSVJ[NOSYST]= 1.;
+            systWeightsSVJ[PUUP]= 1.;
+            systWeightsSVJ[PUDOWN]= 1.;
+      systWeightsSVJ[TRIGUP]= 1.;
+      systWeightsSVJ[TRIGDOWN]= 1.;
+    }
 
-        systSVJ.copySysts(systZero);
-        systSVJ.setWeight(0,1.);
-        systSVJ.setWeight("puDown",1.);
-        systSVJ.setWeight("puUp",1.);
-        systSVJ.setWeight("trigDown",1.);
-        systSVJ.setWeight("trigUp",1.);
+    //   if(isData=="MC"){
+    // //double puUpFact=(LumiWeightsUp_.weight(NumInteractions))/(LumiWeights_.weight(NumInteractions));
+    // //double puDownFact=(LumiWeightsDown_.weight(NumInteractions))/(LumiWeights_.weight(NumInteractions));
 
-        systWeightsSVJ[NOSYST]= 1.;
-              systWeightsSVJ[PUUP]= 1.;
-              systWeightsSVJ[PUDOWN]= 1.;
-        systWeightsSVJ[TRIGUP]= 1.;
-        systWeightsSVJ[TRIGDOWN]= 1.;
-      }
-
-      if(isData=="MC"){
-	//double puUpFact=(LumiWeightsUp_.weight(NumInteractions))/(LumiWeights_.weight(NumInteractions));
-	//double puDownFact=(LumiWeightsDown_.weight(NumInteractions))/(LumiWeights_.weight(NumInteractions));
-
-      }
+    //     }
       //JET                
-      std::vector<int> mult = *multPtr;
-      std::vector<double> axisminor = *axisminorPtr;
-      std::vector<double> girth = *girthPtr;
-      std::vector<double> tau1 = *tau1Ptr;
-      std::vector<double> tau2 = *tau2Ptr;
-      std::vector<double> tau3 = *tau3Ptr;
-      std::vector<double> msd = *msdPtr;
-      std::vector<double> muMiniIso = *muMiniIsoPtr;
-      std::vector<bool> jetsID = *jetsIDPtr;
+    std::vector<int> mult = *multPtr;
+    std::vector<double> axisminor = *axisminorPtr;
+    std::vector<double> girth = *girthPtr;
+    std::vector<double> tau1 = *tau1Ptr;
+    std::vector<double> tau2 = *tau2Ptr;
+    std::vector<double> tau3 = *tau3Ptr;
+    std::vector<double> msd = *msdPtr;
+    std::vector<double> muMiniIso = *muMiniIsoPtr;
+    std::vector<bool> jetsID = *jetsIDPtr;
 
-      std::vector<double> NHF = *JetsAK8_NHFPtr;
-      std::vector<double> CHF = *JetsAK8_CHFPtr;
+    std::vector<double> NHF = *JetsAK8_NHFPtr;
+    std::vector<double> CHF = *JetsAK8_CHFPtr;
 
-      std::vector<TLorentzVector> AK8Jets = *jetsAK8CHSPtr;
+    std::vector<TLorentzVector> AK8Jets = *jetsAK8CHSPtr;
 
-      // std::vector<TLorentzVector> Muons;
-      TLorentzVector Muon;
-      std::vector<TLorentzVector> Electrons;
-      TLorentzVector Electron;
-      std::vector<TLorentzVector> muons = *MuonsPtr;
-      std::vector<TLorentzVector> electrons = *ElectronsPtr;
+    // std::vector<TLorentzVector> Muons;
+    TLorentzVector Muon;
+    std::vector<TLorentzVector> Electrons;
+    TLorentzVector Electron;
+    std::vector<TLorentzVector> muons = *MuonsPtr;
+    std::vector<TLorentzVector> electrons = *ElectronsPtr;
 
-      std::vector<int>& triggerPass = *triggerPassPtr;
+    // std::vector<int>& triggerPass = *triggerPassPtr;
 
-      bool preselection_metfilters = 0;
-      bool preselection_metfilters_1 = 0;
-      bool preselection_metfilters_2 = 0;
-      bool preselection_metfilters_3 = 0;
-      bool preselection_metfilters_4 = 0;
-      bool preselection_metfilters_5 = 0;
-      bool preselection_metfilters_6 = 0;
-      bool preselection_metfilters_7 = 0;
-      preselection_metfilters = BadChargedCandidateFilter>0 && BadPFMuonFilter>0 && EcalDeadCellTriggerPrimitiveFilter>0 && HBHEIsoNoiseFilter>0 && HBHENoiseFilter>0 && globalTightHalo2016Filter>0 && NVtx > 0;
-      preselection_metfilters_1 = BadChargedCandidateFilter>0;
-      preselection_metfilters_2 = BadPFMuonFilter>0; 
-      preselection_metfilters_3 = EcalDeadCellTriggerPrimitiveFilter>0;
-      preselection_metfilters_4 = HBHEIsoNoiseFilter>0;
-      preselection_metfilters_5 = HBHENoiseFilter>0; 
-      preselection_metfilters_6 = globalTightHalo2016Filter>0;
-      preselection_metfilters_7 = NVtx > 0;
-      //preselection_metfilters = 1;
+    bool preselection_metfilters = 0;
+    bool preselection_metfilters_1 = 0;
+    bool preselection_metfilters_2 = 0;
+    bool preselection_metfilters_3 = 0;
+    bool preselection_metfilters_4 = 0;
+    bool preselection_metfilters_5 = 0;
+    bool preselection_metfilters_6 = 0;
+    bool preselection_metfilters_7 = 0;
+    preselection_metfilters = BadChargedCandidateFilter>0 && BadPFMuonFilter>0 && EcalDeadCellTriggerPrimitiveFilter>0 && HBHEIsoNoiseFilter>0 && HBHENoiseFilter>0 && globalTightHalo2016Filter>0 && NVtx > 0;
+    preselection_metfilters_1 = BadChargedCandidateFilter>0;
+    preselection_metfilters_2 = BadPFMuonFilter>0; 
+    preselection_metfilters_3 = EcalDeadCellTriggerPrimitiveFilter>0;
+    preselection_metfilters_4 = HBHEIsoNoiseFilter>0;
+    preselection_metfilters_5 = HBHENoiseFilter>0; 
+    preselection_metfilters_6 = globalTightHalo2016Filter>0;
+    preselection_metfilters_7 = NVtx > 0;
+    //preselection_metfilters = 1;
 
-      if(preselection_metfilters){
-	systSVJ.fillHistogramsSysts( h_AK8jetsmult_presel, AK8Jets.size(),w,systWeightsSVJ);
+    if(preselection_metfilters){
+      systSVJ.fillHistogramsSysts( h_AK8jetsmult_presel, AK8Jets.size(),w,systWeightsSVJ);
+    }
+
+    //HV quarks definition
+    TLorentzVector vHVsum;
+    //     if(isData=="MC"){
+    // // std::vector<TLorentzVector>& genParts = *genPartsPtr;
+	
+    // struct genParticle{
+    //   TLorentzVector vect;
+    //   int pdgId;
+    //   int status;
+    // };
+    
+    // genParticle HVgenParticlesInv;
+    // std::vector<genParticle> HVgenParticlesInvVect;
+    
+    // for(int j=0; j<sizeMax_gen; j++){
+    //   if(std::abs(genPart_pdgId[j])==4900211 || std::abs(genPart_pdgId[j])==4900213 ){
+    //     HVgenParticlesInv.vect = genParts[j];
+    //     HVgenParticlesInv.pdgId=genPart_pdgId[j];
+    //     HVgenParticlesInv.status=genPart_Status[j];
+    //     HVgenParticlesInvVect.push_back(HVgenParticlesInv);  
+    //     vHVsum += (HVgenParticlesInv.vect);
+    //   }
+    // }
+    //     }
+        //start of the analysis and of the variable definition                                                                                   
+    if(AK8Jets.size()>1){
+      //if(1>0){
+      //Compute angular distances between the two leading jets
+      double AK8Jets_dr=-1;
+      AK8Jets_dr = (AK8Jets.at(0)).DeltaR(AK8Jets.at(1));
+      double dEta=0, dPhi=0;
+      dEta= (std::fabs((AK8Jets.at(0)).Eta() - (AK8Jets.at(1)).Eta()));
+      dPhi= std::fabs(reco::deltaPhi(AK8Jets.at(0).Phi(),AK8Jets.at(1).Phi()));
+
+      double dPhi_j0_met=0., dPhi_j1_met=0.;//, dPhi_min=0.;  
+      dPhi_j0_met = std::fabs(reco::deltaPhi(AK8Jets.at(0).Phi(),metFull_Phi));
+      dPhi_j1_met = std::fabs(reco::deltaPhi(AK8Jets.at(1).Phi(),metFull_Phi));
+      //dPhi_min = std::min(dPhi_j0_met,dPhi_j1_met);
+
+      //Compute masses
+      double Mjj=0., Mmc=0., MT2=0.;
+      double  Mjj2=0., ptjj = 0., ptjj2 = 0., ptMet = 0.;
+      //Mjj = mass of the two large reclustered jets                                                                                    
+      TLorentzVector vjj = AK8Jets.at(0) + AK8Jets.at(1);
+      if(AK8Jets.size()>=3){
+        bool merge = false;
+        merge = (AK8Jets.at(1).DeltaR(AK8Jets.at(2))<1.4 ) || (AK8Jets.at(0).DeltaR(AK8Jets.at(2))<1.4 );
+        merge = false;
+        if(merge) {
+          std::cout<<"==========> We found a third jet"<<std::endl;
+          vjj +=  AK8Jets.at(2);
+        }
+      }
+      
+      double metFull_Px=0., metFull_Py=0.; 
+      metFull_Py = metFull_Pt*sin(metFull_Phi);
+      metFull_Px = metFull_Pt*cos(metFull_Phi);
+
+      Mjj = vjj.M();
+      Mjj2 = Mjj*Mjj;
+      ptjj = vjj.Pt();
+      ptjj2 = ptjj * ptjj;
+      ptMet = vjj.Px()*metFull_Px +  vjj.Py()*metFull_Py;
+      
+      //Mmc = the reconstructed Z' mass using all the dark matter particles in the MC                                                           
+      if(isData=="DATA"){vHVsum = {0, 0, 0, 0};}
+      TLorentzVector vmc = vHVsum + vjj;
+      Mmc = vmc.M();
+
+      MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*metFull_Pt   -  ptMet) );   
+      //std::cout<<"Old MT: "<<MT<<std::endl;
+      //std::cout<<"New MT: "<<MT2<<std::endl;
+      //cout << MT2 << " " << MT << endl;
+      MT2 = MT;
+
+      //Define preselection
+      bool preselection_jetseta = 0, preselection_jetsID = 0, preselection_trigplateau=0, preselection_deltaeta=0, preselection_transratio = 0, preselection_leptonveto = 0 , preselection_jetspt = 0, preselection = 0;
+      bool preselection_dijet(0), preselection_muonveto(0), preselection_muonLooseveto(1), preselection_electronveto(0);
+      bool preselection_trigger(0);
+
+      int sizeMax_muons=muons.size();
+
+      for(int j=0; j< sizeMax_muons; j++){
+        if (muMiniIso[j]<0.4){preselection_muonLooseveto = 0;}
       }
 
-      //HV quarks definition
-      TLorentzVector vHVsum;
-      if(isData=="MC"){
-	std::vector<TLorentzVector>& genParts = *genPartsPtr;
-	
-	struct genParticle{
-	  TLorentzVector vect;
-	  int pdgId;
-	  int status;
-	};
-	
-	genParticle HVgenParticlesInv;
-	std::vector<genParticle> HVgenParticlesInvVect;
-	
-	for(int j=0; j<sizeMax_gen; j++){
-	  if(std::abs(genPart_pdgId[j])==4900211 || std::abs(genPart_pdgId[j])==4900213 ){
-	    HVgenParticlesInv.vect = genParts[j];
-	    HVgenParticlesInv.pdgId=genPart_pdgId[j];
-	    HVgenParticlesInv.status=genPart_Status[j];
-	    HVgenParticlesInvVect.push_back(HVgenParticlesInv);  
-	    vHVsum += (HVgenParticlesInv.vect);
-	  }
-	}
+      preselection_jetseta = (std::abs((AK8Jets.at(0)).Eta()) < 2.5 && std::abs((AK8Jets.at(1)).Eta()) < 2.5);
+      preselection_jetsID = jetsID.at(0) == 1 && jetsID.at(1)==1;
+      preselection_deltaeta = std::abs(AK8Jets.at(0).Eta() - AK8Jets.at(1).Eta()) < 1.5;
+      preselection_trigplateau = preselection_deltaeta;
+      preselection_transratio = metFull_Pt/MT2 > 0.15;
+      preselection_leptonveto = nElectrons + nMuons < 1;
+      preselection_muonveto = nMuons<1 && preselection_muonLooseveto;
+      preselection_electronveto =nElectrons<1;
+      preselection_jetspt = (AK8Jets.at(0)).Pt() > 200 && (AK8Jets.at(1)).Pt()>200;
+      preselection_dijet =  preselection_jetseta &&  preselection_jetsID && preselection_jetspt;
+      
+      preselection_trigger = 1;
+
+      // if(isData2016 == true)	preselection_trigger = triggerPass[10] == 1 || triggerPass[13] == 1 || triggerPass[103] == 1 || triggerPass[105] == 1 || triggerPass[106] == 1;
+      // else if (isData2017 == true) preselection_trigger = triggerPass[11] == 1 || triggerPass[13] == 1 || triggerPass[67] == 1 || triggerPass[107] == 1;
+      
+      bool selection_transverseratio_window=0;
+      selection_transverseratio_window = (metFull_Pt/MT2)> 0.15 && (metFull_Pt/MT2) < 0.25 ;
+      
+      bool preselection_CR = 0;
+      preselection_CR = preselection_muonveto && preselection_jetseta && preselection_jetsID && preselection_deltaeta && preselection_leptonveto && preselection_metfilters && MT2 > 1500 && preselection_trigger;
+
+      preselection = preselection_muonveto && preselection_jetseta && preselection_jetsID && preselection_deltaeta && preselection_transratio && preselection_leptonveto && preselection_trigger && MT2 > 1500 && preselection_metfilters;
+
+      bool selection_dPhi = 0, selection_transverseratio = 0, selection_mt = 0,  selection = 0;
+      selection_dPhi = DeltaPhiMin < 0.75;
+      selection_mt = MT2 > 1500;
+      selection_transverseratio = (metFull_Pt/MT2) > 0.25; 
+
+      selection = (preselection  && selection_dPhi && selection_transverseratio && selection_mt);
+      bool selection_CR = 0;
+      selection_CR = preselection_CR && selection_dPhi && selection_transverseratio_window && selection_mt;
+
+      double mva1_(0.), mva2_(0.);
+
+      bdt_mult= mult.at(0); bdt_axisminor = axisminor.at(0); bdt_girth = girth.at(0); bdt_tau21 = tau2.at(0)/tau1.at(0);  bdt_tau32 = tau3.at(0)/tau1.at(0);
+      bdt_msd = msd.at(0); bdt_deltaphi = deltaphi1;  bdt_pt = AK8Jets.at(0).Pt();  bdt_eta =  AK8Jets.at(0).Eta(); bdt_mt =  MT2;
+
+      mva1_ = reader.EvaluateMVA("BDTG");
+      bdt_mult= mult.at(1); bdt_axisminor = axisminor.at(1); bdt_girth = girth.at(1); bdt_tau21 = tau2.at(1)/tau1.at(1);  bdt_tau32 = tau3.at(1)/tau1.at(1);
+      bdt_msd = msd.at(1); bdt_deltaphi = deltaphi2;  bdt_pt = AK8Jets.at(1).Pt();  bdt_eta = AK8Jets.at(1).Eta(); bdt_mt = MT2;
+
+      mva2_ = reader.EvaluateMVA("BDTG");
+
+      if(preselection){
+        if(preselection_metfilters_1){
+          systSVJ.fillHistogramsSysts(h_Mt_presel_1,MT2,w,systWeightsSVJ);
+          systSVJ.fillHistogramsSysts(h_METPt_presel_1,metFull_Pt,w,systWeightsSVJ);
+        }
+        if(preselection_metfilters_2){
+          systSVJ.fillHistogramsSysts(h_Mt_presel_2,MT2,w,systWeightsSVJ);
+          systSVJ.fillHistogramsSysts(h_METPt_presel_2,metFull_Pt,w,systWeightsSVJ);
+        }
+        if(preselection_metfilters_3){
+          systSVJ.fillHistogramsSysts(h_Mt_presel_3,MT2,w,systWeightsSVJ);
+          systSVJ.fillHistogramsSysts(h_METPt_presel_3,metFull_Pt,w,systWeightsSVJ);
+        }
+        if(preselection_metfilters_4){
+          systSVJ.fillHistogramsSysts(h_Mt_presel_4,MT2,w,systWeightsSVJ);
+          systSVJ.fillHistogramsSysts(h_METPt_presel_4,metFull_Pt,w,systWeightsSVJ);
+        }
+        if(preselection_metfilters_5){
+          systSVJ.fillHistogramsSysts(h_Mt_presel_5,MT2,w,systWeightsSVJ);
+          systSVJ.fillHistogramsSysts(h_METPt_presel_5,metFull_Pt,w,systWeightsSVJ);
+        }
+        if(preselection_metfilters_6){
+          systSVJ.fillHistogramsSysts(h_Mt_presel_6,MT2,w,systWeightsSVJ);
+          systSVJ.fillHistogramsSysts(h_METPt_presel_6,metFull_Pt,w,systWeightsSVJ);
+        }
+        if(preselection_metfilters_7){
+          systSVJ.fillHistogramsSysts(h_Mt_presel_7,MT2,w,systWeightsSVJ);
+          systSVJ.fillHistogramsSysts(h_METPt_presel_7,metFull_Pt,w,systWeightsSVJ);
+        }
       }
-      //start of the analysis and of the variable definition                                                                                   
-      if(AK8Jets.size()>1){
-	//if(1>0){
-	//Compute angular distances between the two leading jets
-	double AK8Jets_dr=-1;
-	AK8Jets_dr = (AK8Jets.at(0)).DeltaR(AK8Jets.at(1));
-	double dEta=0, dPhi=0;
-	dEta= (std::fabs((AK8Jets.at(0)).Eta() - (AK8Jets.at(1)).Eta()));
-	dPhi= std::fabs(reco::deltaPhi(AK8Jets.at(0).Phi(),AK8Jets.at(1).Phi()));
+    
+      if(preselection){
+        if(metFull_Pt>300){
+          h_AK8jet_etaphi_lead->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
+          h_AK8jet_etaphi_sublead->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
+          if(NHF.at(0) < 0.8 && CHF.at(0) > 0.1) h_AK8jet_etaphi_lead_newID->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
+          if(NHF.at(1) < 0.8 && CHF.at(1) > 0.1) h_AK8jet_etaphi_sublead_newID->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
+        }
+        
+        systSVJ.fillHistogramsSysts(h_nPV,NVtx,1.,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_nPV_w,NVtx,w,systWeightsSVJ);
+        
+        //Leptons
+        systSVJ.fillHistogramsSysts(h_Muonsmult_presel,nMuons,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Electronsmult_presel,nElectrons,w,systWeightsSVJ);
 
-	double dPhi_j0_met=0., dPhi_j1_met=0.;//, dPhi_min=0.;  
-	dPhi_j0_met = std::fabs(reco::deltaPhi(AK8Jets.at(0).Phi(),metFull_Phi));
-	dPhi_j1_met = std::fabs(reco::deltaPhi(AK8Jets.at(1).Phi(),metFull_Phi));
-	//dPhi_min = std::min(dPhi_j0_met,dPhi_j1_met);
+        //MET
+        systSVJ.fillHistogramsSysts(h_METPt_presel, metFull_Pt,w,systWeightsSVJ);
+        
+        //Hadronic objects
+        systSVJ.fillHistogramsSysts(h_Ht_presel,Ht,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetPt_presel,AK8Jets.at(0).Pt(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetPt_presel,AK8Jets.at(1).Pt(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetEta_presel,AK8Jets.at(0).Eta(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetEta_presel,AK8Jets.at(1).Eta(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetPhi_presel,AK8Jets.at(0).Phi(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetPhi_presel,AK8Jets.at(1).Phi(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetE_lead_presel,AK8Jets.at(0).E(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetE_sublead_presel,AK8Jets.at(1).E(),w,systWeightsSVJ);
 
-	//Compute masses
-	double Mjj=0., Mmc=0., MT2=0.;
-	double  Mjj2=0., ptjj = 0., ptjj2 = 0., ptMet = 0.;
-	//Mjj = mass of the two large reclustered jets                                                                                    
-	TLorentzVector vjj = AK8Jets.at(0) + AK8Jets.at(1);
-	if(AK8Jets.size()>=3){
-	  bool merge = false;
-	  merge = (AK8Jets.at(1).DeltaR(AK8Jets.at(2))<1.4 ) || (AK8Jets.at(0).DeltaR(AK8Jets.at(2))<1.4 );
-	  merge = false;
-	  if(merge) {
-	    std::cout<<"==========> We found a third jet"<<std::endl;
-	    vjj +=  AK8Jets.at(2);
-	  }
-	}
-	
-	double metFull_Px=0., metFull_Py=0.; 
-	metFull_Py = metFull_Pt*sin(metFull_Phi);
-	metFull_Px = metFull_Pt*cos(metFull_Phi);
+        systSVJ.fillHistogramsSysts(h_AK8jetPt_lead_presel,AK8Jets.at(0).Pt(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetPt_sublead_presel,AK8Jets.at(1).Pt(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetEta_lead_presel,AK8Jets.at(0).Eta(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetEta_sublead_presel,AK8Jets.at(1).Eta(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetPhi_lead_presel,AK8Jets.at(0).Phi(),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetPhi_sublead_presel,AK8Jets.at(1).Phi(),w,systWeightsSVJ);
 
-	Mjj = vjj.M();
-	Mjj2 = Mjj*Mjj;
-	ptjj = vjj.Pt();
-	ptjj2 = ptjj * ptjj;
-	ptMet = vjj.Px()*metFull_Px +  vjj.Py()*metFull_Py;
-	
-	//Mmc = the reconstructed Z' mass using all the dark matter particles in the MC                                                           
-	if(isData=="DATA"){vHVsum = {0, 0, 0, 0};}
-	TLorentzVector vmc = vHVsum + vjj;
-	Mmc = vmc.M();
+        systSVJ.fillHistogramsSysts(h_AK8jetdR_presel,AK8Jets_dr,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetdP_presel,dPhi,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetdE_presel,dEta,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhi1_presel,dPhi_j0_met,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhi2_presel,dPhi_j1_met,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mmc_presel,Mmc,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mjj_presel,Mjj,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mt_presel,MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhimin_presel,DeltaPhiMin,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_transverseratio_presel,metFull_Pt/MT2,w,systWeightsSVJ);
 
-	MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*metFull_Pt   -  ptMet) );   
-	//std::cout<<"Old MT: "<<MT<<std::endl;
-	//std::cout<<"New MT: "<<MT2<<std::endl;
-	//cout << MT2 << " " << MT << endl;
-	MT2 = MT;
+        systSVJ.fillHistogramsSysts(h_bdt_mult_0_presel,mult.at(0),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_mult_1_presel,mult.at(1),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_axisminor_0_presel,axisminor.at(0),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_axisminor_1_presel,axisminor.at(1),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_girth_0_presel,girth.at(0),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_girth_1_presel,girth.at(1),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_tau21_0_presel,tau2.at(0)/tau1.at(0),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_tau21_1_presel,tau2.at(1)/tau1.at(1),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_tau32_0_presel,tau3.at(0)/tau2.at(0),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_tau32_1_presel,tau3.at(1)/tau2.at(1),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_tau32_0_presel,tau3.at(0)/tau2.at(0),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_tau32_1_presel,tau3.at(1)/tau2.at(1),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_msd_0_presel,msd.at(0),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_msd_1_presel,msd.at(1),w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_deltaphi_0_presel,deltaphi1,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_deltaphi_1_presel,deltaphi2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_mva_0_presel,mva1_,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_bdt_mva_1_presel,mva2_,w,systWeightsSVJ);
 
-	//Define preselection
-	bool preselection_jetseta = 0, preselection_jetsID = 0, preselection_trigplateau=0, preselection_deltaeta=0, preselection_transratio = 0, preselection_leptonveto = 0 , preselection_jetspt = 0, preselection = 0;
-	bool preselection_dijet(0), preselection_muonveto(0), preselection_muonLooseveto(1), preselection_electronveto(0);
-	bool preselection_trigger(0);
+      }
 
-	int sizeMax_muons=muons.size();
+            double bdtCut = -0.14;
+      bool selection_BDT2(0), selection_BDT1(0), selection_BDT0(0);
+      selection_BDT2= selection && (mva1_>bdtCut) && (mva2_>bdtCut);
+      selection_BDT1= selection && (((mva1_>bdtCut) && (mva2_<bdtCut)) || ((mva1_<bdtCut) && (mva2_>bdtCut)));
+      selection_BDT0= selection && ((mva1_<bdtCut) && (mva2_<bdtCut));
+      bool selection_CRBDT2(0), selection_CRBDT1(0), selection_CRBDT0(0);
+      selection_CRBDT2= selection_CR && (mva1_>bdtCut) && (mva2_>bdtCut);
+      selection_CRBDT1= selection_CR && (((mva1_>bdtCut) && (mva2_<bdtCut)) || ((mva1_<bdtCut) && (mva2_>bdtCut)));
+      selection_CRBDT0= selection_CR && ((mva1_<bdtCut) && (mva2_<bdtCut));
 
-	for(int j=0; j< sizeMax_muons; j++){
-	  if (muMiniIso[j]<0.4){preselection_muonLooseveto = 0;}
-	}
+      if(selection){	  
 
-	preselection_jetseta = (std::abs((AK8Jets.at(0)).Eta()) < 2.5 && std::abs((AK8Jets.at(1)).Eta()) < 2.5);
-	preselection_jetsID = jetsID.at(0) == 1 && jetsID.at(1)==1;
-	preselection_deltaeta = std::abs(AK8Jets.at(0).Eta() - AK8Jets.at(1).Eta()) < 1.5;
-	preselection_trigplateau = preselection_deltaeta;
-	preselection_transratio = metFull_Pt/MT2 > 0.15;
-	preselection_leptonveto = nElectrons + nMuons < 1;
-	preselection_muonveto = nMuons<1 && preselection_muonLooseveto;
-	preselection_electronveto =nElectrons<1;
-	preselection_jetspt = (AK8Jets.at(0)).Pt() > 200 && (AK8Jets.at(1)).Pt()>200;
-	preselection_dijet =  preselection_jetseta &&  preselection_jetsID && preselection_jetspt;
-	
-	preselection_trigger = 1;
+        systSVJ.fillHistogramsSysts(h_dEta,dEta,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhi,dPhi,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhimin,DeltaPhiMin,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_transverseratio,metFull_Pt/MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mt,MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mjj,Mjj,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mmc,Mmc,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_METPt,metFull_Pt,w,systWeightsSVJ);
 
-	if(isData2016 == true)	preselection_trigger = triggerPass[10] == 1 || triggerPass[13] == 1 || triggerPass[103] == 1 || triggerPass[105] == 1 || triggerPass[106] == 1;
-	else if (isData2017 == true) preselection_trigger = triggerPass[11] == 1 || triggerPass[13] == 1 || triggerPass[67] == 1 || triggerPass[107] == 1;
-	
-	bool selection_transverseratio_window=0;
-	selection_transverseratio_window = (metFull_Pt/MT2)> 0.15 && (metFull_Pt/MT2) < 0.25 ;
-	
-	bool preselection_CR = 0;
-	preselection_CR = preselection_muonveto && preselection_jetseta && preselection_jetsID && preselection_deltaeta && preselection_leptonveto && preselection_metfilters && MT2 > 1500 && preselection_trigger;
+      }
 
-	preselection = preselection_muonveto && preselection_jetseta && preselection_jetsID && preselection_deltaeta && preselection_transratio && preselection_leptonveto && preselection_trigger && MT2 > 1500 && preselection_metfilters;
+      if(selection && (selection_BDT1 || selection_BDT2)){	  
 
-	bool selection_dPhi = 0, selection_transverseratio = 0, selection_mt = 0,  selection = 0;
-	selection_dPhi = DeltaPhiMin < 0.75;
-	selection_mt = MT2 > 1500;
-	selection_transverseratio = (metFull_Pt/MT2) > 0.25; 
+        systSVJ.fillHistogramsSysts(h_dEta_BDT,dEta,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhi_BDT,dPhi,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhimin_BDT,DeltaPhiMin,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_transverseratio_BDT,metFull_Pt/MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mt_BDT,MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mjj_BDT,Mjj,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mmc_BDT,Mmc,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_METPt_BDT,metFull_Pt,w,systWeightsSVJ);
 
-	selection = (preselection  && selection_dPhi && selection_transverseratio && selection_mt);
-	bool selection_CR = 0;
-	selection_CR = preselection_CR && selection_dPhi && selection_transverseratio_window && selection_mt;
+      }
 
-	double mva1_(0.), mva2_(0.);
+      if(selection_BDT0){
 
-	bdt_mult= mult.at(0); bdt_axisminor = axisminor.at(0); bdt_girth = girth.at(0); bdt_tau21 = tau2.at(0)/tau1.at(0);  bdt_tau32 = tau3.at(0)/tau1.at(0);
-	bdt_msd = msd.at(0); bdt_deltaphi = deltaphi1;  bdt_pt = AK8Jets.at(0).Pt();  bdt_eta =  AK8Jets.at(0).Eta(); bdt_mt =  MT2;
+        systSVJ.fillHistogramsSysts(h_transverseratio_BDT0,metFull_Pt/MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mt_BDT0,MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mjj_BDT0,Mjj,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mmc_BDT0,Mmc,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_METPt_BDT0,metFull_Pt,w,systWeightsSVJ);
 
-	mva1_ = reader.EvaluateMVA("BDTG");
-	bdt_mult= mult.at(1); bdt_axisminor = axisminor.at(1); bdt_girth = girth.at(1); bdt_tau21 = tau2.at(1)/tau1.at(1);  bdt_tau32 = tau3.at(1)/tau1.at(1);
-	bdt_msd = msd.at(1); bdt_deltaphi = deltaphi2;  bdt_pt = AK8Jets.at(1).Pt();  bdt_eta = AK8Jets.at(1).Eta(); bdt_mt = MT2;
+      }
 
-	mva2_ = reader.EvaluateMVA("BDTG");
+      if(selection_BDT1){
 
-	if(preselection){
-	  if(preselection_metfilters_1){
-	    systSVJ.fillHistogramsSysts(h_Mt_presel_1,MT2,w,systWeightsSVJ);
-	    systSVJ.fillHistogramsSysts(h_METPt_presel_1,metFull_Pt,w,systWeightsSVJ);
-	  }
-	  if(preselection_metfilters_2){
-	    systSVJ.fillHistogramsSysts(h_Mt_presel_2,MT2,w,systWeightsSVJ);
-	    systSVJ.fillHistogramsSysts(h_METPt_presel_2,metFull_Pt,w,systWeightsSVJ);
-	  }
-	  if(preselection_metfilters_3){
-	    systSVJ.fillHistogramsSysts(h_Mt_presel_3,MT2,w,systWeightsSVJ);
-	    systSVJ.fillHistogramsSysts(h_METPt_presel_3,metFull_Pt,w,systWeightsSVJ);
-	  }
-	  if(preselection_metfilters_4){
-	    systSVJ.fillHistogramsSysts(h_Mt_presel_4,MT2,w,systWeightsSVJ);
-	    systSVJ.fillHistogramsSysts(h_METPt_presel_4,metFull_Pt,w,systWeightsSVJ);
-	  }
-	  if(preselection_metfilters_5){
-	    systSVJ.fillHistogramsSysts(h_Mt_presel_5,MT2,w,systWeightsSVJ);
-	    systSVJ.fillHistogramsSysts(h_METPt_presel_5,metFull_Pt,w,systWeightsSVJ);
-	  }
-	  if(preselection_metfilters_6){
-	    systSVJ.fillHistogramsSysts(h_Mt_presel_6,MT2,w,systWeightsSVJ);
-	    systSVJ.fillHistogramsSysts(h_METPt_presel_6,metFull_Pt,w,systWeightsSVJ);
-	  }
-	  if(preselection_metfilters_7){
-	    systSVJ.fillHistogramsSysts(h_Mt_presel_7,MT2,w,systWeightsSVJ);
-	    systSVJ.fillHistogramsSysts(h_METPt_presel_7,metFull_Pt,w,systWeightsSVJ);
-	  }
-	}
- 
-	if(preselection){
-	  if(metFull_Pt>300){
-	    h_AK8jet_etaphi_lead->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
-	    h_AK8jet_etaphi_sublead->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
-	    if(NHF.at(0) < 0.8 && CHF.at(0) > 0.1) h_AK8jet_etaphi_lead_newID->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
-	    if(NHF.at(1) < 0.8 && CHF.at(1) > 0.1) h_AK8jet_etaphi_sublead_newID->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
-	  }
-	  
-	  systSVJ.fillHistogramsSysts(h_nPV,NVtx,1.,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_nPV_w,NVtx,w,systWeightsSVJ);
-	  
-	  //Leptons
-	  systSVJ.fillHistogramsSysts(h_Muonsmult_presel,nMuons,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Electronsmult_presel,nElectrons,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_transverseratio_BDT1,metFull_Pt/MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mt_BDT1,MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mjj_BDT1,Mjj,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mmc_BDT1,Mmc,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_METPt_BDT1,metFull_Pt,w,systWeightsSVJ);
 
-	  //MET
-	  systSVJ.fillHistogramsSysts(h_METPt_presel, metFull_Pt,w,systWeightsSVJ);
-	  
-	  //Hadronic objects
-	  systSVJ.fillHistogramsSysts(h_Ht_presel,Ht,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetPt_presel,AK8Jets.at(0).Pt(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetPt_presel,AK8Jets.at(1).Pt(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetEta_presel,AK8Jets.at(0).Eta(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetEta_presel,AK8Jets.at(1).Eta(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetPhi_presel,AK8Jets.at(0).Phi(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetPhi_presel,AK8Jets.at(1).Phi(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetE_lead_presel,AK8Jets.at(0).E(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetE_sublead_presel,AK8Jets.at(1).E(),w,systWeightsSVJ);
+      }
 
-	  systSVJ.fillHistogramsSysts(h_AK8jetPt_lead_presel,AK8Jets.at(0).Pt(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetPt_sublead_presel,AK8Jets.at(1).Pt(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetEta_lead_presel,AK8Jets.at(0).Eta(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetEta_sublead_presel,AK8Jets.at(1).Eta(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetPhi_lead_presel,AK8Jets.at(0).Phi(),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetPhi_sublead_presel,AK8Jets.at(1).Phi(),w,systWeightsSVJ);
+      if(selection_BDT2){
 
-	  systSVJ.fillHistogramsSysts(h_AK8jetdR_presel,AK8Jets_dr,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetdP_presel,dPhi,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_AK8jetdE_presel,dEta,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_dPhi1_presel,dPhi_j0_met,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_dPhi2_presel,dPhi_j1_met,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mmc_presel,Mmc,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mjj_presel,Mjj,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mt_presel,MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_dPhimin_presel,DeltaPhiMin,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_transverseratio_presel,metFull_Pt/MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_transverseratio_BDT2,metFull_Pt/MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mt_BDT2,MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mjj_BDT2,Mjj,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mmc_BDT2,Mmc,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_METPt_BDT2,metFull_Pt,w,systWeightsSVJ);
 
-	  systSVJ.fillHistogramsSysts(h_bdt_mult_0_presel,mult.at(0),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_mult_1_presel,mult.at(1),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_axisminor_0_presel,axisminor.at(0),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_axisminor_1_presel,axisminor.at(1),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_girth_0_presel,girth.at(0),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_girth_1_presel,girth.at(1),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_tau21_0_presel,tau2.at(0)/tau1.at(0),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_tau21_1_presel,tau2.at(1)/tau1.at(1),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_tau32_0_presel,tau3.at(0)/tau2.at(0),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_tau32_1_presel,tau3.at(1)/tau2.at(1),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_tau32_0_presel,tau3.at(0)/tau2.at(0),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_tau32_1_presel,tau3.at(1)/tau2.at(1),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_msd_0_presel,msd.at(0),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_msd_1_presel,msd.at(1),w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_deltaphi_0_presel,deltaphi1,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_deltaphi_1_presel,deltaphi2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_mva_0_presel,mva1_,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_bdt_mva_1_presel,mva2_,w,systWeightsSVJ);
+      }
 
-	}
+      if(selection_CRBDT0) systSVJ.fillHistogramsSysts(h_Mt_CRBDT0,MT2,w,systWeightsSVJ);
+      if(selection_CRBDT1) systSVJ.fillHistogramsSysts(h_Mt_CRBDT1,MT2,w,systWeightsSVJ);
+      if(selection_CRBDT2) systSVJ.fillHistogramsSysts(h_Mt_CRBDT2,MT2,w,systWeightsSVJ);
 
-        double bdtCut = -0.14;
-	bool selection_BDT2(0), selection_BDT1(0), selection_BDT0(0);
-	selection_BDT2= selection && (mva1_>bdtCut) && (mva2_>bdtCut);
- 	selection_BDT1= selection && (((mva1_>bdtCut) && (mva2_<bdtCut)) || ((mva1_<bdtCut) && (mva2_>bdtCut)));
- 	selection_BDT0= selection && ((mva1_<bdtCut) && (mva2_<bdtCut));
-	bool selection_CRBDT2(0), selection_CRBDT1(0), selection_CRBDT0(0);
-	selection_CRBDT2= selection_CR && (mva1_>bdtCut) && (mva2_>bdtCut);
- 	selection_CRBDT1= selection_CR && (((mva1_>bdtCut) && (mva2_<bdtCut)) || ((mva1_<bdtCut) && (mva2_>bdtCut)));
- 	selection_CRBDT0= selection_CR && ((mva1_<bdtCut) && (mva2_<bdtCut));
+      if(selection_CR){	  
 
-	if(selection){	  
+        systSVJ.fillHistogramsSysts(h_dEta_CR,dEta,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhi_CR,dPhi,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhimin_CR,DeltaPhiMin,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_transverseratio_CR,metFull_Pt/MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mt_CR,MT2,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mjj_CR,Mjj,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_Mmc_CR,Mmc,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_METPt_CR,metFull_Pt,w,systWeightsSVJ);
 
-	  systSVJ.fillHistogramsSysts(h_dEta,dEta,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_dPhi,dPhi,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_dPhimin,DeltaPhiMin,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_transverseratio,metFull_Pt/MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mt,MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mjj,Mjj,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mmc,Mmc,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_METPt,metFull_Pt,w,systWeightsSVJ);
+      }
 
-	}
+      // Fill cutflow entries
+      n_twojets+=1;
+      if(preselection_dijet && preselection_trigger) {
+        n_prejetspt+=1;
+        if(preselection_transratio ) {
+          n_transratio +=1;
+          if(preselection_muonveto) {
+            n_muonveto+=1;
+            if(preselection_electronveto) {
+              n_electronveto+=1;
+              if(preselection_trigplateau) {
+                n_pretrigplateau+=1;
+                if(selection_mt) {
+                  n_MT+=1;
+                  if(selection_transverseratio){
+                    n_transverse+=1;
+                    if(selection_dPhi){
+                      n_dPhi+=1;
+                      if(preselection_metfilters){
+                        n_METfilters +=1;
+                        if(selection_BDT2){
+                          n_BDT+=1;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } //end of nAK8CHSJets>1
+    
+  }//end of loop over events
 
-	if(selection && (selection_BDT1 || selection_BDT2)){	  
-
-	  systSVJ.fillHistogramsSysts(h_dEta_BDT,dEta,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_dPhi_BDT,dPhi,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_dPhimin_BDT,DeltaPhiMin,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_transverseratio_BDT,metFull_Pt/MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mt_BDT,MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mjj_BDT,Mjj,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mmc_BDT,Mmc,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_METPt_BDT,metFull_Pt,w,systWeightsSVJ);
-
-	}
-
-	if(selection_BDT0){
-
-	  systSVJ.fillHistogramsSysts(h_transverseratio_BDT0,metFull_Pt/MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mt_BDT0,MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mjj_BDT0,Mjj,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mmc_BDT0,Mmc,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_METPt_BDT0,metFull_Pt,w,systWeightsSVJ);
-
-	}
-
-	if(selection_BDT1){
-
-	  systSVJ.fillHistogramsSysts(h_transverseratio_BDT1,metFull_Pt/MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mt_BDT1,MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mjj_BDT1,Mjj,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mmc_BDT1,Mmc,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_METPt_BDT1,metFull_Pt,w,systWeightsSVJ);
-
-	}
-
-	if(selection_BDT2){
-
-	  systSVJ.fillHistogramsSysts(h_transverseratio_BDT2,metFull_Pt/MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mt_BDT2,MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mjj_BDT2,Mjj,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mmc_BDT2,Mmc,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_METPt_BDT2,metFull_Pt,w,systWeightsSVJ);
-
-	}
-
-	if(selection_CRBDT0) systSVJ.fillHistogramsSysts(h_Mt_CRBDT0,MT2,w,systWeightsSVJ);
-	if(selection_CRBDT1) systSVJ.fillHistogramsSysts(h_Mt_CRBDT1,MT2,w,systWeightsSVJ);
-	if(selection_CRBDT2) systSVJ.fillHistogramsSysts(h_Mt_CRBDT2,MT2,w,systWeightsSVJ);
-
-	if(selection_CR){	  
-
-	  systSVJ.fillHistogramsSysts(h_dEta_CR,dEta,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_dPhi_CR,dPhi,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_dPhimin_CR,DeltaPhiMin,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_transverseratio_CR,metFull_Pt/MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mt_CR,MT2,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mjj_CR,Mjj,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_Mmc_CR,Mmc,w,systWeightsSVJ);
-	  systSVJ.fillHistogramsSysts(h_METPt_CR,metFull_Pt,w,systWeightsSVJ);
-
-	}
-
-	// Fill cutflow entries
-	n_twojets+=1;
-	if(preselection_dijet && preselection_trigger){
-	  n_prejetspt+=1;
-	  if(preselection_transratio ){
-	    n_transratio +=1;
-	      if(preselection_muonveto){
-		n_muonveto+=1;
-		if(preselection_electronveto){
-		  n_electronveto+=1;
-		  if(preselection_trigplateau){
-		    n_pretrigplateau+=1;
-		    if(selection_mt){
-		      n_MT+=1;
-		      if(selection_transverseratio){
-			n_transverse+=1;
-			if(selection_dPhi){
-			  n_dPhi+=1;
-			  if(preselection_metfilters){
-			    n_METfilters +=1;
-			    if(selection_BDT2){
-			      n_BDT+=1;
-			    }
-			}
-		      }
-		    }
-		  }
-		}
-	      }
-	    }
-	  }
-	}
-      }//end of nAK8CHSJets>1
-	
-    }//end of loop over events
-
-  
   h_cutFlow->SetBinContent(1,nEvents);
   h_cutFlow->GetXaxis()->SetBinLabel(1,"no selection");
   h_cutFlow->SetBinContent(2,nEvents);
