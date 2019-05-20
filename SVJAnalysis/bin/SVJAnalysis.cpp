@@ -194,6 +194,7 @@ int main(int argc, char **argv) {
   std::vector<TLorentzVector>* jetsAK8CHSPtr(0x0);
   std::vector<TLorentzVector>* MuonsPtr(0x0);
   std::vector<TLorentzVector>* ElectronsPtr(0x0);
+  
   // std::vector<TLorentzVector>* GenElectronsPtr(0x0);
   // std::vector<TLorentzVector>* GenMuonsPtr(0x0);
   // std::vector<double>* JetsAK8_NHFPtr(0x0);
@@ -236,68 +237,7 @@ int main(int argc, char **argv) {
   // chain.SetBranchAddress("DeltaPhi2_AK8", &deltaphi2);
 
   float p=1;
-
-  float x=0.;
   float NE=0.;
-
-  if(strcmp (sample.c_str(),"QCDHT100To200") == 0) NE=(float)(16399902.);
-  else if(strcmp (sample.c_str(),"QCDHT200To300") == 0) NE=(float)((18398764.));
-  else if(strcmp (sample.c_str(),"QCDHT300To500") == 0) NE=(float)((18398764.));
-  else if(strcmp (sample.c_str(),"QCDHT500To700") == 0) NE=(float)((18398764.));
-  else if(strcmp (sample.c_str(),"QCDHT700To1000") == 0) NE=(float)((15289380.));
-  else if(strcmp (sample.c_str(),"QCDHT1500To2000") == 0) NE=(float)((3970819.));
-  else if(strcmp (sample.c_str(),"QCDHT1000To1500") == 0) NE=(float)((4767100.));
-  else if(strcmp (sample.c_str(),"QCDHT2000ToInf") == 0) NE=(float)((1913485.));
-
-
-  else if(strcmp (sample.c_str(),"WJetsHT200to400") == 0) NE=(float)((19735128.));
-  else if(strcmp (sample.c_str(),"WJetsHT400to600") == 0) NE=(float)((5677949.));
-  else if(strcmp (sample.c_str(),"WJetsHT600to800") == 0) NE=(float)((14560421.));
-  else if(strcmp (sample.c_str(),"WJetsHT800to1200") == 0) NE=(float)((1944423.));
-  else if(strcmp (sample.c_str(),"WJetsHT1200to2500") == 0) NE=(float)((5455497.));
-  else if(strcmp (sample.c_str(),"WJetsHT2500toInf") == 0) NE=(float)((2384260.));
-
-
-  else if(strcmp (sample.c_str(),"ZJetsHT200to400") == 0) NE=(float)((4532071.));
-  else if(strcmp (sample.c_str(),"ZJetsHT400to600") == 0) NE=(float)((1020309.));
-  else if(strcmp (sample.c_str(),"ZJetsHT600to800") == 0) NE=(float)((5600226.));
-  else if(strcmp (sample.c_str(),"ZJetsHT800to1200") == 0) NE=(float)((1944423.));
-  else if(strcmp (sample.c_str(),"ZJetsHT1200to2500") == 0) NE=(float)((296666.));
-  else if(strcmp (sample.c_str(),"ZJetsHT2500toInf") == 0) NE=(float)((405752.));
-
-  else if(strcmp (sample.c_str(),"TTJets") == 0) NE=(float)((103191488.));
-  else if(strcmp (sample.c_str(),"SVJalphaD01mZ1000rinv03") == 0) NE=(float)(12500.);
-  else if(strcmp (sample.c_str(),"SVJalphaD01mZ2000rinv03") == 0) NE=(float)(12500.);
-  else if(strcmp (sample.c_str(),"SVJalphaD01mZ3000rinv03") == 0) NE=(float)(12500.);
-  else if(strcmp (sample.c_str(),"SVJalphaD01mZ4000rinv03") == 0) NE=(float)(12003.);
-  x = (float)(1000./NE);
-
-  if(strcmp (sample.c_str(),"QCDHT300To500") == 0) p=(float)(x * (float)(347700));
-  else if(strcmp (sample.c_str(),"QCDHT500To700") == 0) p=(float)(x * (float)(32100));
-  else if(strcmp (sample.c_str(),"QCDHT700To1000") == 0) p=(float)(x * (float)(6831));
-  else if(strcmp (sample.c_str(),"QCDHT1000To1500") == 0) p=(float)(x * (float)(1207));
-  else if(strcmp (sample.c_str(),"QCDHT1500To2000") == 0) p=(float)(x * (float)(119.9));
-  else if(strcmp (sample.c_str(),"QCDHT2000ToInf") == 0) p=(float)(x * (float)(25.24));
-
-  else if(strcmp (sample.c_str(),"WJetsHT200to400") == 0) p=(float)(1.21 *x * (float)(359.7));
-  else if(strcmp (sample.c_str(),"WJetsHT400to600") == 0) p=(float)(1.21 *x * (float)(48.91));
-  else if(strcmp (sample.c_str(),"WJetsHT600to800") == 0) p=(float)(1.21 *x * (float)(12.05));
-  else if(strcmp (sample.c_str(),"WJetsHT800to1200") == 0) p=(float)(1.21 *x * (float)(5.501));
-  else if(strcmp (sample.c_str(),"WJetsHT1200to2500") == 0) p=(float)(1.21 *x * (float)(1.329));
-  else if(strcmp (sample.c_str(),"WJetsHT2500toInf") == 0) p=(float)(1.21 * x * (float)(0.03216));
-
-  else if(strcmp (sample.c_str(),"ZJetsHT200to400") == 0) p=(float)(1.23 * x * (float)(77.67));
-  else if(strcmp (sample.c_str(),"ZJetsHT400to600") == 0) p=(float)(1.23 * x * (float)(10.73));
-  else if(strcmp (sample.c_str(),"ZJetsHT600to800") == 0) p=(float)(1.23 * x * (float)(2.559));
-  else if(strcmp (sample.c_str(),"ZJetsHT800to1200") == 0) p=(float)(1.23 * x * (float)(1.1796));
-  else if(strcmp (sample.c_str(),"ZJetsHT1200to2500") == 0) p=(float)(1.23 * x * (float)(0.28833));
-  else if(strcmp (sample.c_str(),"ZJetsHT2500toInf") == 0) p=(float)(1.23 * x * (float)(0.006945));
-  else if(strcmp (sample.c_str(),"TT") == 0) p=(float)(x * (float)(831.76));
-  else if(strcmp (sample.c_str(),"SVJalphaD01mZ1000rinv03") == 0) p=(float)(x * (float)(1.));
-  else if(strcmp (sample.c_str(),"SVJalphaD01mZ2000rinv03") == 0) p=(float)(x * (float)(1.));
-  else if(strcmp (sample.c_str(),"SVJalphaD01mZ3000rinv03") == 0) p=(float)(x * (float)(1.));
-  else if(strcmp (sample.c_str(),"SVJalphaD01mZ4000rinv03") == 0) p=(float)(x * (float)(1.));
-  cout << "weight is " << p << endl;
 
   TH2F *h_AK8jet_etaphi_lead = new TH2F("h_AK8jet_etaphi_lead", "h_AK8jet_etaphi_lead", 24, -2.4, +2.4, 35, -3.5, +3.5);
   TH2F *h_AK8jet_etaphi_sublead = new TH2F("h_AK8jet_etaphi_sublead", "h_AK8jet_etaphi_sublead", 24, -2.4, +2.4, 35, -3.5, +3.5);
@@ -409,9 +349,6 @@ int main(int argc, char **argv) {
   TH1F *h_bdt_axisminor_1_presel = new TH1F( "h_bdt_axisminor_1_presel", "axisminor jet 1", 100, 0, 0.2);
   TH1F *h_bdt_girth_0_presel = new TH1F( "h_bdt_girth_0_presel", "girth jet 0", 100, 0, 0.7);
   TH1F *h_bdt_girth_1_presel = new TH1F( "h_bdt_girth_1_presel", "girth jet 1", 100, 0, 0.7);
-
-
-
 
   TH1F *h_bdt_deltaphi_0_presel = new TH1F( "h_bdt_deltaphi_0_presel", "deltaphi jet 0", 100, 0, 3.5);
   TH1F *h_bdt_deltaphi_1_presel = new TH1F( "h_bdt_deltaphi_1_presel", "deltaphi jet 1", 100, 0, 3.5);
@@ -692,10 +629,6 @@ int main(int argc, char **argv) {
         // // systSVJ.fillHistogramsSysts(h_bdt_axisminor_1_presel,axisminor.at(1),w,systWeightsSVJ);
         // systSVJ.fillHistogramsSysts(h_bdt_girth_0_presel,girth.at(0),w,systWeightsSVJ);
         // systSVJ.fillHistogramsSysts(h_bdt_girth_1_presel,girth.at(1),w,systWeightsSVJ);
-
-
-
-
 
 
         // systSVJ.fillHistogramsSysts(h_bdt_msd_0_presel,msd.at(0),w,systWeightsSVJ);
