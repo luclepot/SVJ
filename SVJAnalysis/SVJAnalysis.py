@@ -224,11 +224,15 @@ parser.add_option('-m','--mode', dest='mode', default='t3se', choices=['local','
 parser.add_option('--t3batch', dest='t3batch', action='store_true', default=False)
 parser.add_option('-t', '--tree-name', dest='tree_name', action='store', type='string', help='name of tree to run', default='tree')
 parser.add_option('-f', '--filter', dest='filter', action='store', type='string', help='filter for root files', default='*')
+parser.add_option('-o', '--file-format', dest='file_format', action='store', type='string', help='old vs new file format (for debug)', default='OLD')
 
 isData="MC"
 #isData="DATA"
 
 (opt, args) = parser.parse_args()
+
+ff = opt.file_format.upper()
+assert(ff in ['OLD', 'NEW'])
 
 if opt.sys not in systematics:
     parser.error('Please choose an allowed value for sys: "noSys", "jesUp", "jesDown", "jerUp", "jerDown", "jmsUp", "jmsDown", "jmrUp", "jmrDown"')
@@ -290,7 +294,7 @@ for s in samples:
         cwd = os.getcwd()
 
         makedirs(resDirs,cwd)
-        cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  cwd + ' ' + opt.year + ' ' + opt.tree_name
+        cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  cwd + ' ' + opt.year + ' ' + opt.tree_name + ' ' + ff
         
         run(s,cmd,opt)
 
@@ -353,6 +357,6 @@ for s in samples:
 
             sampleFileList = writeFileList(ss, files,opt)
 
-            cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  wd + ' ' + opt.tree_name
+            cmd = 'SVJAnalysis '+ s + ' ' + sampleFileList  + ' ' + opt.sys + ' ' + opt.sync + ' ' + isData + ' ' +  wd + ' ' + opt.tree_name + ' ' + ff
 
             run(ss,cmd,opt)
