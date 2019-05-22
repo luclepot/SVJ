@@ -511,12 +511,15 @@ int main(int argc, char **argv) {
 
     nMuons = 0;
     nElectrons = 0;
-    for (size_t i = 0; i < Muons.size(); ++i) 
+    for (size_t i = 0; i < Muons.size(); ++i) {
       nMuons += (std::fabs(Muons[i].Pt()) > 10.0 && std::fabs(Muons[i].Eta()) < 2.4);
-    for (size_t i = 0; i < Electrons.size(); ++i)
+    }
+    for (size_t i = 0; i < Electrons.size(); ++i) {
       nElectrons += (std::fabs(Electrons[i].Pt()) > 10.0 && std::fabs(Electrons[i].Eta()) < 2.4);
+    }
 
     TLorentzVector vHVsum;
+
     if(AK8Jets.size() > 1){
 
       double AK8Jets_dr=-1;
@@ -681,11 +684,11 @@ int main(int argc, char **argv) {
       //   systSVJ.fillHistogramsSysts(h_AK8jetPhi_lead_presel,AK8Jets.at(0).Phi(),w,systWeightsSVJ);
       //   systSVJ.fillHistogramsSysts(h_AK8jetPhi_sublead_presel,AK8Jets.at(1).Phi(),w,systWeightsSVJ);
 
-      //   systSVJ.fillHistogramsSysts(h_AK8jetdR_presel,AK8Jets_dr,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_AK8jetdR_presel,AK8Jets_dr,w,systWeightsSVJ);
       //   systSVJ.fillHistogramsSysts(h_AK8jetdP_presel,dPhi,w,systWeightsSVJ);
       //   systSVJ.fillHistogramsSysts(h_AK8jetdE_presel,dEta,w,systWeightsSVJ);
-      //   systSVJ.fillHistogramsSysts(h_dPhi1_presel,dPhi_j0_met,w,systWeightsSVJ);
-      //   systSVJ.fillHistogramsSysts(h_dPhi2_presel,dPhi_j1_met,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhi1_presel,dPhi_j0_met,w,systWeightsSVJ);
+        systSVJ.fillHistogramsSysts(h_dPhi2_presel,dPhi_j1_met,w,systWeightsSVJ);
       //   systSVJ.fillHistogramsSysts(h_Mmc_presel,Mmc,w,systWeightsSVJ);
       //   systSVJ.fillHistogramsSysts(h_Mjj_presel,Mjj,w,systWeightsSVJ);
       //   systSVJ.fillHistogramsSysts(h_Mt_presel,MT2,w,systWeightsSVJ);
@@ -701,7 +704,7 @@ int main(int argc, char **argv) {
 
 
       //   // systSVJ.fillHistogramsSysts(h_bdt_msd_0_presel,msd.at(0),w,systWeightsSVJ);
-      //   // systSVJ.fillHistogramsSysts(h_bdt_msd_1_presel,msd.at(1),w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_bdt_msd_1_presel,msd.at(1),w,systWeightsSVJ);ZZ
       //   // systSVJ.fillHistogramsSysts(h_bdt_deltaphi_0_presel,deltaphi1,w,systWeightsSVJ);
       //   // systSVJ.fillHistogramsSysts(h_bdt_deltaphi_1_presel,deltaphi2,w,systWeightsSVJ);
       //   // systSVJ.fillHistogramsSysts(h_bdt_mva_0_presel,mva1_,w,systWeightsSVJ);
@@ -810,11 +813,9 @@ int main(int argc, char **argv) {
                     n_transverse+=1;
                     if(selection_dPhi){
                       n_dPhi+=1;
-                      if(preselection_metfilters){
-                        n_METfilters +=1;
-                        if(selection_BDT2){
-                          n_BDT+=1;
-                        }
+                      n_METfilters +=1;
+                      if(selection_BDT2){
+                        n_BDT+=1;
                       }
                     }
                   }
