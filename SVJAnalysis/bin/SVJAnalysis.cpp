@@ -2,6 +2,7 @@
 #include "TChain.h"
 #include "TTree.h"
 #include "TBranch.h"
+#include "TLeaf.h"
 #include "TH1.h"
 #include "TH1F.h"
 #include "TH2F.h"
@@ -67,6 +68,82 @@ struct systWeights{
   string categoriesNames[10];
 };
 
+class TLorentzMock  {
+    public:
+        TLorentzMock() = delete; 
+
+        TLorentzMock(Float_t Pt_, Float_t Eta_) {
+            this->Eta_ = Eta_;
+            this->Pt_ = Pt_; 
+        }
+
+        TLorentzMock(Float_t Pt_, Float_t Eta_, Float_t Isolation_) {
+            this->Eta_ = Eta_;
+            this->Pt_ = Pt_; 
+            this->Isolation_ = Isolation_;
+        }
+        
+        TLorentzMock(Float_t Pt_, Float_t Eta_, Float_t Isolation_, Float_t EhadOverEem_) {
+            this->Eta_ = Eta_;
+            this->Pt_ = Pt_; 
+            this->Isolation_ = Isolation_;
+            this->EhadOverEem_ = EhadOverEem_; 
+        }
+
+        Float_t Eta() {
+            return this->Eta_; 
+        }
+        Float_t Pt() {
+            return this->Pt_; 
+        }
+        Float_t Isolation() {
+            return this->Isolation_;
+        }
+        Float_t EhadOverEem() {
+            return this->EhadOverEem_; 
+        }
+        
+    private:
+        Float_t Eta_, Pt_, Isolation_, EhadOverEem_;
+};
+
+vector<TLorentzVector> getTLorentzVectorsPtEtaPhiM(vector<TLeaf*> &v) {
+    int n = v[0]->GetLen(); 
+    vector<TLorentzVector> ret;
+    for (int i = 0; i < n; ++i) {
+        ret.push_back(TLorentzVector());
+        ret[i].SetPtEtaPhiM(
+            v[0]->GetValue(i),
+            v[1]->GetValue(i),
+            v[2]->GetValue(i),
+            v[3]->GetValue(i)
+        );
+    }
+    return ret;
+}
+
+vector<TLorentzMock> getTLorentzMockVectors(vector<TLeaf*> &v) {
+    int n = v[0]->GetLen();
+    int size = v.size();
+    vector<TLorentzMock> ret;
+    for(int i = 0; i < n; ++i) {
+        switch (size) {
+            case 2: {
+                ret.push_back(TLorentzMock(v[0]->GetValue(i), v[1]->GetValue(i)));
+                break;
+            }
+            case 3: {
+                ret.push_back(TLorentzMock(v[0]->GetValue(i), v[1]->GetValue(i), v[2]->GetValue(i)));
+                break;
+            }
+            case 4: {
+                ret.push_back(TLorentzMock(v[0]->GetValue(i), v[1]->GetValue(i), v[2]->GetValue(i), v[3]->GetValue(i)));
+                break;
+            }
+        }
+    }
+    return ret; 
+}
 
 int main(int argc, char **argv) {
 
@@ -158,6 +235,7 @@ int main(int argc, char **argv) {
   TChain chain(treePath);
   chain.AddFileInfoList(fc.GetList());
   Int_t nEvents = (Int_t)chain.GetEntries();
+
   bench.Stop("NEvents");
   bench.Print("NEvents");
 
@@ -165,7 +243,7 @@ int main(int argc, char **argv) {
 
   double topWeight=totalWeightTop.GetMean();
   cout << "totaltopweight is " << topWeight << endl;
-  if(topWeight==0)topWeight=1;
+  if(topWeight==0) topWeight=1;
 
 
   std::string samplestr(sample.c_str());
@@ -208,6 +286,7 @@ int main(int argc, char **argv) {
   // std::vector<double>* girthPtr(0x0);
   // std::vector<double>* msdPtr(0x0);
   // std::vector<bool>* jetsIDPtr(0x0);
+
   // std::vector<double>* muMiniIsoPtr(0x0);
 
   double Ht(0.), MT(0.);
@@ -218,34 +297,35 @@ int main(int argc, char **argv) {
   // double DeltaPhiMin;
 
   bool new_format = fileformat=="NEW"; 
+  string muon_prefix = "MuonLoose";
+  
+  cout << endl << endl << "NEW FORMAT" << endl << endl;
+  // initial components
+  TLeaf *lMetPt = chain.FindLeaf("MissingET.MET"), *lMetPhi = chain.FindLeaf("MissingET.Phi");
 
-  // chain.SetBranchAddress("MT_AK8", &MT);
+  // component vectors
+  vector<TLeaf*> 
+    JetComps = {
+      chain.FindLeaf("Jet.PT"),
+      chain.FindLeaf("Jet.Eta"),
+      chain.FindLeaf("Jet.Phi"),
+      chain.FindLeaf("Jet.Mass")
+    },
+    ElectronComps = {
+      chain.FindLeaf("Electron.PT"),
+      chain.FindLeaf("Electron.Eta"),
+      chain.FindLeaf("Electron.IsolationVarRhoCorr"),
+      chain.FindLeaf("Electron.EhadOverEem")
+    },
+    MuonComps = {
+      chain.FindLeaf((muon_prefix + ".PT").c_str()),
+      chain.FindLeaf((muon_prefix + ".Eta").c_str()),
+      chain.FindLeaf((muon_prefix + ".IsolationVarRhoCorr").c_str()),
+    };
 
-  std::vector<TLorentzVector>* jetsAK8CHSPtr(0x0);
-  std::vector<TLorentzVector>* MuonsPtr(0x0);
-  std::vector<TLorentzVector>* ElectronsPtr(0x0);
-  double jet_pt, jet_eta, jet_phi, jet_M;
+  vector<TLorentzVector> AK8Jets;
+  vector<TLorentzMock> Electrons, Muons;
   double metFull_Pt, metFull_Phi;
-  float metFull_Pt_new, metFull_Phi_new;
-
-  if (new_format) {
-    cout << endl << endl << "NEW FORMAT" << endl << endl; 
-    chain.SetBranchAddress("MissingET.MET",&metFull_Pt_new);
-    chain.SetBranchAddress("MissingET.Phi",&metFull_Phi_new);
-    chain.SetBranchAddress("Jet.PT", &jet_pt);
-    chain.SetBranchAddress("Jet.Eta", &jet_eta);
-    chain.SetBranchAddress("Jet.Phi", &jet_phi);
-    chain.SetBranchAddress("Jet.Mass", &jet_M);
-  }
-  else {
-    cout << endl << endl << "OLD FORMAT" << endl << endl; 
-    chain.SetBranchAddress("MET",&metFull_Pt);
-    chain.SetBranchAddress("METPhi",&metFull_Phi);
-    chain.SetBranchAddress("JetsAK8", &jetsAK8CHSPtr);
-    chain.SetBranchAddress("Muons", &MuonsPtr);
-    chain.SetBranchAddress("Electrons",&ElectronsPtr);
-  }
-
 
   // chain.SetBranchAddress("JetsAK8_neutralHadronEnergyFraction", &JetsAK8_NHFPtr);
   // chain.SetBranchAddress("JetsAK8_chargedHadronEnergyFraction", &JetsAK8_CHFPtr);
@@ -271,7 +351,6 @@ int main(int argc, char **argv) {
 
   TH1F *h_nPV = new TH1F("h_nPV", "nPV", 70, 0, 70);
   TH1F *h_nPV_w = new TH1F("h_nPV_w","nPV",70,0,70);
-
 
   TH1F *h_AK8jetsmult_presel = new TH1F("h_AK8jetsmult_presel", "AK8 jets multiplicity", 10, -0.5, 9.5);
   TH1F *h_Muonsmult_presel = new TH1F("h_Muonsmult_presel", " muons multiplicity", 10, -0.5, 9.5);
@@ -382,7 +461,7 @@ int main(int argc, char **argv) {
 
   float n_twojets(0.), n_prejetspt(0.), n_pretrigplateau(0.), n_transratio(0.), n_MT(0.), n_METfilters(0.), n_dPhi(0.), n_transverse(0.);
   float n_muonveto(0.), n_electronveto(0.), n_BDT(0.) ;
-
+  std::cout<< "===> Number of Skimmed Events: "<< nEvents << std::endl;
 
   systZero.createFilesSysts(allMyFiles,outdir+"/res/"+sample +syststr);
 
@@ -390,7 +469,8 @@ int main(int argc, char **argv) {
   systZero.setOnlyNominal(onlyNominal);
   systSVJ.setOnlyNominal(onlyNominal);
 
-  nEvents = 100;
+  nEvents = 1000;
+
   for(Int_t i=0; i<nEvents; i++ ) {
 
     chain.GetEntry(i);
@@ -398,8 +478,10 @@ int main(int argc, char **argv) {
 
     TriggerFuncCorrector tfc;
     string trig_filename = cmssw_base + std::string("/src/SVJ/SVJAnalysis/data/trigEffFit_SingleMuon_"+ year +"_DetaHLTmatch.root");
-    tfc.SetFunc(trig_filename,"fit_MTAK8","err_MTAK8");
-    if(isData=="DATA"){
+    
+    tfc.SetFunc(trig_filename, "fit_MTAK8", "err_MTAK8");
+    
+    if(isData=="DATA") {
       systZero.setWeight(0,1.);
       systZero.setWeight("puDown",1.);
       systZero.setWeight("puUp",1.);
@@ -419,64 +501,23 @@ int main(int argc, char **argv) {
       systWeightsSVJ[TRIGUP]= 1.;
       systWeightsSVJ[TRIGDOWN]= 1.;
     }
+    
+    metFull_Pt = lMetPt->GetValue(0);
+    metFull_Phi = lMetPhi->GetValue(0); 
 
-    // std::vector<int> mult = *multPtr;
-    // std::vector<double> axisminor = *axisminorPtr;
-    // std::vector<double> girth = *girthPtr;
+    AK8Jets = getTLorentzVectorsPtEtaPhiM(JetComps);
+    Electrons = getTLorentzMockVectors(ElectronComps);
+    Muons = getTLorentzMockVectors(MuonComps);
 
-
-
-    // std::vector<double> msd = *msdPtr;
-    // // std::vector<double> muMiniIso = *muMiniIsoPtr;
-    // std::vector<bool> jetsID = *jetsIDPtr;
-
-    // std::vector<double> NHF = *JetsAK8_NHFPtr;
-    // std::vector<double> CHF = *JetsAK8_CHFPtr;
-
-    std::vector<TLorentzVector> AK8Jets, Electrons, muons, electrons; 
-    TLorentzVector Electron; 
-
-    if (new_format) {
-      // AK8Jets.SetPtEtaPhiM(jet_pt, jet_eta, jet_phi, jet_M);
-      muons = *MuonsPtr;
-      electrons = *ElectronsPtr;
-    } 
-    else {
-      AK8Jets = *jetsAK8CHSPtr;
-      muons = *MuonsPtr;
-      electrons = *ElectronsPtr;
-    }
-
-
-
-
-
-    bool preselection_metfilters = 0;
-    bool preselection_metfilters_1 = 0;
-    bool preselection_metfilters_2 = 0;
-    bool preselection_metfilters_3 = 0;
-    bool preselection_metfilters_4 = 0;
-    bool preselection_metfilters_5 = 0;
-    bool preselection_metfilters_6 = 0;
-    bool preselection_metfilters_7 = 0;
-    preselection_metfilters = BadChargedCandidateFilter>0 && BadPFMuonFilter>0 && EcalDeadCellTriggerPrimitiveFilter>0 && HBHEIsoNoiseFilter>0 && HBHENoiseFilter>0 && globalTightHalo2016Filter>0 && NVtx > 0;
-    preselection_metfilters_1 = BadChargedCandidateFilter>0;
-    preselection_metfilters_2 = BadPFMuonFilter>0;
-    preselection_metfilters_3 = EcalDeadCellTriggerPrimitiveFilter>0;
-    preselection_metfilters_4 = HBHEIsoNoiseFilter>0;
-    preselection_metfilters_5 = HBHENoiseFilter>0;
-    preselection_metfilters_6 = globalTightHalo2016Filter>0;
-    preselection_metfilters_7 = NVtx > 0;
-
-
-    if(preselection_metfilters){
-      systSVJ.fillHistogramsSysts( h_AK8jetsmult_presel, AK8Jets.size(),w,systWeightsSVJ);
-    }
-
+    nMuons = 0;
+    nElectrons = 0;
+    for (size_t i = 0; i < Muons.size(); ++i) 
+      nMuons += (std::fabs(Muons[i].Pt()) > 10.0 && std::fabs(Muons[i].Eta()) < 2.4);
+    for (size_t i = 0; i < Electrons.size(); ++i)
+      nElectrons += (std::fabs(Electrons[i].Pt()) > 10.0 && std::fabs(Electrons[i].Eta()) < 2.4);
 
     TLorentzVector vHVsum;
-    if(AK8Jets.size()>1){
-
+    if(AK8Jets.size() > 1){
 
       double AK8Jets_dr=-1;
       AK8Jets_dr = (AK8Jets.at(0)).DeltaR(AK8Jets.at(1));
@@ -487,8 +528,6 @@ int main(int argc, char **argv) {
       double dPhi_j0_met=0., dPhi_j1_met=0.;
       dPhi_j0_met = std::fabs(reco::deltaPhi(AK8Jets.at(0).Phi(),metFull_Phi));
       dPhi_j1_met = std::fabs(reco::deltaPhi(AK8Jets.at(1).Phi(),metFull_Phi));
-
-
 
       double Mjj=0., Mmc=0., MT2=0.;
       double Mjj2=0., ptjj = 0., ptjj2 = 0., ptMet = 0.;
@@ -526,7 +565,7 @@ int main(int argc, char **argv) {
       bool preselection_dijet(0), preselection_muonveto(0), preselection_muonLooseveto(1), preselection_electronveto(0);
       bool preselection_trigger(0);
 
-      int sizeMax_muons=muons.size();
+      int sizeMax_muons=Muons.size();
 
       // for(int j=0; j< sizeMax_muons; j++){
       //   if (muMiniIso[j]<0.4){ preselection_muonLooseveto = 0; }
@@ -538,7 +577,7 @@ int main(int argc, char **argv) {
       preselection_trigplateau = preselection_deltaeta;
       preselection_transratio = metFull_Pt/MT2 > 0.15;
       preselection_leptonveto = nElectrons + nMuons < 1;
-      preselection_muonveto = nMuons<1 && preselection_muonLooseveto;
+      preselection_muonveto = nMuons < 1 && preselection_muonLooseveto;
       preselection_electronveto =nElectrons<1;
       preselection_jetspt = (AK8Jets.at(0)).Pt() > 200 && (AK8Jets.at(1)).Pt()>200;
       preselection_dijet = preselection_jetseta && preselection_jetsID && preselection_jetspt;
@@ -549,9 +588,9 @@ int main(int argc, char **argv) {
       selection_transverseratio_window = (metFull_Pt/MT2)> 0.15 && (metFull_Pt/MT2) < 0.25 ;
 
       bool preselection_CR = 0;
-      preselection_CR = preselection_muonveto && preselection_jetseta && preselection_jetsID && preselection_deltaeta && preselection_leptonveto && preselection_metfilters && MT2 > 1500 && preselection_trigger;
+      preselection_CR = preselection_muonveto && preselection_jetseta && preselection_jetsID && preselection_deltaeta && preselection_leptonveto && MT2 > 1500 && preselection_trigger;
 
-      preselection = preselection_muonveto && preselection_jetseta && preselection_jetsID && preselection_deltaeta && preselection_transratio && preselection_leptonveto && preselection_trigger && MT2 > 1500 && preselection_metfilters;
+      preselection = preselection_muonveto && preselection_jetseta && preselection_jetsID && preselection_deltaeta && preselection_transratio && preselection_leptonveto && preselection_trigger && MT2 > 1500;
 
       bool selection_dPhi = 0, selection_transverseratio = 0, selection_mt = 0, selection = 0;
       selection_dPhi = true; //DeltaPhiMin < 0.75;
@@ -573,102 +612,102 @@ int main(int argc, char **argv) {
 
       // mva2_ = reader.EvaluateMVA("BDTG");
 
-      if(preselection){
-        if(preselection_metfilters_1){
-          systSVJ.fillHistogramsSysts(h_Mt_presel_1,MT2,w,systWeightsSVJ);
-          systSVJ.fillHistogramsSysts(h_METPt_presel_1,metFull_Pt,w,systWeightsSVJ);
-        }
-        if(preselection_metfilters_2){
-          systSVJ.fillHistogramsSysts(h_Mt_presel_2,MT2,w,systWeightsSVJ);
-          systSVJ.fillHistogramsSysts(h_METPt_presel_2,metFull_Pt,w,systWeightsSVJ);
-        }
-        if(preselection_metfilters_3){
-          systSVJ.fillHistogramsSysts(h_Mt_presel_3,MT2,w,systWeightsSVJ);
-          systSVJ.fillHistogramsSysts(h_METPt_presel_3,metFull_Pt,w,systWeightsSVJ);
-        }
-        if(preselection_metfilters_4){
-          systSVJ.fillHistogramsSysts(h_Mt_presel_4,MT2,w,systWeightsSVJ);
-          systSVJ.fillHistogramsSysts(h_METPt_presel_4,metFull_Pt,w,systWeightsSVJ);
-        }
-        if(preselection_metfilters_5){
-          systSVJ.fillHistogramsSysts(h_Mt_presel_5,MT2,w,systWeightsSVJ);
-          systSVJ.fillHistogramsSysts(h_METPt_presel_5,metFull_Pt,w,systWeightsSVJ);
-        }
-        if(preselection_metfilters_6){
-          systSVJ.fillHistogramsSysts(h_Mt_presel_6,MT2,w,systWeightsSVJ);
-          systSVJ.fillHistogramsSysts(h_METPt_presel_6,metFull_Pt,w,systWeightsSVJ);
-        }
-        if(preselection_metfilters_7){
-          systSVJ.fillHistogramsSysts(h_Mt_presel_7,MT2,w,systWeightsSVJ);
-          systSVJ.fillHistogramsSysts(h_METPt_presel_7,metFull_Pt,w,systWeightsSVJ);
-        }
-      }
+      // if(preselection){
+      //   if(preselection_metfilters_1){
+      //     systSVJ.fillHistogramsSysts(h_Mt_presel_1,MT2,w,systWeightsSVJ);
+      //     systSVJ.fillHistogramsSysts(h_METPt_presel_1,metFull_Pt,w,systWeightsSVJ);
+      //   }
+      //   if(preselection_metfilters_2){
+      //     systSVJ.fillHistogramsSysts(h_Mt_presel_2,MT2,w,systWeightsSVJ);
+      //     systSVJ.fillHistogramsSysts(h_METPt_presel_2,metFull_Pt,w,systWeightsSVJ);
+      //   }
+      //   if(preselection_metfilters_3){
+      //     systSVJ.fillHistogramsSysts(h_Mt_presel_3,MT2,w,systWeightsSVJ);
+      //     systSVJ.fillHistogramsSysts(h_METPt_presel_3,metFull_Pt,w,systWeightsSVJ);
+      //   }
+      //   if(preselection_metfilters_4){
+      //     systSVJ.fillHistogramsSysts(h_Mt_presel_4,MT2,w,systWeightsSVJ);
+      //     systSVJ.fillHistogramsSysts(h_METPt_presel_4,metFull_Pt,w,systWeightsSVJ);
+      //   }
+      //   if(preselection_metfilters_5){
+      //     systSVJ.fillHistogramsSysts(h_Mt_presel_5,MT2,w,systWeightsSVJ);
+      //     systSVJ.fillHistogramsSysts(h_METPt_presel_5,metFull_Pt,w,systWeightsSVJ);
+      //   }
+      //   if(preselection_metfilters_6){
+      //     systSVJ.fillHistogramsSysts(h_Mt_presel_6,MT2,w,systWeightsSVJ);
+      //     systSVJ.fillHistogramsSysts(h_METPt_presel_6,metFull_Pt,w,systWeightsSVJ);
+      //   }
+      //   if(preselection_metfilters_7){
+      //     systSVJ.fillHistogramsSysts(h_Mt_presel_7,MT2,w,systWeightsSVJ);
+      //     systSVJ.fillHistogramsSysts(h_METPt_presel_7,metFull_Pt,w,systWeightsSVJ);
+      //   }
+      // }
 
-      if(preselection){
-        if(metFull_Pt>300) {
-          h_AK8jet_etaphi_lead->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
-          h_AK8jet_etaphi_sublead->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
-          // if(NHF.at(0) < 0.8 && CHF.at(0) > 0.1) 
-          //   h_AK8jet_etaphi_lead_newID->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
-          // if(NHF.at(1) < 0.8 && CHF.at(1) > 0.1)
-          //   h_AK8jet_etaphi_sublead_newID->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
-        }
+      // if(preselection){
+      //   if(metFull_Pt>300) {
+      //     h_AK8jet_etaphi_lead->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
+      //     h_AK8jet_etaphi_sublead->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
+      //     // if(NHF.at(0) < 0.8 && CHF.at(0) > 0.1) 
+      //     //   h_AK8jet_etaphi_lead_newID->Fill(AK8Jets.at(0).Eta(), AK8Jets.at(0).Phi());
+      //     // if(NHF.at(1) < 0.8 && CHF.at(1) > 0.1)
+      //     //   h_AK8jet_etaphi_sublead_newID->Fill(AK8Jets.at(1).Eta(), AK8Jets.at(1).Phi());
+      //   }
 
-        systSVJ.fillHistogramsSysts(h_nPV,NVtx,1.,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_nPV_w,NVtx,w,systWeightsSVJ);
-
-
-        systSVJ.fillHistogramsSysts(h_Muonsmult_presel,nMuons,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_Electronsmult_presel,nElectrons,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_nPV,NVtx,1.,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_nPV_w,NVtx,w,systWeightsSVJ);
 
 
-        systSVJ.fillHistogramsSysts(h_METPt_presel, metFull_Pt,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_Muonsmult_presel,nMuons,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_Electronsmult_presel,nElectrons,w,systWeightsSVJ);
 
 
-        systSVJ.fillHistogramsSysts(h_Ht_presel,Ht,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetPt_presel,AK8Jets.at(0).Pt(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetPt_presel,AK8Jets.at(1).Pt(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetEta_presel,AK8Jets.at(0).Eta(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetEta_presel,AK8Jets.at(1).Eta(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetPhi_presel,AK8Jets.at(0).Phi(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetPhi_presel,AK8Jets.at(1).Phi(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetE_lead_presel,AK8Jets.at(0).E(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetE_sublead_presel,AK8Jets.at(1).E(),w,systWeightsSVJ);
-
-        systSVJ.fillHistogramsSysts(h_AK8jetPt_lead_presel,AK8Jets.at(0).Pt(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetPt_sublead_presel,AK8Jets.at(1).Pt(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetEta_lead_presel,AK8Jets.at(0).Eta(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetEta_sublead_presel,AK8Jets.at(1).Eta(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetPhi_lead_presel,AK8Jets.at(0).Phi(),w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetPhi_sublead_presel,AK8Jets.at(1).Phi(),w,systWeightsSVJ);
-
-        systSVJ.fillHistogramsSysts(h_AK8jetdR_presel,AK8Jets_dr,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetdP_presel,dPhi,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_AK8jetdE_presel,dEta,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_dPhi1_presel,dPhi_j0_met,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_dPhi2_presel,dPhi_j1_met,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_Mmc_presel,Mmc,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_Mjj_presel,Mjj,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_Mt_presel,MT2,w,systWeightsSVJ);
-        // systSVJ.fillHistogramsSysts(h_dPhimin_presel,DeltaPhiMin,w,systWeightsSVJ);
-        systSVJ.fillHistogramsSysts(h_transverseratio_presel,metFull_Pt/MT2,w,systWeightsSVJ);
-
-        // systSVJ.fillHistogramsSysts(h_bdt_mult_0_presel,mult.at(0),w,systWeightsSVJ);
-        // systSVJ.fillHistogramsSysts(h_bdt_mult_1_presel,mult.at(1),w,systWeightsSVJ);
-        // systSVJ.fillHistogramsSysts(h_bdt_axisminor_0_presel,axisminor.at(0),w,systWeightsSVJ);
-        // // systSVJ.fillHistogramsSysts(h_bdt_axisminor_1_presel,axisminor.at(1),w,systWeightsSVJ);
-        // systSVJ.fillHistogramsSysts(h_bdt_girth_0_presel,girth.at(0),w,systWeightsSVJ);
-        // systSVJ.fillHistogramsSysts(h_bdt_girth_1_presel,girth.at(1),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_METPt_presel, metFull_Pt,w,systWeightsSVJ);
 
 
-        // systSVJ.fillHistogramsSysts(h_bdt_msd_0_presel,msd.at(0),w,systWeightsSVJ);
-        // systSVJ.fillHistogramsSysts(h_bdt_msd_1_presel,msd.at(1),w,systWeightsSVJ);
-        // systSVJ.fillHistogramsSysts(h_bdt_deltaphi_0_presel,deltaphi1,w,systWeightsSVJ);
-        // systSVJ.fillHistogramsSysts(h_bdt_deltaphi_1_presel,deltaphi2,w,systWeightsSVJ);
-        // systSVJ.fillHistogramsSysts(h_bdt_mva_0_presel,mva1_,w,systWeightsSVJ);
-        // systSVJ.fillHistogramsSysts(h_bdt_mva_1_presel,mva2_,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_Ht_presel,Ht,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetPt_presel,AK8Jets.at(0).Pt(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetPt_presel,AK8Jets.at(1).Pt(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetEta_presel,AK8Jets.at(0).Eta(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetEta_presel,AK8Jets.at(1).Eta(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetPhi_presel,AK8Jets.at(0).Phi(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetPhi_presel,AK8Jets.at(1).Phi(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetE_lead_presel,AK8Jets.at(0).E(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetE_sublead_presel,AK8Jets.at(1).E(),w,systWeightsSVJ);
 
-      }
+      //   systSVJ.fillHistogramsSysts(h_AK8jetPt_lead_presel,AK8Jets.at(0).Pt(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetPt_sublead_presel,AK8Jets.at(1).Pt(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetEta_lead_presel,AK8Jets.at(0).Eta(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetEta_sublead_presel,AK8Jets.at(1).Eta(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetPhi_lead_presel,AK8Jets.at(0).Phi(),w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetPhi_sublead_presel,AK8Jets.at(1).Phi(),w,systWeightsSVJ);
+
+      //   systSVJ.fillHistogramsSysts(h_AK8jetdR_presel,AK8Jets_dr,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetdP_presel,dPhi,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_AK8jetdE_presel,dEta,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_dPhi1_presel,dPhi_j0_met,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_dPhi2_presel,dPhi_j1_met,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_Mmc_presel,Mmc,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_Mjj_presel,Mjj,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_Mt_presel,MT2,w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_dPhimin_presel,DeltaPhiMin,w,systWeightsSVJ);
+      //   systSVJ.fillHistogramsSysts(h_transverseratio_presel,metFull_Pt/MT2,w,systWeightsSVJ);
+
+      //   // systSVJ.fillHistogramsSysts(h_bdt_mult_0_presel,mult.at(0),w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_bdt_mult_1_presel,mult.at(1),w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_bdt_axisminor_0_presel,axisminor.at(0),w,systWeightsSVJ);
+      //   // // systSVJ.fillHistogramsSysts(h_bdt_axisminor_1_presel,axisminor.at(1),w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_bdt_girth_0_presel,girth.at(0),w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_bdt_girth_1_presel,girth.at(1),w,systWeightsSVJ);
+
+
+      //   // systSVJ.fillHistogramsSysts(h_bdt_msd_0_presel,msd.at(0),w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_bdt_msd_1_presel,msd.at(1),w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_bdt_deltaphi_0_presel,deltaphi1,w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_bdt_deltaphi_1_presel,deltaphi2,w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_bdt_mva_0_presel,mva1_,w,systWeightsSVJ);
+      //   // systSVJ.fillHistogramsSysts(h_bdt_mva_1_presel,mva2_,w,systWeightsSVJ);
+
+      // }
 
           double bdtCut = -0.14;
       bool selection_BDT2(0), selection_BDT1(0), selection_BDT0(0);
