@@ -33,7 +33,6 @@ enum class vectorType {
     Map
 };
 
-
 class SVJFinder {
     public:
         // constructor, requires argv as input
@@ -230,7 +229,6 @@ class SVJFinder {
                     print(LorentzVectors[subIndex[it->second].first], 2);
                 }
             }
-            
         }
 
         // general init vars, parsed from argv
