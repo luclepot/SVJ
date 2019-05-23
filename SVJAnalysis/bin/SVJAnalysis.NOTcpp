@@ -68,7 +68,7 @@ struct systWeights{
   string categoriesNames[10];
 };
 
-class TLorentzMock  {
+class TLorentzMock{
     public:
         TLorentzMock() = delete; 
 

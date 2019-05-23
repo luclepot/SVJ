@@ -23,6 +23,7 @@
 #include <iostream>
 #include <typeinfo>
 #include <sstream> 
+#include <utility>
 
 // #include "TMVA/Tools.h"
 // #include "TMVA/Reader.h"
@@ -45,6 +46,7 @@ using std::string;
 using std::endl;
 using std::cout;
 using std::vector;
+using std::pair; 
 
 class TLorentzMock{
     public:
@@ -131,7 +133,8 @@ enum class vectorType {
 
 class SVJFinder {
     public:
-        SVJFinder(char **argv) {
+        // constructor, requires argv as input
+        SVJFinder(char **argv, bool _debug=false) {
             cout << endl;
             log("-----------------------------------");
             log(":          SVJAnalysis            :");
@@ -139,8 +142,10 @@ class SVJFinder {
             this->init_vars(argv);
             log("SVJ object created");
             log();
+            debug = _debug; 
         }
 
+        // generates tfile collection and returns a pointer to it
         TFileCollection *MakeFileCollection() {
             log("Loading File Collection from " + path);
             if (fc)
@@ -151,6 +156,7 @@ class SVJFinder {
             return fc;
         }
 
+        // generates a chain an returns a pointer to it
         TChain *MakeChain() {
             log("Creating file chain with tree type '" + treename + "'...");
             if (chain)  
@@ -163,59 +169,219 @@ class SVJFinder {
             return chain;
         }
 
-        // general function to add LEAF components as a part of a (recognized) structure
-        void addComps(string vectorName, vector<string> components, vectorType type=vectorType::Map) {
-            if (type == vectorType::Lorentz)
-                assert(components.size() == 4);
-            else if (type == vectorType::Mock)
-                assert(components.size() > 1 && components.size() < 5);
-            logp("Adding " + to_string(components.size()) + " components to vector " + vectorName + " with type " + componentTypeStrings[type] + "...  ");
-            componentVectors[vectorName] = vector<TLeaf*>();
-            componentTypes[vectorName] = type;
-            componentNames[vectorName] = vector<string>();
-            for (size_t i = 0; i < components.size(); ++i) {
-                componentVectors[vectorName].push_back(chain->FindLeaf(components[i].c_str()));
-                componentNames[vectorName].push_back(lastWord(components[i]));
-            }
-            logr("Success"); 
-        }
+        // general function to add LEAF components as a part of a tlorentz vector
+        vector<TLorentzVector>* AddLorentz(string vectorName, vector<string> components) {
+            assert(components.size() == 4);
+            AddCompsBase(vectorName, components);
 
-        void addComp(string varName, string component) {
-            logp("Adding 1 component to var " + varName + "...  ");
-            componentVars[varName] = chain->FindLeaf(TString(component));
+            size_t i = LorentzVectors.size();
+            subIndex.push_back(std::make_pair(i, vectorType::Lorentz));
+
+            LorentzVectors.push_back(vector<TLorentzVector>());
             logr("Success");
+            return &LorentzVectors[i];
         }
 
-        std::map<string, TLeaf *> componentVars;
-        std::map<string, vector<TLeaf*>> componentVectors;
-        std::map<string, vectorType> componentTypes;
-        std::map<string, vector<string>> componentNames;
+        // general function to add LEAF components as a part of a mock tlorentz vector
+        vector<TLorentzMock>* AddLorentzMock(string vectorName, vector<string> components) {
+            assert(components.size() > 1 && components.size() < 5);
+            AddCompsBase(vectorName, components);
+            
+            size_t i = MockVectors.size();
+            subIndex.push_back(std::make_pair(i, vectorType::Mock));
 
-        TFileCollection *fc=nullptr;
-        TChain *chain=nullptr;
+            MockVectors.push_back(vector<TLorentzMock>());
+            logr("Success");
+            return &MockVectors[i];
+        }
 
+        // general function to add LEAF components as a part of a basic vector of vectors
+        vector<vector<double>>* AddComps(string vectorName, vector<string> components) {
+            AddCompsBase(vectorName, components);
+            
+            size_t i = MapVectors.size();
+            subIndex.push_back(std::make_pair(i, vectorType::Map));
+            MapVectors.push_back(vector<vector<double>>());
+            logr("Success");
+            return &MapVectors[i];
+        }
+
+        // general function to add a singular leaf component
+        double* AddVar(string varName, string component) {
+            logp("Adding 1 component to var " + varName + "...  ");
+            size_t i = varLeafs.size();
+            varIndex[varName] = i;
+            varLeafs.push_back(chain->FindLeaf(TString(component)));
+            varValues.push_back(-1);
+            logr("Success");
+            return &varValues[i];
+        }
+
+        int GetEntry(int entry = 0) {
+            assert(entry < chain->GetEntries());
+            logp("Getting entry " + to_string(entry) + "...  ");
+            chain->GetEntry(entry);
+            for (size_t i = 0; i < subIndex.size(); ++i) {
+                switch(subIndex[i].second) {
+                    case vectorType::Lorentz: {
+                        SetLorentz(i, subIndex[i].first);
+                        break;
+                    }
+                    case vectorType::Mock: {
+                        SetMock(i, subIndex[i].first);
+                        break;
+                    }
+                    case vectorType::Map: {
+                        SetMap(i, subIndex[i].first);
+                        break;
+                    }
+                }
+            }
+
+            for (size_t i = 0; i < varLeafs.size(); ++i) {
+                SetVar(i);
+            }
+
+            logr("Success");
+            return 1; 
+        }
+
+        Int_t GetEntries() {
+            return nEvents;  
+        }
+
+        void Debug(bool debugSwitch) {
+            debug = debugSwitch;
+        }
+
+
+        // general init vars
+        string sample, path, outdir, treename;
+        Int_t nEvents;
+
+        bool debug=true;
+                       
     private:
+
+        void SetLorentz(size_t leafIndex, size_t lvIndex) {
+            vector<TLeaf*> & v = compVectors[leafIndex];
+            vector<TLorentzVector> & ret = LorentzVectors[lvIndex];
+            ret.clear();
+
+            size_t n = v[0]->GetLen(); 
+            for (size_t i = 0; i < n; ++i) {
+                ret.push_back(TLorentzVector());
+                ret[i].SetPtEtaPhiM(
+                    v[0]->GetValue(i),
+                    v[1]->GetValue(i),
+                    v[2]->GetValue(i),
+                    v[3]->GetValue(i)
+                );
+            }
+        }
+
+        void SetMock(size_t leafIndex, size_t mvIndex) {
+            vector<TLeaf*> & v = compVectors[leafIndex];
+            vector<TLorentzMock> & ret = MockVectors[mvIndex];            
+            ret.clear();
+
+            size_t n = v[0]->GetLen(), size = v.size();
+            for(size_t i = 0; i < n; ++i) {
+                switch(size) {
+                    case 2: {
+                        ret.push_back(TLorentzMock(v[0]->GetValue(i), v[1]->GetValue(i)));
+                        break;
+                    }
+                    case 3: {
+                        ret.push_back(TLorentzMock(v[0]->GetValue(i), v[1]->GetValue(i), v[2]->GetValue(i)));
+                        break;
+                    }
+                    case 4: {
+                        ret.push_back(TLorentzMock(v[0]->GetValue(i), v[1]->GetValue(i), v[2]->GetValue(i), v[3]->GetValue(i)));
+                        break;
+                    }
+                    default: {
+                        throw "Invalid number arguments for MockTLorentz vector (" + to_string(size) + ")";
+                    }                   
+                }
+            }
+        }
+
+        void SetMap(size_t leafIndex, size_t mIndex) {
+            vector<TLeaf*> & v = compVectors[leafIndex];
+
+            // cout << mIndex << endl;
+            // cout << leafIndex << endl;
+            // cout << MapVectors.size() << endl; 
+            vector<vector<double>> & ret = MapVectors[mIndex];
+            size_t n = v[0]->GetLen();
+
+            ret.clear(); 
+            ret.resize(n);
+            
+            for (size_t i = 0; i < n; ++i) {
+                ret[i].clear();
+                ret[i].reserve(v.size());
+                for (size_t j = 0; j < v.size(); ++j) {
+                    ret[i].push_back(v[j]->GetValue(i));
+                }
+            }
+        }
+
+        void SetVar(size_t leafIndex) {
+            varValues[leafIndex] = varLeafs[leafIndex]->GetValue(0);
+        }
+
+        void AddCompsBase(string& vectorName, vector<string>& components) {
+            if(compIndex.find(vectorName) != compIndex.end())
+                throw "Vector variable '" + vectorName + "' already exists!"; 
+            size_t index = compIndex.size();
+            logp("Adding " + to_string(components.size()) + " components to vector " + vectorName + "...  "); 
+            compVectors.push_back(vector<TLeaf*>());
+            compNames.push_back(vector<string>());
+
+            for (size_t i = 0; i < components.size(); ++i) {
+                compVectors[index].push_back(chain->FindLeaf(components[i].c_str()));
+                compNames[index].push_back(lastWord(components[i]));
+            }
+            compIndex[vectorName] = index;
+        }
+
         void log() {
-            cout << LOG_PREFIX << endl; 
+            if (debug)
+                cout << LOG_PREFIX << endl; 
         }
         
         template<typename t>
         void log(t s) {
-            cout << LOG_PREFIX;
-            lograw(s);
-            cout << endl;
+            if (debug) {
+                cout << LOG_PREFIX;
+                lograw(s);
+                cout << endl;
+            }
         }
 
         template<typename t>
         void logp(t s) {
-            cout << LOG_PREFIX;
-            lograw(s);
+            if (debug) {
+                cout << LOG_PREFIX;
+                lograw(s);
+            }
         }
 
         template<typename t>
         void logr(t s) {
-            lograw(s);
-            cout << endl; 
+            if (debug) {
+                lograw(s);
+                cout << endl; 
+            }
+        }
+
+        template<typename t>
+        void warning(t s) {
+            debug = true;
+            log("WARNING :: " + to_string(s));
+            debug = false;
         }
 
         template<typename t>
@@ -239,16 +405,6 @@ class SVJFinder {
             log(string("Tree name: " + treename));
         }
 
-        string sample, path, outdir, treename;
-        Int_t nEvents;
-
-        const string LOG_PREFIX = "SVJAnalysis :: ";
-        std::map<vectorType, std::string> componentTypeStrings = {
-            {vectorType::Lorentz, "TLorentzVector"},
-            {vectorType::Mock, "MockTLorentzVector"},
-            {vectorType::Map, "Map"}
-        };
-
         vector<string> split(string s, char delimiter = '.') {
             std::replace(s.begin(), s.end(), delimiter, ' ');
             vector<string> ret;
@@ -262,17 +418,82 @@ class SVJFinder {
         string lastWord(string s, char delimiter = '.') {
             return split(s, delimiter).back(); 
         }
+
+        TFileCollection *fc=nullptr;
+        TChain *chain=nullptr;
+
+
+        const string LOG_PREFIX = "SVJAnalysis :: ";
+        std::map<vectorType, std::string> componentTypeStrings = {
+            {vectorType::Lorentz, "TLorentzVector"},
+            {vectorType::Mock, "MockTLorentzVector"},
+            {vectorType::Map, "Map"}
+        };
+
+        // single variable data
+        std::map<string, size_t> varIndex;
+        vector<TLeaf *> varLeafs;
+        vector<double> varValues;
+
+        // vector component data
+        std::map<string, size_t> compIndex;
+        vector<pair<size_t, vectorType>> subIndex;
+
+        vector<vector<TLeaf*>> compVectors;
+        vector<vector<string>> compNames;
+
+        vector< vector< TLorentzVector > > LorentzVectors;
+        vector< vector< TLorentzMock > > MockVectors;
+        vector<vector<vector<double>>> MapVectors;
+
 };
 
+template<typename t>
+void pvec(vector<t> v){
+    cout << "{ ";
+    for (size_t i = 0; i < v.size(); ++i) {
+        cout << v[i] << " ";
+    }
+    cout << "}" << endl;
+}
+
 int main(int argc, char **argv) {
-    SVJFinder core(argv);
-    TFileCollection* fc = core.MakeFileCollection();
-    TChain* chain = core.MakeChain();
-    core.addComps("Jet", {"Jet.PT","Jet.Eta","Jet.Phi","Jet.Mass"}, vectorType::Lorentz);
-    core.addComps("Electron", {"Electron.PT","Electron.Eta"}, vectorType::Mock);
-    core.addComps("ElectronParams", {"Electron.IsolationVarRhoCorr","Electron.EhadOverEem"}, vectorType::Map); 
-    core.addComps("Muon", {"MuonLoose.PT","MuonLoose.Eta"}, vectorType::Mock);
-    core.addComps("MuonParams", {"MuonLoose.IsolationVarRhoCorr"}, vectorType::Map);
-    core.addComps("MissingET", {"MissingET.MET", "MissingET.Phi"}, vectorType::Map);
+    // declare object
+    SVJFinder core(argv, true);
+    
+    // make file collection and chain
+    core.MakeFileCollection();
+    TChain * chain = core.MakeChain();
+
+    // add componenets for jets, electrons, muons, and missing et
+    // - declare
+    vector<TLorentzVector> *Jets;
+    vector<TLorentzMock> *Electrons, *Muons;
+    vector<vector<double>> *ElectronParams, *MuonParams;
+    double *metMET, *metPhi, *jsize; 
+    // - then initalize
+    Jets = core.AddLorentz("Jet", {"Jet.PT","Jet.Eta","Jet.Phi","Jet.Mass"});
+    Electrons = core.AddLorentzMock("Electron", {"Electron.PT","Electron.Eta"});
+    Muons = core.AddLorentzMock("Muon", {"MuonLoose.PT","MuonLoose.Eta"});
+    ElectronParams = core.AddComps("ElectronParams", {"Electron.IsolationVarRhoCorr","Electron.EhadOverEem"}); 
+    MuonParams = core.AddComps("MuonParams", {"MuonLoose.IsolationVarRhoCorr"});
+    
+    metMET = core.AddVar("metMET", "MissingET.MET");
+    metPhi = core.AddVar("metPhi", "MissingET.Phi");
+    jsize = core.AddVar("Jet_size", "Jet_size");
+
+    // turn off debug outputss
+    core.Debug(false);
+
+    // analysis loop
+    int skim = 10;
+    for (int en = 0; en < skim; ++en) {
+        core.GetEntry(en);
+    }
+    // cout << *jsize << endl;
+
+    // for (int i = 0; i < 3; ++i) {
+    // }
+
     return 0;
 }
