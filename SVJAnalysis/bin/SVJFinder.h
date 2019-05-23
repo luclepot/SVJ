@@ -4,11 +4,9 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
-#include <fstream>
 #include <string>
 #include <cmath>
 #include <cassert>
-#include <sstream>
 #include <string>
 #include "TFileCollection.h"
 #include "THashList.h"
@@ -198,37 +196,55 @@ class SVJFinder {
 
         // prints a summary of the current entry
         void Current() {
-            print("SINGLE VARIABLES:");
+            log();
+            if (varIndex.size() > 0) {
+                log();
+                print("SINGLE VARIABLES:");
+            }
             for (auto it = varIndex.begin(); it != varIndex.end(); it++) {
                 print(it->first, 1);
                 print(varValues[it->second], 2);
             }
-            print("VECTOR VARIABLES:");
+            if (vectorVarIndex.size() > 0) {
+                log();
+                print("VECTOR VARIABLES:");
+            }
             for (auto it = vectorVarIndex.begin(); it != vectorVarIndex.end(); it++) {
                 print(it->first, 1);
                 print(varValues[it->second], 2);
             }
-            print("MAP VECTORS:");
+            if (MapVectors.size() > 0) {
+                log();
+                print("MAP VECTORS:");
+            }
             for (auto it = compIndex.begin(); it != compIndex.end(); it++) {
                 if (subIndex[it->second].second == vectorType::Map) {
                     print(it->first, 1);
                     print(MapVectors[subIndex[it->second].first], 2);
                 }
             }
-            print("MOCK VECTORS:");
+            if (MockVectors.size() > 0) {
+                log();
+                print("MOCK VECTORS:");
+            }
             for (auto it = compIndex.begin(); it != compIndex.end(); it++) {
                 if (subIndex[it->second].second == vectorType::Mock) {
                     print(it->first, 1);
                     print(MockVectors[subIndex[it->second].first], 2);
                 }
             }
-            print("TLORENTZ VECTORS:");
+            if (LorentzVectors.size() > 0) {
+                log();
+                print("TLORENTZ VECTORS:");
+            }
             for (auto it = compIndex.begin(); it != compIndex.end(); it++) {
                 if (subIndex[it->second].second == vectorType::Lorentz) {
                     print(it->first, 1);
                     print(LorentzVectors[subIndex[it->second].first], 2);
                 }
             }
+            log(); 
+            log();
         }
 
         // general init vars, parsed from argv

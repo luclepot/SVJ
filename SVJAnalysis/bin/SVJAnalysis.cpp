@@ -2,41 +2,6 @@
 #include "SVJFinder.h"
 #include <math.h> 
 
-// #include <typeinfo>
-// #include "DataFormats/Math/interface/LorentzVector.h"
-// #include "SVJ/SVJAnalysis/interface/Weights.h"
-// #include "SVJ/SVJAnalysis/interface/MT2Utility.h"
-// #include "SVJ/SVJAnalysis/interface/mt2w_bisect.h"
-// #include "SVJ/SVJAnalysis/interface/mt2bl_bisect.h"
-// #include "SVJ/SVJAnalysis/interface/Mt2Com_bisect.h"
-// #include "SVJ/SVJAnalysis/interface/kFactors.h"
-// #include "SVJ/SVJAnalysis/interface/TriggerFuncCorrector.h"
-// #include "DataFormats/Math/interface/deltaR.h"
-// #include <assert.h>
-// #include "TMVA/Tools.h"
-// #include "TMVA/Reader.h"
-// #include "DataFormats/Math/interface/deltaPhi.h"
-// #include "PhysicsTools/Utilities/interface/LumiReWeighting.h"
-// #include "TH1.h"
-// #include "TH1F.h"
-// #include "TH2F.h"
-
-// using SVJFinder;
-// using SVJFinder::vectorTypes;
-// using TLorentzMock::TLorentzMock; 
-
-template<typename t>
-void pvec(vector<t> v, bool end=true){
-    cout << "printin"; 
-    cout << "{ ";
-    for (size_t i = 0; i < v.size(); ++i) {
-        cout << v[i] << " ";
-    }
-    cout << "},   "; 
-    if (end)
-        cout << endl;
-}
-
 
 int main(int argc, char **argv) {
     // declare object
