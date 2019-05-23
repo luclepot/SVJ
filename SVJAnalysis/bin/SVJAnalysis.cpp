@@ -1,15 +1,15 @@
 #include "TLorentzMock.h"
 #include "SVJFinder.h"
-#include <math.h> 
-
+#include <math.h>
 
 int main(int argc, char **argv) {
-    // declare object
-    SVJFinder core(argv, true);
-    
+    // declare core object and enable debug
+    SVJFinder core(argv);
+    core.Debug(true);
+
     // make file collection and chain
     core.MakeFileCollection();
-    TChain * chain = core.MakeChain();
+    core.MakeChain();
 
     // add componenets for jets (tlorentz)
     vector<TLorentzVector>* Jets = core.AddLorentz("Jet", {"Jet.PT","Jet.Eta","Jet.Phi","Jet.Mass"});
@@ -28,40 +28,13 @@ int main(int argc, char **argv) {
     double* metPhi = core.AddVar("metPhi", "MissingET.Phi");
     double* jsize = core.AddVar("Jet_size", "Jet_size");
 
-    core.GetEntry(17);
+    // disable debug
+    // core.Debug(false);
 
-    core.Current(); 
-    // for (int i = 0; i < 100; ++i)
-    // print(Jets);
-    // print(); 
-    // print(Electrons);
-    // print(Muons);
-    // print();
-    // print(MuonIsolation);
-    // print(ElectronIsolation);
-    // print(ElectronEhadOverEem);
-    // print();
-    // print(metMET);
-    // print(metPhi);
-    // print();
-    // print(metMET);
-    // print(metPhi);
-    // print(jsize);
+    size_t nEntries = 100;
+    for (size_t entry = 0; entry < nEntries; ++entry) {
+        core.GetEntry(entry);
+    }
 
-    // for (int en = 0; en < size; ++en) {
-
-    // }
-
-    // pvec(*ElectronIsolation); 
-    // pvec(*ElectronEhadOverEem);
-    // pvec(*MuonIsolation);
-    // cout << "first" << endl;
-    // cout << "second" << endl;
-
-    // core.Debug(true);
-
-    // // analysis loop
-    // int size = 4;
-    
     return 0;
 }
