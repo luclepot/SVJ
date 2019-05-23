@@ -34,43 +34,6 @@ enum class vectorType {
 };
 
 
-void indent(int level){
-    cout << string(level, '  ');
-}
-
-void print(double* var, int level=0) {
-    indent(level); cout << *var << endl;
-}
-
-void print(vector<double>* var, int level=0) {
-    indent(level);
-    cout << "{ ";
-    for (size_t i = 0; i < var->size() - 1; ++i) {
-        cout << var->at(i) << ", ";
-    }
-    cout << var->back() << " }";
-    cout << endl;
-}
-
-void print(vector<TLorentzMock>* var, int level=0) {
-    for (size_t i = 0; i < var->size(); ++i) {
-        auto elt = var->at(i);
-        indent(level); cout << "(Pt,Eta)=(" << elt.Pt() << "," << elt.Eta() << "}" << endl;
-    }
-}
-
-void print(vector<TLorentzVector>* var, int level=0) {
-    for (size_t i = 0; i < var->size(); ++i) {
-        auto elt = var->at(i);
-        indent(level);
-        elt.Print();
-    }
-}
-
-void print() {
-    cout << endl; 
-}
-
 class SVJFinder {
     public:
         // constructor, requires argv as input
@@ -85,6 +48,7 @@ class SVJFinder {
             debug = _debug; 
         }
 
+        // destructor for dynamically allocated data
         ~SVJFinder() {
             DelVector(varValues);
             DelVector(vectorVarValues);
@@ -97,15 +61,7 @@ class SVJFinder {
             //     DelVector(vec);
         }
 
-        template<typename t>
-        void DelVector(vector<t*> &v) {
-            for (size_t i = 0; i < v.size(); ++i) {
-                delete v[i];
-                v[i] = nullptr;
-            }
-        }
-
-        // generates tfile collection and returns a pointer to it
+        // sets up tfile collection and returns a pointer to it
         TFileCollection *MakeFileCollection() {
             log("Loading File Collection from " + path);
             if (fc)
@@ -116,7 +72,7 @@ class SVJFinder {
             return fc;
         }
 
-        // generates a chain an returns a pointer to it
+        // sets up tchain and returns a pointer to it
         TChain *MakeChain() {
             log("Creating file chain with tree type '" + treename + "'...");
             if (chain)  
@@ -129,7 +85,7 @@ class SVJFinder {
             return chain;
         }
 
-        // general function to add LEAF components as a part of a tlorentz vector
+        // creates, assigns, and returns tlorentz vector pointer to be updated on GetEntry
         vector<TLorentzVector>* AddLorentz(string vectorName, vector<string> components) {
             assert(components.size() == 4);
             AddCompsBase(vectorName, components);
@@ -141,7 +97,7 @@ class SVJFinder {
             return ret;
         }
 
-        // general function to add LEAF components as a part of a mock tlorentz vector
+        // creates, assigns, and returns mock tlorentz vector pointer to be updated on GetEntry
         vector<TLorentzMock>* AddLorentzMock(string vectorName, vector<string> components) {
             assert(components.size() > 1 && components.size() < 5);
             AddCompsBase(vectorName, components);
@@ -153,7 +109,7 @@ class SVJFinder {
             return ret;
         }
 
-        // general function to add LEAF components as a part of a basic vector of vectors
+        // creates, assigns, and returns general double vector pointer to be updated on GetEntry
         vector<vector<double>>* AddComps(string vectorName, vector<string> components) {
             AddCompsBase(vectorName, components);
             size_t i = MapVectors.size();
@@ -164,6 +120,7 @@ class SVJFinder {
             return ret;
         }
 
+        // creates, assigns, and returns a vectorized single variable pointer to be updates on GetEntry
         vector<double>* AddVectorVar(string vectorVarName, string component) {
             logp("Adding 1 component to vector var " + vectorVarName + "...  ");
             int i = int(vectorVarValues.size());
@@ -178,7 +135,7 @@ class SVJFinder {
             return ret;
         }
 
-        // general function to add a singular leaf component
+        // creates, assigns, and returns a singular double variable pointer to update on GetEntry 
         double* AddVar(string varName, string component) {
             logp("Adding 1 component to var " + varName + "...  ");
             size_t i = varLeaves.size();
@@ -190,6 +147,7 @@ class SVJFinder {
             return ret;
         }
 
+        // get the ith entry of the TChain
         void GetEntry(int entry = 0) {
             assert(entry < chain->GetEntries());
             logp("Getting entry " + to_string(entry) + "...  ");
@@ -229,25 +187,68 @@ class SVJFinder {
             logr("Success");
         }
 
+        // get the number of entries in the TChain
         Int_t GetEntries() {
             return nEvents;  
         }
 
+        // Turn on or off debug logging with this switch
         void Debug(bool debugSwitch) {
             debug = debugSwitch;
         }
 
+        // prints a summary of the current entry
         void Current() {
-
+            print("SINGLE VARIABLES:");
+            for (auto it = varIndex.begin(); it != varIndex.end(); it++) {
+                print(it->first, 1);
+                print(varValues[it->second], 2);
+            }
+            print("VECTOR VARIABLES:");
+            for (auto it = vectorVarIndex.begin(); it != vectorVarIndex.end(); it++) {
+                print(it->first, 1);
+                print(varValues[it->second], 2);
+            }
+            print("MAP VECTORS:");
+            for (auto it = compIndex.begin(); it != compIndex.end(); it++) {
+                if (subIndex[it->second].second == vectorType::Map) {
+                    print(it->first, 1);
+                    print(MapVectors[subIndex[it->second].first], 2);
+                }
+            }
+            print("MOCK VECTORS:");
+            for (auto it = compIndex.begin(); it != compIndex.end(); it++) {
+                if (subIndex[it->second].second == vectorType::Mock) {
+                    print(it->first, 1);
+                    print(MockVectors[subIndex[it->second].first], 2);
+                }
+            }
+            print("TLORENTZ VECTORS:");
+            for (auto it = compIndex.begin(); it != compIndex.end(); it++) {
+                if (subIndex[it->second].second == vectorType::Lorentz) {
+                    print(it->first, 1);
+                    print(LorentzVectors[subIndex[it->second].first], 2);
+                }
+            }
+            
         }
 
-        // general init vars
+        // general init vars, parsed from argv
         string sample, path, outdir, treename;
+        // number of events
         Int_t nEvents;
-
+        // internal debug switch
         bool debug=true;
                        
     private:
+
+        template<typename t>
+        void DelVector(vector<t*> &v) {
+            for (size_t i = 0; i < v.size(); ++i) {
+                delete v[i];
+                v[i] = nullptr;
+            }
+        }
 
         void SetLorentz(size_t leafIndex, size_t lvIndex) {
             vector<TLeaf*> & v = compVectors[leafIndex];
@@ -384,6 +385,55 @@ class SVJFinder {
         template<typename t>
         void lograw(t s) {
             cout << s; 
+        }
+
+        void indent(int level){
+            cout << LOG_PREFIX << string(level*3, ' ');
+        }
+
+        void print(string s, int level=0) {
+            indent(level);
+            cout << s << endl;
+        }
+
+        void print(double* var, int level=0) {
+            indent(level); cout << *var << endl;
+        }
+
+        void print(vector<double>* var, int level=0) {
+            indent(level);
+            cout << "{ ";
+            for (size_t i = 0; i < var->size() - 1; ++i) {
+                cout << var->at(i) << ", ";
+            }
+            cout << var->back() << " }";
+            cout << endl;
+        }
+
+        void print(vector<vector<double>>* var, int level=0) {
+            for (size_t i = 0; i < var->size(); ++i) {
+                print(&var[i], level);
+            }
+        }
+
+        void print(vector<TLorentzMock>* var, int level=0) {
+            for (size_t i = 0; i < var->size(); ++i) {
+                auto elt = var->at(i);
+                indent(level); cout << "(Pt,Eta)=(" << elt.Pt() << "," << elt.Eta() << "}" << endl;
+            }
+        }
+
+        void print(vector<TLorentzVector>* var, int level=0) {
+            for (size_t i = 0; i < var->size(); ++i) {
+                auto elt = var->at(i);
+                indent(level);
+                elt.Print();
+            }
+        }
+
+        void print() {
+            indent(0);
+            cout << endl; 
         }
 
         void init_vars(char **argv) {

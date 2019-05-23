@@ -64,22 +64,24 @@ int main(int argc, char **argv) {
     double* jsize = core.AddVar("Jet_size", "Jet_size");
 
     core.GetEntry(17);
+
+    core.Current(); 
     // for (int i = 0; i < 100; ++i)
-    print(Jets);
-    print(); 
-    print(Electrons);
-    print(Muons);
-    print();
-    print(MuonIsolation);
-    print(ElectronIsolation);
-    print(ElectronEhadOverEem);
-    print();
-    print(metMET);
-    print(metPhi);
-    print();
-    print(metMET);
-    print(metPhi);
-    print(jsize);
+    // print(Jets);
+    // print(); 
+    // print(Electrons);
+    // print(Muons);
+    // print();
+    // print(MuonIsolation);
+    // print(ElectronIsolation);
+    // print(ElectronEhadOverEem);
+    // print();
+    // print(metMET);
+    // print(metPhi);
+    // print();
+    // print(metMET);
+    // print(metPhi);
+    // print(jsize);
 
     // for (int en = 0; en < size; ++en) {
 
