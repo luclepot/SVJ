@@ -18,6 +18,8 @@
 #include <cassert>
 #include <chrono>
 
+
+using std::fabs;
 using std::chrono::microseconds;  
 using std::chrono::duration_cast;
 using std::string;
