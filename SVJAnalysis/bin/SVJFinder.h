@@ -16,7 +16,10 @@
 #include <utility>
 #include <map>
 #include <cassert>
+#include <chrono>
 
+using std::chrono::microseconds;  
+using std::chrono::duration_cast;
 using std::string;
 using std::endl;
 using std::cout;
@@ -34,24 +37,38 @@ enum class vectorType {
 class SVJFinder {
     public:
         // constructor, requires argv as input
-        SVJFinder(char **argv, bool _debug=false) {
+        SVJFinder(char **argv, bool _debug=false, bool _timing=true) {
+            start();
             cout << endl;
+            timing = _timing;
             log("-----------------------------------");
             log(":          SVJAnalysis            :");
             log("-----------------------------------");
             this->init_vars(argv);
             log("SVJ object created");
+            end();
+            logt();
             log();
             debug = _debug; 
         }
 
         // destructor for dynamically allocated data
         ~SVJFinder() {
+            start(); 
+
+            Debug(true); 
+            log();
+            logp("Quitting; cleaning up class variables...  ");
             DelVector(varValues);
             DelVector(vectorVarValues);
             DelVector(LorentzVectors);
             DelVector(MockVectors);
             DelVector(MapVectors);
+            logr("Success");
+            end();
+            logt();
+            
+            log(); 
             // DelVector(varLeaves);
             // DelVector(vectorVarLeaves);
             // for (vector<TLeaf*> vec : compVectors) 
@@ -60,17 +77,21 @@ class SVJFinder {
 
         // sets up tfile collection and returns a pointer to it
         TFileCollection *MakeFileCollection() {
+            start();
             log("Loading File Collection from " + path);
             if (fc)
                 delete fc;
             fc = new TFileCollection(sample.c_str(), sample.c_str(), path.c_str());
             log("Success: Loaded " + std::to_string(fc->GetNFiles())  + " file(s).");
+            end();
+            logt();
             log();
             return fc;
         }
 
         // sets up tchain and returns a pointer to it
         TChain *MakeChain() {
+            start();
             log("Creating file chain with tree type '" + treename + "'...");
             if (chain)  
                 delete chain;
@@ -78,12 +99,15 @@ class SVJFinder {
             chain->AddFileInfoList(fc->GetList());
             nEvents = (Int_t)chain->GetEntries();
             log("Success");
+            end();
+            logt();
             log();
             return chain;
         }
 
         // creates, assigns, and returns tlorentz vector pointer to be updated on GetEntry
         vector<TLorentzVector>* AddLorentz(string vectorName, vector<string> components) {
+            start();
             assert(components.size() == 4);
             AddCompsBase(vectorName, components);
             size_t i = LorentzVectors.size();
@@ -91,11 +115,14 @@ class SVJFinder {
             vector<TLorentzVector>* ret = new vector<TLorentzVector>; 
             LorentzVectors.push_back(ret);
             logr("Success");
+            end();
+            logt();
             return ret;
         }
 
         // creates, assigns, and returns mock tlorentz vector pointer to be updated on GetEntry
         vector<TLorentzMock>* AddLorentzMock(string vectorName, vector<string> components) {
+            start();
             assert(components.size() > 1 && components.size() < 5);
             AddCompsBase(vectorName, components);
             size_t i = MockVectors.size();
@@ -103,22 +130,28 @@ class SVJFinder {
             vector<TLorentzMock>* ret = new vector<TLorentzMock>; 
             MockVectors.push_back(ret);
             logr("Success");
+            end();
+            logt();
             return ret;
         }
 
         // creates, assigns, and returns general double vector pointer to be updated on GetEntry
         vector<vector<double>>* AddComps(string vectorName, vector<string> components) {
+            start(); 
             AddCompsBase(vectorName, components);
             size_t i = MapVectors.size();
             subIndex.push_back(std::make_pair(i, vectorType::Map));
             vector<vector<double>>* ret = new vector<vector<double>>;
             MapVectors.push_back(ret);
             logr("Success");
+            end();
+            logt();
             return ret;
         }
 
         // creates, assigns, and returns a vectorized single variable pointer to be updates on GetEntry
         vector<double>* AddVectorVar(string vectorVarName, string component) {
+            start();
             logp("Adding 1 component to vector var " + vectorVarName + "...  ");
             int i = int(vectorVarValues.size());
             vectorVarIndex[vectorVarName] = i;
@@ -126,6 +159,8 @@ class SVJFinder {
             vector<double>* ret = new vector<double>;
             vectorVarValues.push_back(ret);
             logr("Success");
+            end();
+            logt();
             // log(vectorVarIndex.size());
             // log(vectorVarValues.back().size());
             // log(i);
@@ -134,6 +169,7 @@ class SVJFinder {
 
         // creates, assigns, and returns a singular double variable pointer to update on GetEntry 
         double* AddVar(string varName, string component) {
+            start();
             logp("Adding 1 component to var " + varName + "...  ");
             size_t i = varLeaves.size();
             varIndex[varName] = i;
@@ -141,6 +177,8 @@ class SVJFinder {
             varLeaves.push_back(chain->FindLeaf(TString(component)));
             varValues.push_back(ret);
             logr("Success");
+            end();
+            logt(); 
             return ret;
         }
 
@@ -192,6 +230,10 @@ class SVJFinder {
         // Turn on or off debug logging with this switch
         void Debug(bool debugSwitch) {
             debug = debugSwitch;
+        }
+
+        void Timing(bool timingSwitch) {
+            timing=timingSwitch;
         }
 
         // prints a summary of the current entry
@@ -247,12 +289,38 @@ class SVJFinder {
             log();
         }
 
+        double ts() {
+            return duration/1000000.; 
+        }
+
+        double tms() {
+            return duration/1000.;
+        }
+
+        double tus() {
+            return duration; 
+        }
+
+        void logt() {
+            if (timing)
+                log("(execution time: " + to_string(ts()) + "s)");             
+        }
+
+        void start() {
+            timestart = std::chrono::high_resolution_clock::now(); 
+        }
+
+        void end() {
+            duration = duration_cast<microseconds>(std::chrono::high_resolution_clock::now() - timestart).count();
+        }
+
         // general init vars, parsed from argv
         string sample, path, outdir, treename;
+
         // number of events
         Int_t nEvents;
         // internal debug switch
-        bool debug=true;
+        bool debug=true, timing=true;
                        
     private:
 
@@ -480,9 +548,11 @@ class SVJFinder {
             return split(s, delimiter).back(); 
         }
 
+        double duration = 0;
+        std::chrono::high_resolution_clock::time_point timestart;
+
         TFileCollection *fc=nullptr;
         TChain *chain=nullptr;
-
 
         const string LOG_PREFIX = "SVJAnalysis :: ";
         std::map<vectorType, std::string> componentTypeStrings = {

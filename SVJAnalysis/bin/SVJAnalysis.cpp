@@ -2,6 +2,15 @@
 #include "SVJFinder.h"
 #include <math.h>
 
+// remove leptons according to eta/pt restriction
+size_t leptonVeto(vector<TLorentzMock>* lepton) {
+    size_t n = 0;
+    for (size_t i = 0; i < lepton->size(); ++i)
+        if (std::fabs(lepton->at(i).Pt()) > 10.0 && std::fabs(lepton->at(i).Eta()) < 2.4)
+            n++;
+    return n;
+}
+
 int main(int argc, char **argv) {
     // declare core object and enable debug
     SVJFinder core(argv);
@@ -24,17 +33,33 @@ int main(int argc, char **argv) {
     vector<double>* ElectronIsolation = core.AddVectorVar("ElectronIsolation", "Electron.IsolationVarRhoCorr"); 
     
     // single parameters
-    double* metMET = core.AddVar("metMET", "MissingET.MET");
-    double* metPhi = core.AddVar("metPhi", "MissingET.Phi");
-    double* jsize = core.AddVar("Jet_size", "Jet_size");
+    double* metFull_Pt = core.AddVar("metMET", "MissingET.MET");
+    double* metFull_Phi = core.AddVar("metPhi", "MissingET.Phi");
+    double* jetSize = core.AddVar("Jet_size", "Jet_size");
 
     // disable debug
-    // core.Debug(false);
+    core.Debug(false);
 
-    size_t nEntries = 100;
+    // loop over the first nEntries (debug) 
+    size_t nEntries = 10000;
+    
+    // start loop timer
+    core.start();
+    
     for (size_t entry = 0; entry < nEntries; ++entry) {
         core.GetEntry(entry);
+        int nMuons=0, nElectrons=0;
+
+        nMuons = leptonVeto(Muons);
+        nElectrons = leptonVeto(Electrons);
+
+        if (nMuons || nElectrons || Muons->size() || Electrons->size())
+            cout << entry << ": " << nElectrons << "/" << Electrons->size() << ", " << nMuons << "/" << Muons->size() << endl;
     }
+
+    core.Debug(true); 
+    core.end();
+    core.logt();
 
     return 0;
 }
