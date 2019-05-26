@@ -8,7 +8,7 @@ using std::cos;
 using std::sqrt; 
 using std::abs; 
 
-// count leptons according to eta/pt restriction
+using namespace Cuts;
 
 namespace Vetos {
     bool LeptonVeto(TLorentzMock& lepton) {
@@ -26,6 +26,10 @@ namespace Vetos {
     bool JetDeltaEtaVeto(TLorentzVector& jet1, TLorentzVector& jet2) {
         return abs(jet1.Eta() - jet2.Eta()) < 1.5;
     }
+
+    bool JetPtVeto(TLorentzVector& jet) {
+        return jet.Pt() > 200.;
+    }
 }
 
 size_t leptonCount(vector<TLorentzMock>* leptons, vector<double>* isos) {
@@ -36,15 +40,6 @@ size_t leptonCount(vector<TLorentzMock>* leptons, vector<double>* isos) {
     return n;
 }
 
-struct BooleanCuts {
-    bool leptonsCount = false;
-    bool jetsCount = false; 
-    bool jetsEta = false;
-    bool jetsDeltaEta = false;
-    bool ptRatio = false;
-    bool jetsPt = false; 
-    bool jetsDijet = false; 
-};
 
 int main(int argc, char **argv) {
     // declare core object and enable debug
@@ -87,24 +82,25 @@ int main(int argc, char **argv) {
     // start loop timer
     core.start();
 
-
     for (size_t entry = 0; entry < nEntries; ++entry) {
 
-        BooleanCuts cuts;
-        
+        // init
+        core.InitCuts(); 
         core.GetEntry(entry);
 
-        // lepton vetos (automatically called in leptonCount)
-        nMuons = leptonCount(Muons, MuonIsolation);
-        nElectrons = leptonCount(Electrons, ElectronIsolation);
-
         // add lepton cut, need to have zero
-        cuts.leptonsCount = (nElectrons + nMuons) < 1; 
+        core.Cut(
+            (leptonCount(Muons, MuonIsolation) + leptonCount(Electrons, ElectronIsolation)) < 1,
+            leptonCounts
+            );
 
         // require more than 1 jet
-        cuts.jetsCount = (Jets->size() > 1); 
+        core.Cut(
+            Jets->size() > 1,
+            jetCounts
+            ); 
 
-        if (cuts.jetsCount) {
+        if (core.Cut(jetCounts)) {
             double JetsDR = (Jets->at(0)).DeltaR(Jets->at(1));
 
             // leading jet eta difference 
@@ -128,23 +124,47 @@ int main(int argc, char **argv) {
             double MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*(*metFull_Pt) - ptMet));
 
             // leading jet etas both meet eta veto
-            cuts.jetsEta = Vetos::JetEtaVeto(Jets->at(0)) && Vetos::JetEtaVeto(Jets->at(1));
+            core.Cut(
+                Vetos::JetEtaVeto(Jets->at(0)) && Vetos::JetEtaVeto(Jets->at(1)), 
+                jetEtas
+                );
             
             // leading jets meet delta eta veto
-            cuts.jetsDeltaEta = Vetos::JetDeltaEtaVeto(Jets->at(0), Jets->at(1));
+            core.Cut(
+                Vetos::JetDeltaEtaVeto(Jets->at(0), Jets->at(1)),
+                jetDeltaEtas
+                );
 
             // ratio between calculated mt2 of dijet system and missing momentum is not negligible
-            cuts.ptRatio = (*metFull_Pt)/MT2 > 0.15;
+            core.Cut(
+                (*metFull_Pt) / MT2 > 0.15,
+                metRatio
+                );
 
-            // 
-            cuts.jetsPt = (Jets->at(0)).Pt() > 200 && (Jets->at(1)).Pt()>200;
+            // require both leading jets to have transverse momentum greater than 200
+            core.Cut(
+                Vetos::JetPtVeto(Jets->at(0)) && Vetos::JetPtVeto(Jets->at(1)),
+                jetPt
+                );
 
+            // conglomerate cut, whether jet is a dijet
+            core.Cut(
+                core.Cut(jetEtas) && core.Cut(jetPt),
+                jetDiJet
+                );
 
-            // preselection_muonveto = nMuons < 1 && preselection_muonLooseveto;
-            // preselection_jetspt = 
-            // preselection_dijet = preselection_jetseta && preselection_jetsID && preselection_jetspt;
-            
+            // magnitude of MET squared > 1500 
+            core.Cut(
+                MT2 > 1500,
+                metValue
+                );
+
+            core.Cut(
+                core.CutsRange(0, int(preselection - 1)),
+                preselection
+                );            
         }
+        core.PrintCuts(); 
     }
 
     core.Debug(true); 
