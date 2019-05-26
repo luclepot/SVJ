@@ -40,7 +40,6 @@ size_t leptonCount(vector<TLorentzMock>* leptons, vector<double>* isos) {
     return n;
 }
 
-
 int main(int argc, char **argv) {
     // declare core object and enable debug
     SVJFinder core(argv);
@@ -59,19 +58,16 @@ int main(int argc, char **argv) {
 
     // extra vectorized parameters for electrons and muons    
     vector<double>* MuonIsolation = core.AddVectorVar("MuonIsolation", "MuonLoose.IsolationVarRhoCorr");
-    vector<double>* ElectronEhadOverEem = core.AddVectorVar("ElectronEhadOverEem", "Electron.EhadOverEem");
+    // vector<double>* ElectronEhadOverEem = core.AddVectorVar("ElectronEhadOverEem", "Electron.EhadOverEem");
     vector<double>* ElectronIsolation = core.AddVectorVar("ElectronIsolation", "Electron.IsolationVarRhoCorr"); 
     
     // single parameters
     double* metFull_Pt = core.AddVar("metMET", "MissingET.MET");
     double* metFull_Phi = core.AddVar("metPhi", "MissingET.Phi");
-    double* jetSize = core.AddVar("Jet_size", "Jet_size");
+    // double* jetSize = core.AddVar("Jet_size", "Jet_size");
 
 
     // needed variables for loop
-    vector<bool> cutsRef; 
-    TLorentzVector Vjj;
-    int nMuons, nElectrons; 
 
     // disable debug
     core.Debug(false);
@@ -82,6 +78,7 @@ int main(int argc, char **argv) {
     // start loop timer
     core.start();
 
+    //TODO: add histograms
     // TH1F *h_dEta = new TH1F( "h_dEta", "#Delta#eta(j0,j1)", 100, 0, 10);
     // TH1F *h_dPhi = new TH1F("h_dPhi", "#Delta#Phi(j0,j1)", 100, 0, 5);
     // TH1F *h_transverseratio = new TH1F( "h_transverseratio", "MET/M_{T}", 100, 0, 1);
@@ -108,27 +105,28 @@ int main(int argc, char **argv) {
             ); 
 
         if (core.Cut(jetCounts)) {
-            double JetsDR = (Jets->at(0)).DeltaR(Jets->at(1));
+            TLorentzVector Vjj;
+
+            // double JetsDR = (Jets->at(0)).DeltaR(Jets->at(1));
 
             // leading jet eta difference 
-            double dEta= fabs(Jets->at(0).Eta() - Jets->at(1).Eta());
-            double dPhi= fabs(reco::deltaPhi(Jets->at(0).Phi(), Jets->at(1).Phi())); 
+            double dEta= fabs(Jets->at(0).Eta() - Jets->at(1).Eta()); // SAVE
+            double dPhi= fabs(reco::deltaPhi(Jets->at(0).Phi(), Jets->at(1).Phi())); // SAVE
             
             // leading jet phi difference w/ missing et phi
-            double dPhi_j0_met = fabs(reco::deltaPhi(Jets->at(0).Phi(), *metFull_Phi));
-            double dPhi_j1_met = fabs(reco::deltaPhi(Jets->at(1).Phi(), *metFull_Phi));
+            // double dPhi_j0_met = fabs(reco::deltaPhi(Jets->at(0).Phi(), *metFull_Phi));
+            // double dPhi_j1_met = fabs(reco::deltaPhi(Jets->at(1).Phi(), *metFull_Phi));
 
             Vjj = Jets->at(0) + Jets->at(1);
 
             double metFull_Py = (*metFull_Pt)*sin(*metFull_Phi);
             double metFull_Px = (*metFull_Pt)*cos(*metFull_Phi);
-            double Mjj = Vjj.M();
+            double Mjj = Vjj.M(); // SAVE
             double Mjj2 = Mjj*Mjj;
             double ptjj = Vjj.Pt();
             double ptjj2 = ptjj*ptjj;
             double ptMet = Vjj.Px()*(metFull_Px + Vjj.Py()*metFull_Py);
-
-            double MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*(*metFull_Pt) - ptMet));
+            double MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*(*metFull_Pt) - ptMet)); // SAVE
 
             // leading jet etas both meet eta veto
             core.Cut(
@@ -166,26 +164,30 @@ int main(int argc, char **argv) {
                 metValue
                 );
 
+            // preselection cut
             core.Cut(
                 core.CutsRange(0, int(preselection)),
                 preselection
                 );
             
+            // tighter MET ratio
             core.Cut(
                 (*metFull_Pt) / MT2 > 0.25,
                 metRatioTight
                 );
                  
+            // final selection cut
             core.Cut(
                 core.Cut(preselection) && core.Cut(metRatioTight),
                 selection
             ); 
 
+            // save histograms, if passing
             if (core.Cut(selection)) {
                 // fill histogram with
                 // dEta
                 // dPhi
-                // metFull_Pt
+                // metFull_Pt/MT2
                 // MT2
                 // Mjj
                 // metFull_Pt
