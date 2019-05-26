@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
     core.Debug(false);
 
     // loop over the first nEntries (debug) 
-    size_t nEntries = 100;
+    size_t nEntries = 10000;
     
     // start loop timer
     core.start();
@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
                 );
 
             core.Cut(
-                core.CutsRange(0, int(preselection - 1)),
+                core.CutsRange(0, int(preselection)),
                 preselection
                 );
             
@@ -177,9 +177,9 @@ int main(int argc, char **argv) {
                 );
                  
             core.Cut(
-                core.Cut(preselection, metRatioTight),
+                core.Cut(preselection) && core.Cut(metRatioTight),
                 selection
-            )
+            ); 
 
             if (core.Cut(selection)) {
                 // fill histogram with
