@@ -48,7 +48,8 @@ namespace Cuts {
         jetDiJet,
         metValue,
         preselection,
-
+        metRatioTight,
+        selection,
         COUNT
     };
 };

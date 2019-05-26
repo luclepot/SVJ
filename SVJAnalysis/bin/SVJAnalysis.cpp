@@ -82,6 +82,13 @@ int main(int argc, char **argv) {
     // start loop timer
     core.start();
 
+    // TH1F *h_dEta = new TH1F( "h_dEta", "#Delta#eta(j0,j1)", 100, 0, 10);
+    // TH1F *h_dPhi = new TH1F("h_dPhi", "#Delta#Phi(j0,j1)", 100, 0, 5);
+    // TH1F *h_transverseratio = new TH1F( "h_transverseratio", "MET/M_{T}", 100, 0, 1);
+    // TH1F *h_Mt = new TH1F("h_Mt", "m_{T}", 750, 0, 7500);
+    // TH1F *h_Mjj = new TH1F("h_Mjj", "m_{JJ}", 750, 0, 7500);
+    // TH1F *h_METPt = new TH1F("h_METPt", "MET_{p_{T}}", 100, 0, 2000);
+
     for (size_t entry = 0; entry < nEntries; ++entry) {
 
         // init
@@ -162,9 +169,29 @@ int main(int argc, char **argv) {
             core.Cut(
                 core.CutsRange(0, int(preselection - 1)),
                 preselection
-                );            
+                );
+            
+            core.Cut(
+                (*metFull_Pt) / MT2 > 0.25,
+                metRatioTight
+                );
+                 
+            core.Cut(
+                core.Cut(preselection, metRatioTight),
+                selection
+            )
+
+            if (core.Cut(selection)) {
+                // fill histogram with
+                // dEta
+                // dPhi
+                // metFull_Pt
+                // MT2
+                // Mjj
+                // metFull_Pt
+                core.PrintCuts();
+            }
         }
-        core.PrintCuts(); 
     }
 
     core.Debug(true); 
