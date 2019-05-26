@@ -521,8 +521,6 @@ int main(int argc, char **argv) {
       nElectrons += (std::fabs(Electrons[i].Pt()) > 10.0 && std::fabs(Electrons[i].Eta()) < 2.4);
     }
 
-    TLorentzVector vHVsum;
-
     if(AK8Jets.size() > 1){
 
       double AK8Jets_dr=-1;
@@ -539,15 +537,6 @@ int main(int argc, char **argv) {
       double Mjj2=0., ptjj = 0., ptjj2 = 0., ptMet = 0.;
 
       TLorentzVector vjj = AK8Jets.at(0) + AK8Jets.at(1);
-      if(AK8Jets.size()>=3){
-        bool merge = false;
-        merge = (AK8Jets.at(1).DeltaR(AK8Jets.at(2))<1.4 ) || (AK8Jets.at(0).DeltaR(AK8Jets.at(2))<1.4 );
-        merge = false;
-        if(merge) {
-          std::cout << "==========> We found a third jet" << std::endl;
-          vjj += AK8Jets.at(2);
-        }
-      }
 
       double metFull_Px=0., metFull_Py=0.;
       metFull_Py = metFull_Pt*sin(metFull_Phi);
@@ -559,10 +548,6 @@ int main(int argc, char **argv) {
       ptjj2 = ptjj * ptjj;
       ptMet = vjj.Px()*metFull_Px + vjj.Py()*metFull_Py;
 
-
-      if(isData=="DATA"){vHVsum = {0, 0, 0, 0};}
-      TLorentzVector vmc = vHVsum + vjj;
-      // Mmc = vmc.M();
 
       MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*metFull_Pt - ptMet) );
       // MT2 = MT;
@@ -578,17 +563,16 @@ int main(int argc, char **argv) {
       // }
 
       preselection_jetseta = (std::abs((AK8Jets.at(0)).Eta()) < 2.5 && std::abs((AK8Jets.at(1)).Eta()) < 2.5);
-      preselection_jetsID = true; // jetsID.at(0) == 1 && jetsID.at(1)==1;
       preselection_deltaeta = std::abs(AK8Jets.at(0).Eta() - AK8Jets.at(1).Eta()) < 1.5;
-      preselection_trigplateau = preselection_deltaeta;
       preselection_transratio = metFull_Pt/MT2 > 0.15;
-      preselection_leptonveto = nElectrons + nMuons < 1;
-      preselection_muonveto = nMuons < 1 && preselection_muonLooseveto;
-      preselection_electronveto =nElectrons<1;
       preselection_jetspt = (AK8Jets.at(0)).Pt() > 200 && (AK8Jets.at(1)).Pt()>200;
       preselection_dijet = preselection_jetseta && preselection_jetsID && preselection_jetspt;
 
+      preselection_leptonveto = nElectrons + nMuons < 1;
+      preselection_electronveto =nElectrons<1;
       preselection_trigger = 1;
+      preselection_jetsID = true; // jetsID.at(0) == 1 && jetsID.at(1)==1;
+      preselection_trigplateau = preselection_deltaeta;
 
       // bool selection_transverseratio_window=0;
       // selection_transverseratio_window = (metFull_Pt/MT2)> 0.15 && (metFull_Pt/MT2) < 0.25 ;

@@ -1,6 +1,8 @@
 #include "TChain.h"
 #include "TLeaf.h"
 #include "TLorentzVector.h"
+#include "TFile.h"
+#include "TH1F.h"
 #include <vector>
 #include <algorithm>
 #include <iostream>
@@ -16,7 +18,11 @@
 #include <utility>
 #include <map>
 #include <cassert>
+#include <chrono>
 
+using std::fabs;
+using std::chrono::microseconds;  
+using std::chrono::duration_cast;
 using std::string;
 using std::endl;
 using std::cout;
@@ -24,53 +30,131 @@ using std::vector;
 using std::pair; 
 using std::to_string;
 using std::stringstream; 
+using std::setw;
 
-enum class vectorType {
-    Lorentz,
-    Mock,
-    Map
+namespace vectorTypes{
+    enum vectorType {
+        Lorentz,
+        Mock,
+        Map
+    };
 };
 
+namespace Cuts {
+    enum CutType {
+        leptonCounts,
+        jetCounts,
+        jetEtas,
+        jetDeltaEtas,
+        metRatio,
+        jetPt,
+        jetDiJet,
+        metValue,
+        metRatioTight,
+        selection,
+        COUNT
+    };
+
+    std::map<CutType, string> CutName {
+        {leptonCounts, "Lepton Veto"},
+        {jetCounts, "n Jets > 1"},
+        {jetEtas, "jet Eta veto"},
+        {jetDeltaEtas, "DeltaEta veto"},
+        {metRatio,"MET/M_T > 0.15"},
+        {jetPt, "Jet PT veto"},
+        {jetDiJet, "Dijet veto"},
+        {metValue, "loose MET cut"},
+        {metRatioTight, "MET/M_T > 0.25"},
+        {selection, "final selection"}
+    };
+};
+
+namespace Hists {
+    enum HistType {
+        dEta,
+        dPhi,
+        tRatio,
+        met2,
+        mjj,
+        metPt,
+        COUNT
+    };
+}; 
+
+
+// import for backportability (;-<)
+using namespace vectorTypes; 
+using namespace Cuts; 
+
 class SVJFinder {
-    public:
+public:
+    /// CON/DESTRUCTORS
+    ///
+
         // constructor, requires argv as input
-        SVJFinder(char **argv, bool _debug=false) {
+        SVJFinder(char **argv, bool _debug=false, bool _timing=true, bool _saveCuts=true) {
+            start();
             cout << endl;
+            timing = _timing;
             log("-----------------------------------");
             log(":          SVJAnalysis            :");
             log("-----------------------------------");
             this->init_vars(argv);
             log("SVJ object created");
+            end();
+            logt();
             log();
-            debug = _debug; 
+            debug = _debug;
+            saveCuts = _saveCuts; 
         }
 
         // destructor for dynamically allocated data
         ~SVJFinder() {
+            start(); 
+
+            Debug(true); 
+            log();
+            logp("Quitting; cleaning up class variables...  ");
             DelVector(varValues);
             DelVector(vectorVarValues);
             DelVector(LorentzVectors);
             DelVector(MockVectors);
             DelVector(MapVectors);
+            DelVector(hists);
+            file->Close();
+            file = nullptr; 
+            logr("Success");
+            end();
+            logt();
+            
+            log(); 
             // DelVector(varLeaves);
             // DelVector(vectorVarLeaves);
             // for (vector<TLeaf*> vec : compVectors) 
             //     DelVector(vec);
         }
 
+    /// FILE HANDLERS
+    ///
+
         // sets up tfile collection and returns a pointer to it
         TFileCollection *MakeFileCollection() {
+            start();
             log("Loading File Collection from " + path);
             if (fc)
                 delete fc;
             fc = new TFileCollection(sample.c_str(), sample.c_str(), path.c_str());
+            file = new TFile((outdir + "/output.root").c_str(), "RECREATE");
             log("Success: Loaded " + std::to_string(fc->GetNFiles())  + " file(s).");
+            end();
+            logt();
             log();
             return fc;
         }
 
         // sets up tchain and returns a pointer to it
         TChain *MakeChain() {
+            start();
             log("Creating file chain with tree type '" + treename + "'...");
             if (chain)  
                 delete chain;
@@ -78,12 +162,18 @@ class SVJFinder {
             chain->AddFileInfoList(fc->GetList());
             nEvents = (Int_t)chain->GetEntries();
             log("Success");
+            end();
+            logt();
             log();
             return chain;
         }
 
+    /// VARIABLE TRACKER FUNCTIONS
+    ///
+
         // creates, assigns, and returns tlorentz vector pointer to be updated on GetEntry
         vector<TLorentzVector>* AddLorentz(string vectorName, vector<string> components) {
+            start();
             assert(components.size() == 4);
             AddCompsBase(vectorName, components);
             size_t i = LorentzVectors.size();
@@ -91,11 +181,14 @@ class SVJFinder {
             vector<TLorentzVector>* ret = new vector<TLorentzVector>; 
             LorentzVectors.push_back(ret);
             logr("Success");
+            end();
+            logt();
             return ret;
         }
 
         // creates, assigns, and returns mock tlorentz vector pointer to be updated on GetEntry
         vector<TLorentzMock>* AddLorentzMock(string vectorName, vector<string> components) {
+            start();
             assert(components.size() > 1 && components.size() < 5);
             AddCompsBase(vectorName, components);
             size_t i = MockVectors.size();
@@ -103,22 +196,28 @@ class SVJFinder {
             vector<TLorentzMock>* ret = new vector<TLorentzMock>; 
             MockVectors.push_back(ret);
             logr("Success");
+            end();
+            logt();
             return ret;
         }
 
         // creates, assigns, and returns general double vector pointer to be updated on GetEntry
         vector<vector<double>>* AddComps(string vectorName, vector<string> components) {
+            start(); 
             AddCompsBase(vectorName, components);
             size_t i = MapVectors.size();
             subIndex.push_back(std::make_pair(i, vectorType::Map));
             vector<vector<double>>* ret = new vector<vector<double>>;
             MapVectors.push_back(ret);
             logr("Success");
+            end();
+            logt();
             return ret;
         }
 
         // creates, assigns, and returns a vectorized single variable pointer to be updates on GetEntry
         vector<double>* AddVectorVar(string vectorVarName, string component) {
+            start();
             logp("Adding 1 component to vector var " + vectorVarName + "...  ");
             int i = int(vectorVarValues.size());
             vectorVarIndex[vectorVarName] = i;
@@ -126,6 +225,8 @@ class SVJFinder {
             vector<double>* ret = new vector<double>;
             vectorVarValues.push_back(ret);
             logr("Success");
+            end();
+            logt();
             // log(vectorVarIndex.size());
             // log(vectorVarValues.back().size());
             // log(i);
@@ -134,6 +235,7 @@ class SVJFinder {
 
         // creates, assigns, and returns a singular double variable pointer to update on GetEntry 
         double* AddVar(string varName, string component) {
+            start();
             logp("Adding 1 component to var " + varName + "...  ");
             size_t i = varLeaves.size();
             varIndex[varName] = i;
@@ -141,14 +243,20 @@ class SVJFinder {
             varLeaves.push_back(chain->FindLeaf(TString(component)));
             varValues.push_back(ret);
             logr("Success");
+            end();
+            logt(); 
             return ret;
         }
+
+    /// ENTRY LOADING
+    ///
 
         // get the ith entry of the TChain
         void GetEntry(int entry = 0) {
             assert(entry < chain->GetEntries());
             logp("Getting entry " + to_string(entry) + "...  ");
             chain->GetEntry(entry);
+            currentEntry = entry;
             for (size_t i = 0; i < subIndex.size(); ++i) {
                 switch(subIndex[i].second) {
                     case vectorType::Lorentz: {
@@ -189,9 +297,104 @@ class SVJFinder {
             return nEvents;  
         }
 
+    /// CUTS
+    ///
+
+        void Cut(bool expression, Cuts::CutType cutName) {
+            cutValues[cutName] = expression ? 1 : 0;
+        }
+
+        bool Cut(Cuts::CutType cutName) {
+            return cutValues[cutName]; 
+        }
+
+        bool CutsRange(int start, int end) {
+            return std::all_of(cutValues.begin() + start, cutValues.begin() + end, [](int i){return i > 0;});
+        }
+
+        void InitCuts() {
+            std::fill(cutValues.begin(), cutValues.end(), -1);
+        }
+
+        void PrintCuts() {
+            print(&cutValues);
+        }
+
+        void UpdateCutFlow() {
+            size_t i = 0;
+            CutFlow[0]++; 
+            while (i < cutValues.size() && cutValues[i] > 0)
+                CutFlow[++i]++;
+        }
+
+        void PrintCutFlow() {
+            int n = 10;
+            int ns = 10;
+            int fn = 15;
+
+            cout << std::setprecision(2) << std::fixed;
+            cout << LOG_PREFIX << setw(fn) << "CutFlow" << setw(ns) << "N" << setw(n) << "Abs Eff" << setw(n) << "Rel Eff" << endl;
+            cout << LOG_PREFIX << string(fn + ns + n*2, '=') << endl;
+            cout << LOG_PREFIX << setw(fn) << "None" << setw(ns) << CutFlow[0] << setw(n) << 100.0 << setw(n) << 100.0 << endl;
+
+            int i = 1;
+            for (auto elt : Cuts::CutName) {
+                cout << LOG_PREFIX << std::setw(fn) << elt.second << std::setw(ns) << CutFlow[i] << std::setw(n) << 100.*float(CutFlow[i])/float(CutFlow[0]) << std::setw(n) << 100.*float(CutFlow[i])/float(CutFlow[i - 1]) << endl;
+                i++;
+            }
+        }
+
+        void SaveCutFlow() {
+            TH1F *CutFlowHist = new TH1F("h_CutFlow","CutFlow", Cuts::CutName.size(), -0.5, Cuts::CutName.size() - 0.5);
+            CutFlowHist->SetBinContent(1, CutFlow[0]);
+            CutFlowHist->GetXaxis()->SetBinLabel(1, "no selection");
+            int i = 1;
+            for (auto elt : Cuts::CutName) {
+                CutFlowHist->SetBinContent(i + 1, CutFlow[elt.first]);
+                CutFlowHist->GetXaxis()->SetBinLabel(i + 1, elt.second.c_str());
+                i++;
+            }
+            CutFlowHist->Write(); 
+        }
+
+        // void PrintAllCuts() {
+        //     log("CUTS:");
+        //     for (size_t i = 0; i < savedCuts.size(); ++i)
+        //         print(&savedCuts[i]); 
+        // }
+
+    /// HISTOGRAMS
+    ///
+
+        size_t AddHist(Hists::HistType ht, string name="", string title="", int bins=10, double min=0., double max=1.) {
+            size_t i = hists.size(); 
+            TH1F* newHist = new TH1F(name.c_str(), title.c_str(), bins, min, max);
+            hists.push_back(newHist);
+            histIndex[ht] = i;
+            return i;
+        }
+
+        void Fill(Hists::HistType ht, double value) {
+            hists[histIndex[ht]]->Fill(value);
+        }
+
+        void WriteHists() {
+            for (size_t i = 0; i < hists.size(); ++i)
+                hists[i]->Write();
+        }
+
+
+    /// SWITCHES, TIMING, AND LOGGING
+    ///
+
         // Turn on or off debug logging with this switch
         void Debug(bool debugSwitch) {
             debug = debugSwitch;
+        }
+
+        // turn on or off timing logs with this switch (dependent of debug=true)
+        void Timing(bool timingSwitch) {
+            timing=timingSwitch;
         }
 
         // prints a summary of the current entry
@@ -247,15 +450,53 @@ class SVJFinder {
             log();
         }
 
+        // time of last call, in seconds
+        double ts() {
+            return duration/1000000.; 
+        }
+
+        // '', in milliseconds
+        double tms() {
+            return duration/1000.;
+        }
+
+        // '', in microseconds
+        double tus() {
+            return duration; 
+        }
+
+        // log the time! of the last call
+        void logt() {
+            if (timing)
+                log("(execution time: " + to_string(ts()) + "s)");             
+        }
+
+        // internal timer start
+        void start() {
+            timestart = std::chrono::high_resolution_clock::now(); 
+        }
+
+        // internal timer end
+        void end() {
+            duration = duration_cast<microseconds>(std::chrono::high_resolution_clock::now() - timestart).count();
+        }
+
+    /// PUBLIC DATA
+    ///
         // general init vars, parsed from argv
         string sample, path, outdir, treename;
+
         // number of events
         Int_t nEvents;
         // internal debug switch
-        bool debug=true;
-                       
-    private:
+        bool debug=true, timing=true, saveCuts=true; 
 
+        vector<int> CutFlow = vector<int>(Cuts::COUNT + 1, 0);
+        int last = 1; 
+                    
+private:
+    /// CON/DESTRUCTOR HELPERS
+    ///
         template<typename t>
         void DelVector(vector<t*> &v) {
             for (size_t i = 0; i < v.size(); ++i) {
@@ -263,6 +504,43 @@ class SVJFinder {
                 v[i] = nullptr;
             }
         }
+
+        void init_vars(char **argv) {
+            log("Starting");
+
+            sample = argv[1];
+            log(string("sample: " + sample)); 
+
+            path = argv[2];
+            log(string("File list to open: " + path));
+
+            outdir = argv[6];
+            log(string("Output directory: " + outdir)); 
+
+            treename = argv[8];
+            log(string("Tree name: " + treename));
+        }
+
+    /// VARIABLE TRACKER HELPERS
+    /// 
+    
+        void AddCompsBase(string& vectorName, vector<string>& components) {
+            if(compIndex.find(vectorName) != compIndex.end())
+                throw "Vector variable '" + vectorName + "' already exists!"; 
+            size_t index = compIndex.size();
+            logp("Adding " + to_string(components.size()) + " components to vector " + vectorName + "...  "); 
+            compVectors.push_back(vector<TLeaf*>());
+            compNames.push_back(vector<string>());
+
+            for (size_t i = 0; i < components.size(); ++i) {
+                compVectors[index].push_back(chain->FindLeaf(components[i].c_str()));
+                compNames[index].push_back(lastWord(components[i]));
+            }
+            compIndex[vectorName] = index;
+        }
+
+    /// ENTRY LOADER HELPERS
+    /// 
 
         void SetLorentz(size_t leafIndex, size_t lvIndex) {
             vector<TLeaf*> & v = compVectors[leafIndex];
@@ -344,21 +622,8 @@ class SVJFinder {
             // log();
         }
 
-        void AddCompsBase(string& vectorName, vector<string>& components) {
-            if(compIndex.find(vectorName) != compIndex.end())
-                throw "Vector variable '" + vectorName + "' already exists!"; 
-            size_t index = compIndex.size();
-            logp("Adding " + to_string(components.size()) + " components to vector " + vectorName + "...  "); 
-            compVectors.push_back(vector<TLeaf*>());
-            compNames.push_back(vector<string>());
-
-            for (size_t i = 0; i < components.size(); ++i) {
-                compVectors[index].push_back(chain->FindLeaf(components[i].c_str()));
-                compNames[index].push_back(lastWord(components[i]));
-            }
-            compIndex[vectorName] = index;
-        }
-
+    /// SWITCH, TIMING, AND LOGGING HELPERS
+    /// 
         void log() {
             if (debug)
                 cout << LOG_PREFIX << endl; 
@@ -410,11 +675,13 @@ class SVJFinder {
             cout << s << endl;
         }
 
-        void print(double* var, int level=0) {
+        template<typename t>
+        void print(t* var, int level=0) {
             indent(level); cout << *var << endl;
         }
 
-        void print(vector<double>* var, int level=0) {
+        template<typename t>
+        void print(vector<t>* var, int level=0) {
             indent(level);
             cout << "{ ";
             for (size_t i = 0; i < var->size() - 1; ++i) {
@@ -424,7 +691,8 @@ class SVJFinder {
             cout << endl;
         }
 
-        void print(vector<vector<double>>* var, int level=0) {
+        template<typename t>
+        void print(vector<vector<t>>* var, int level=0) {
             for (size_t i = 0; i < var->size(); ++i) {
                 print(&var[i], level);
             }
@@ -450,22 +718,6 @@ class SVJFinder {
             cout << endl; 
         }
 
-        void init_vars(char **argv) {
-            log("Starting");
-
-            sample = argv[1];
-            log(string("sample: " + sample)); 
-
-            path = argv[2];
-            log(string("File list to open: " + path));
-
-            outdir = argv[6];
-            log(string("Output directory: " + outdir)); 
-
-            treename = argv[8];
-            log(string("Tree name: " + treename));
-        }
-
         vector<string> split(string s, char delimiter = '.') {
             std::replace(s.begin(), s.end(), delimiter, ' ');
             vector<string> ret;
@@ -480,10 +732,25 @@ class SVJFinder {
             return split(s, delimiter).back(); 
         }
 
+    /// PRIVATE DATA
+    /// 
+        // general entry
+        int currentEntry;
+
+        // histogram data
+        vector<TH1F*> hists;
+        vector<size_t> histIndex = vector<size_t>(Hists::COUNT);
+
+        // timing data
+        double duration = 0;
+        std::chrono::high_resolution_clock::time_point timestart;
+
+        // file data
         TFileCollection *fc=nullptr;
         TChain *chain=nullptr;
+        TFile *file=nullptr; 
 
-
+        // logging data
         const string LOG_PREFIX = "SVJAnalysis :: ";
         std::map<vectorType, std::string> componentTypeStrings = {
             {vectorType::Lorentz, "TLorentzVector"},
@@ -502,14 +769,17 @@ class SVJFinder {
         vector<vector<double>*> vectorVarValues;
 
         // vector component data
+        //   indicies
         std::map<string, size_t> compIndex;
         vector<pair<size_t, vectorType>> subIndex;
-
+        //   names
         vector<vector<TLeaf*>> compVectors;
         vector<vector<string>> compNames;
-
+        //   values
         vector< vector< TLorentzVector >*> LorentzVectors;
         vector< vector< TLorentzMock >*> MockVectors;
         vector<vector<vector<double>>*> MapVectors;
 
+        // cut variables
+        vector<int> cutValues = vector<int>(Cuts::COUNT, -1); 
 };
