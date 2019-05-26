@@ -8,8 +8,6 @@ using std::cos;
 using std::sqrt; 
 using std::abs; 
 
-using namespace Cuts;
-
 namespace Vetos {
     bool LeptonVeto(TLorentzMock& lepton) {
         return fabs(lepton.Pt()) > 10 && fabs(lepton.Eta()) < 2.4;
@@ -38,6 +36,11 @@ size_t leptonCount(vector<TLorentzMock>* leptons, vector<double>* isos) {
         if (Vetos::LeptonVeto(leptons->at(i)) && Vetos::IsolationVeto(isos->at(i))) 
             n++;
     return n;
+}
+
+double calculateMT2(TLorentzVector& Vjj, double metFull_Pt, double metFull_Phi) {
+    double Mjj2 = Vjj.M()*Vjj.M(), ptjj2 = Vjj.Pt()*Vjj.Pt();
+    return sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*(metFull_Pt) - Vjj.Px()*((metFull_Pt)*cos(metFull_Phi) + Vjj.Py()*(metFull_Pt)*sin(metFull_Phi))));
 }
 
 int main(int argc, char **argv) {
@@ -73,117 +76,115 @@ int main(int argc, char **argv) {
     core.Debug(false);
 
     // loop over the first nEntries (debug) 
-    size_t nEntries = 10000;
+    size_t nEntries = 100;
+    TLorentzVector Vjj;
+    double MT2;
+    
+    // add histogram tracking
+    core.AddHist(Hists::dEta, "h_dEta", "#Delta#eta(j0,j1)", 100, 0, 10);
+    core.AddHist(Hists::dPhi, "h_dPhi", "#Delta#Phi(j0,j1)", 100, 0, 5);
+    core.AddHist(Hists::tRatio,  "h_transverseratio", "MET/M_{T}", 100, 0, 1);
+    core.AddHist(Hists::met2, "h_Mt", "m_{T}", 750, 0, 7500);
+    core.AddHist(Hists::mjj, "h_Mjj", "m_{JJ}", 750, 0, 7500);
+    core.AddHist(Hists::metPt, "h_METPt", "MET_{p_{T}}", 100, 0, 2000);
+    
     
     // start loop timer
     core.start();
-
-    //TODO: add histograms
-    // TH1F *h_dEta = new TH1F( "h_dEta", "#Delta#eta(j0,j1)", 100, 0, 10);
-    // TH1F *h_dPhi = new TH1F("h_dPhi", "#Delta#Phi(j0,j1)", 100, 0, 5);
-    // TH1F *h_transverseratio = new TH1F( "h_transverseratio", "MET/M_{T}", 100, 0, 1);
-    // TH1F *h_Mt = new TH1F("h_Mt", "m_{T}", 750, 0, 7500);
-    // TH1F *h_Mjj = new TH1F("h_Mjj", "m_{JJ}", 750, 0, 7500);
-    // TH1F *h_METPt = new TH1F("h_METPt", "MET_{p_{T}}", 100, 0, 2000);
-
     for (size_t entry = 0; entry < nEntries; ++entry) {
 
         // init
         core.InitCuts(); 
         core.GetEntry(entry);
 
-        // add lepton cut, need to have zero
+        // require zero leptons which pass cuts
         core.Cut(
             (leptonCount(Muons, MuonIsolation) + leptonCount(Electrons, ElectronIsolation)) < 1,
-            leptonCounts
+            Cuts::leptonCounts
             );
 
         // require more than 1 jet
         core.Cut(
             Jets->size() > 1,
-            jetCounts
-            ); 
+            Cuts::jetCounts
+            );
 
-        if (core.Cut(jetCounts)) {
-            TLorentzVector Vjj;
+
+        // rest of cuts, dependent on jetcount
+        if (core.Cut(Cuts::jetCounts)) {
 
             // double JetsDR = (Jets->at(0)).DeltaR(Jets->at(1));
-
-            // leading jet eta difference 
-            double dEta= fabs(Jets->at(0).Eta() - Jets->at(1).Eta()); // SAVE
-            double dPhi= fabs(reco::deltaPhi(Jets->at(0).Phi(), Jets->at(1).Phi())); // SAVE
             
             // leading jet phi difference w/ missing et phi
             // double dPhi_j0_met = fabs(reco::deltaPhi(Jets->at(0).Phi(), *metFull_Phi));
             // double dPhi_j1_met = fabs(reco::deltaPhi(Jets->at(1).Phi(), *metFull_Phi));
 
             Vjj = Jets->at(0) + Jets->at(1);
-
-            double metFull_Py = (*metFull_Pt)*sin(*metFull_Phi);
-            double metFull_Px = (*metFull_Pt)*cos(*metFull_Phi);
-            double Mjj = Vjj.M(); // SAVE
-            double Mjj2 = Mjj*Mjj;
-            double ptjj = Vjj.Pt();
-            double ptjj2 = ptjj*ptjj;
-            double ptMet = Vjj.Px()*(metFull_Px + Vjj.Py()*metFull_Py);
-            double MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*(*metFull_Pt) - ptMet)); // SAVE
+            MT2 = calculateMT2(Vjj, *metFull_Pt, *metFull_Phi);
 
             // leading jet etas both meet eta veto
             core.Cut(
                 Vetos::JetEtaVeto(Jets->at(0)) && Vetos::JetEtaVeto(Jets->at(1)), 
-                jetEtas
+                Cuts::jetEtas
                 );
             
             // leading jets meet delta eta veto
             core.Cut(
                 Vetos::JetDeltaEtaVeto(Jets->at(0), Jets->at(1)),
-                jetDeltaEtas
+                Cuts::jetDeltaEtas
                 );
 
             // ratio between calculated mt2 of dijet system and missing momentum is not negligible
             core.Cut(
                 (*metFull_Pt) / MT2 > 0.15,
-                metRatio
+                Cuts::metRatio
                 );
 
             // require both leading jets to have transverse momentum greater than 200
             core.Cut(
                 Vetos::JetPtVeto(Jets->at(0)) && Vetos::JetPtVeto(Jets->at(1)),
-                jetPt
+                Cuts::jetPt
                 );
 
             // conglomerate cut, whether jet is a dijet
             core.Cut(
-                core.Cut(jetEtas) && core.Cut(jetPt),
-                jetDiJet
+                core.Cut(Cuts::jetEtas) && core.Cut(Cuts::jetPt),
+                Cuts::jetDiJet
                 );
 
             // magnitude of MET squared > 1500 
             core.Cut(
                 MT2 > 1500,
-                metValue
+                Cuts::metValue
                 );
 
             // preselection cut
             core.Cut(
-                core.CutsRange(0, int(preselection)),
-                preselection
+                core.CutsRange(0, int(Cuts::preselection)),
+                Cuts::preselection
                 );
             
             // tighter MET ratio
             core.Cut(
                 (*metFull_Pt) / MT2 > 0.25,
-                metRatioTight
+                Cuts::metRatioTight
                 );
                  
             // final selection cut
             core.Cut(
-                core.Cut(preselection) && core.Cut(metRatioTight),
-                selection
+                core.Cut(Cuts::preselection) && core.Cut(Cuts::metRatioTight),
+                Cuts::selection
             ); 
 
             // save histograms, if passing
-            if (core.Cut(selection)) {
+            if (core.Cut(Cuts::selection)) {
+                core.Fill(Hists::dEta, fabs(Jets->at(0).Eta() - Jets->at(1).Eta())); 
+                core.Fill(Hists::dPhi, fabs(reco::deltaPhi(Jets->at(0).Phi(), Jets->at(1).Phi())));
+                core.Fill(Hists::tRatio, (*metFull_Pt) / MT2);
+                core.Fill(Hists::mjj, Vjj.M());
+                core.Fill(Hists::met2, MT2);
+                core.Fill(Hists::metPt, *metFull_Pt);
+
                 // fill histogram with
                 // dEta
                 // dPhi
@@ -194,11 +195,12 @@ int main(int argc, char **argv) {
                 core.PrintCuts();
             }
         }
-    }
 
-    core.Debug(true); 
+    }
+    core.Debug(true);
     core.end();
     core.logt();
+    core.WriteHists(); 
 
     return 0;
 }

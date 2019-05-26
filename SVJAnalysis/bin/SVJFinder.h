@@ -1,6 +1,8 @@
 #include "TChain.h"
 #include "TLeaf.h"
 #include "TLorentzVector.h"
+#include "TFile.h"
+#include "TH1F.h"
 #include <vector>
 #include <algorithm>
 #include <iostream>
@@ -54,6 +56,19 @@ namespace Cuts {
     };
 };
 
+namespace Hists {
+    enum HistType {
+        dEta,
+        dPhi,
+        tRatio,
+        met2,
+        mjj,
+        metPt,
+        COUNT
+    };
+}; 
+
+
 // import for backportability (;-<)
 using namespace vectorTypes; 
 using namespace Cuts; 
@@ -91,6 +106,9 @@ public:
             DelVector(LorentzVectors);
             DelVector(MockVectors);
             DelVector(MapVectors);
+            DelVector(hists);
+            file->Close();
+            file = nullptr; 
             logr("Success");
             end();
             logt();
@@ -112,6 +130,7 @@ public:
             if (fc)
                 delete fc;
             fc = new TFileCollection(sample.c_str(), sample.c_str(), path.c_str());
+            file = new TFile((outdir + "/output.root").c_str(), "RECREATE");
             log("Success: Loaded " + std::to_string(fc->GetNFiles())  + " file(s).");
             end();
             logt();
@@ -284,6 +303,27 @@ public:
 
         void PrintCuts() {
             print(&cutValues);
+        }
+
+    /// HISTOGRAMS
+    ///
+
+        
+        size_t AddHist(Hists::HistType ht, string name="", string title="", int bins=10, double min=0., double max=1.) {
+            size_t i = hists.size(); 
+            TH1F* newHist = new TH1F(name.c_str(), title.c_str(), bins, min, max);
+            hists.push_back(newHist);
+            histIndex[ht] = i;
+            return i;
+        }
+
+        void Fill(Hists::HistType ht, double value) {
+            hists[histIndex[ht]]->Fill(value);
+        }
+
+        void WriteHists() {
+            for (size_t i = 0; i < hists.size(); ++i)
+                hists[i]->Write();
         }
 
 
@@ -635,13 +675,21 @@ private:
 
     /// PRIVATE DATA
     /// 
+        // histogram data
+        vector<TH1F*> hists;
+        vector<size_t> histIndex = vector<size_t>(Hists::COUNT);
+        
 
+        // timing data
         double duration = 0;
         std::chrono::high_resolution_clock::time_point timestart;
 
+        // file data
         TFileCollection *fc=nullptr;
         TChain *chain=nullptr;
+        TFile *file=nullptr; 
 
+        // logging data
         const string LOG_PREFIX = "SVJAnalysis :: ";
         std::map<vectorType, std::string> componentTypeStrings = {
             {vectorType::Lorentz, "TLorentzVector"},
