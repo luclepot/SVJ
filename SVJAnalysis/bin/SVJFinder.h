@@ -30,6 +30,7 @@ using std::vector;
 using std::pair; 
 using std::to_string;
 using std::stringstream; 
+using std::setw;
 
 namespace vectorTypes{
     enum vectorType {
@@ -49,10 +50,22 @@ namespace Cuts {
         jetPt,
         jetDiJet,
         metValue,
-        preselection,
         metRatioTight,
         selection,
         COUNT
+    };
+
+    std::map<CutType, string> CutName {
+        {leptonCounts, "Lepton Veto"},
+        {jetCounts, "n Jets > 1"},
+        {jetEtas, "jet Eta veto"},
+        {jetDeltaEtas, "DeltaEta veto"},
+        {metRatio,"MET/M_T > 0.15"},
+        {jetPt, "Jet PT veto"},
+        {jetDiJet, "Dijet veto"},
+        {metValue, "loose MET cut"},
+        {metRatioTight, "MET/M_T > 0.25"},
+        {selection, "final selection"}
     };
 };
 
@@ -79,7 +92,7 @@ public:
     ///
 
         // constructor, requires argv as input
-        SVJFinder(char **argv, bool _debug=false, bool _timing=true) {
+        SVJFinder(char **argv, bool _debug=false, bool _timing=true, bool _saveCuts=true) {
             start();
             cout << endl;
             timing = _timing;
@@ -91,7 +104,8 @@ public:
             end();
             logt();
             log();
-            debug = _debug; 
+            debug = _debug;
+            saveCuts = _saveCuts; 
         }
 
         // destructor for dynamically allocated data
@@ -242,6 +256,7 @@ public:
             assert(entry < chain->GetEntries());
             logp("Getting entry " + to_string(entry) + "...  ");
             chain->GetEntry(entry);
+            currentEntry = entry;
             for (size_t i = 0; i < subIndex.size(); ++i) {
                 switch(subIndex[i].second) {
                     case vectorType::Lorentz: {
@@ -305,10 +320,52 @@ public:
             print(&cutValues);
         }
 
+        void UpdateCutFlow() {
+            size_t i = 0;
+            CutFlow[0]++; 
+            while (i < cutValues.size() && cutValues[i] > 0)
+                CutFlow[++i]++;
+        }
+
+        void PrintCutFlow() {
+            int n = 10;
+            int ns = 10;
+            int fn = 15;
+
+            cout << std::setprecision(2) << std::fixed;
+            cout << LOG_PREFIX << setw(fn) << "CutFlow" << setw(ns) << "N" << setw(n) << "Abs Eff" << setw(n) << "Rel Eff" << endl;
+            cout << LOG_PREFIX << string(fn + ns + n*2, '=') << endl;
+            cout << LOG_PREFIX << setw(fn) << "None" << setw(ns) << CutFlow[0] << setw(n) << 100.0 << setw(n) << 100.0 << endl;
+
+            int i = 1;
+            for (auto elt : Cuts::CutName) {
+                cout << LOG_PREFIX << std::setw(fn) << elt.second << std::setw(ns) << CutFlow[i] << std::setw(n) << 100.*float(CutFlow[i])/float(CutFlow[0]) << std::setw(n) << 100.*float(CutFlow[i])/float(CutFlow[i - 1]) << endl;
+                i++;
+            }
+        }
+
+        void SaveCutFlow() {
+            TH1F *CutFlowHist = new TH1F("h_CutFlow","CutFlow", Cuts::CutName.size(), -0.5, Cuts::CutName.size() - 0.5);
+            CutFlowHist->SetBinContent(1, CutFlow[0]);
+            CutFlowHist->GetXaxis()->SetBinLabel(1, "no selection");
+            int i = 1;
+            for (auto elt : Cuts::CutName) {
+                CutFlowHist->SetBinContent(i + 1, CutFlow[elt.first]);
+                CutFlowHist->GetXaxis()->SetBinLabel(i + 1, elt.second.c_str());
+                i++;
+            }
+            CutFlowHist->Write(); 
+        }
+
+        // void PrintAllCuts() {
+        //     log("CUTS:");
+        //     for (size_t i = 0; i < savedCuts.size(); ++i)
+        //         print(&savedCuts[i]); 
+        // }
+
     /// HISTOGRAMS
     ///
 
-        
         size_t AddHist(Hists::HistType ht, string name="", string title="", int bins=10, double min=0., double max=1.) {
             size_t i = hists.size(); 
             TH1F* newHist = new TH1F(name.c_str(), title.c_str(), bins, min, max);
@@ -424,7 +481,6 @@ public:
             duration = duration_cast<microseconds>(std::chrono::high_resolution_clock::now() - timestart).count();
         }
 
-
     /// PUBLIC DATA
     ///
         // general init vars, parsed from argv
@@ -433,7 +489,10 @@ public:
         // number of events
         Int_t nEvents;
         // internal debug switch
-        bool debug=true, timing=true;
+        bool debug=true, timing=true, saveCuts=true; 
+
+        vector<int> CutFlow = vector<int>(Cuts::COUNT + 1, 0);
+        int last = 1; 
                     
 private:
     /// CON/DESTRUCTOR HELPERS
@@ -675,10 +734,12 @@ private:
 
     /// PRIVATE DATA
     /// 
+        // general entry
+        int currentEntry;
+
         // histogram data
         vector<TH1F*> hists;
         vector<size_t> histIndex = vector<size_t>(Hists::COUNT);
-        
 
         // timing data
         double duration = 0;
@@ -720,5 +781,5 @@ private:
         vector<vector<vector<double>>*> MapVectors;
 
         // cut variables
-        vector<int> cutValues = vector<int>(Cuts::COUNT); 
+        vector<int> cutValues = vector<int>(Cuts::COUNT, -1); 
 };
