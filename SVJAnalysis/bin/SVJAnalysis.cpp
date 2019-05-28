@@ -38,7 +38,6 @@ size_t leptonCount(vector<TLorentzMock>* leptons, vector<double>* isos) {
     return n;
 }
 
-
 int main(int argc, char **argv) {
     // declare core object and enable debug
     SVJFinder core(argv);
@@ -65,7 +64,7 @@ int main(int argc, char **argv) {
     double* metFull_Phi = core.AddVar("metPhi", "MissingET.Phi");
 
     // disable debug
-    core.Debug(false);
+    // core.Debug(false);
 
     // loop over the first nEntries (debug) 
     // start loop timer

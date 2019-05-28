@@ -270,7 +270,8 @@ public:
         void GetEntry(int entry = 0) {
             assert(entry < chain->GetEntries());
             logp("Getting entry " + to_string(entry) + "...  ");
-            chain->GetEntry(entry);
+            chain->LoadTree(entry); 
+	    chain->GetEntry(entry);
             currentEntry = entry;
             for (size_t i = 0; i < subIndex.size(); ++i) {
                 switch(subIndex[i].second) {
