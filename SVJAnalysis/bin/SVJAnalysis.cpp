@@ -43,9 +43,6 @@ int main(int argc, char **argv) {
     // declare core object and enable debug
     SVJFinder core(argv);
 
-    cout << endl;
-    cout << "REBUILLT" << endl;
-    cout << endl; 
     // make file collection and chain
     core.MakeFileCollection();
     core.MakeChain();
@@ -73,10 +70,9 @@ int main(int argc, char **argv) {
     // loop over the first nEntries (debug) 
     // start loop timer
 
-    size_t nEntries = 10000;
     core.start();
 
-    for (size_t entry = 0; entry < nEntries; ++entry) {
+    for (Int_t entry = 0; entry < core.nToRun; ++entry) {
 
         // init
         core.InitCuts(); 

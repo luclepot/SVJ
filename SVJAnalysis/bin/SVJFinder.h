@@ -94,10 +94,12 @@ public:
         // constructor, requires argv as input
         SVJFinder(char **argv) {
             start();
-            cout << endl;
+            log("ROOT");
+            log();
             log("-----------------------------------");
             log(":          SVJAnalysis            :");
             log("-----------------------------------");
+            log(); 
             inputspec = argv[1];
             log(string("File list to open: " + inputspec));
 
@@ -106,10 +108,11 @@ public:
 
             outputdir = argv[3];
             log(string("Output directory: " + outputdir)); 
-            
+            log();
             debug = std::atoi(argv[4]);
             timing = std::atoi(argv[5]);
-            saveCuts = std::atoi(argv[6]); 
+            saveCuts = std::atoi(argv[6]);
+            nToRun = std::stoi(argv[7]); 
             log("SVJ object created");
             end();
             logt();
@@ -340,6 +343,7 @@ public:
             int ns = 10;
             int fn = 15;
 
+            log(); 
             cout << std::setprecision(2) << std::fixed;
             cout << LOG_PREFIX << setw(fn) << "CutFlow" << setw(ns) << "N" << setw(n) << "Abs Eff" << setw(n) << "Rel Eff" << endl;
             cout << LOG_PREFIX << string(fn + ns + n*2, '=') << endl;
@@ -508,7 +512,7 @@ public:
         string sample, inputspec, outputdir;
 
         // number of events
-        Int_t nEvents;
+        Int_t nEvents, nToRun;
         // internal debug switch
         bool debug=true, timing=true, saveCuts=true; 
 
