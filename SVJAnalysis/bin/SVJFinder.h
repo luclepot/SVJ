@@ -113,6 +113,7 @@ public:
             timing = std::atoi(argv[5]);
             saveCuts = std::atoi(argv[6]);
             nToRun = std::stoi(argv[7]); 
+
             log("SVJ object created");
             end();
             logt();
@@ -172,6 +173,9 @@ public:
             chain = new TChain(TString("Delphes"));
             chain->AddFileInfoList(fc->GetList());
             nEvents = (Int_t)chain->GetEntries();
+            if (nToRun < 0 || nToRun > nEvents)
+                nToRun = nEvents;
+
             log("Success");
             end();
             logt();

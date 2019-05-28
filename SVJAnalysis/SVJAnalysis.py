@@ -58,6 +58,7 @@ parser.add_argument('-b', '--build', dest='build', action='store_true', default=
 parser.add_argument('-z', '--dry',  dest='dryrun', action='store_true', default=False, help='don\'t run analysis code')
 parser.add_argument('-g', '--gdb', dest='gdb', action='store_true', default=False, help='run with gdb debugger :-)')
 
+print sys.argv
 
 argscmd = None
 # if len(sys.argv) > 1 and sys.argv[1].lower() == "test":
@@ -93,7 +94,7 @@ if len(samplenames) == 0:
     error("No samples found matching glob crieria '{}'".format(criteria))
 
 if not os.path.exists(outputdir):
-    log("making directory '{}'".format(ouputdir))
+    log("making directory '{}'".format(outputdir))
     os.makedirs(outputdir)
 
 with open(samplefile, "w+") as sf:
