@@ -42,8 +42,10 @@ size_t leptonCount(vector<TLorentzMock>* leptons, vector<double>* isos) {
 int main(int argc, char **argv) {
     // declare core object and enable debug
     SVJFinder core(argv);
-    core.Debug(true);
 
+    cout << endl;
+    cout << "REBUILT" << endl;
+    cout << endl; 
     // make file collection and chain
     core.MakeFileCollection();
     core.MakeChain();
@@ -55,7 +57,6 @@ int main(int argc, char **argv) {
     core.AddHist(Hists::met2, "h_Mt", "m_{T}", 750, 0, 7500);
     core.AddHist(Hists::mjj, "h_Mjj", "m_{JJ}", 750, 0, 7500);
     core.AddHist(Hists::metPt, "h_METPt", "MET_{p_{T}}", 100, 0, 2000);
-    
     
     // add componenets for jets (tlorentz)
     vector<TLorentzVector>* Jets = core.AddLorentz("Jet", {"Jet.PT","Jet.Eta","Jet.Phi","Jet.Mass"});

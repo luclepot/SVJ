@@ -331,9 +331,11 @@ def Convert(filename, outFileName, hlfonly):
         print(outFileName)
         f = h5py.File(outFileName, "w")
         f.create_dataset('HLF', data=np.asarray(HLF), compression='gzip')
-        f.create_dataset('HLF_Names', data=np.array(['EvtId','HT', 'MET', 'DPhiMETLep', 'MT', 'nJets', 'bJets', 'allJetMass', 'LepPt', 'LepEta', \
-                                                    'LepIsoCh', 'LepIsoGamma', 'LepIsoNeu', 'LepCharge', 'LepIsEle', 'nMu', 'allMuMass', 'allMuPt', \
-                                                         'nEle', 'allEleMass', 'allElePt', 'nChHad', 'nNeuHad', 'nPhoton']), compression='gzip')
+        f.create_dataset('HLF_Names', data=np.array([
+            'EvtId', 'HT', 'MET', 'DPhiMETLep', 'MT', 'nJets', 'bJets', 'allJetMass', 'LepPt', 'LepEta', \
+            'LepIsoCh', 'LepIsoGamma', 'LepIsoNeu', 'LepCharge', 'LepIsEle', 'nMu', 'allMuMass', 'allMuPt', \
+            'nEle', 'allEleMass', 'allElePt', 'nChHad', 'nNeuHad', 'nPhoton'
+            ]), compression='gzip')
         if not hlfonly:
             pArray = np.asarray(particles).reshape((Nwritten,(nNeuLength+nPhotonLength+nTrkLength+1+10+10), 20))
             f.create_dataset('Particles', data=pArray, compression='gzip')
