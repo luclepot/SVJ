@@ -13,8 +13,8 @@
 #include "TFileCollection.h"
 #include "THashList.h"
 #include "TBenchmark.h"
-#include <iostream>
 #include <sstream> 
+#include <fstream> 
 #include <utility>
 #include <map>
 #include <cassert>
@@ -92,20 +92,28 @@ public:
     ///
 
         // constructor, requires argv as input
-        SVJFinder(char **argv, bool _debug=false, bool _timing=true, bool _saveCuts=true) {
+        SVJFinder(char **argv) {
             start();
             cout << endl;
-            timing = _timing;
             log("-----------------------------------");
             log(":          SVJAnalysis            :");
             log("-----------------------------------");
-            this->init_vars(argv);
+            inputspec = argv[1];
+            log(string("File list to open: " + inputspec));
+
+            sample = argv[2];
+            log(string("Sample name: " + sample)); 
+
+            outputdir = argv[3];
+            log(string("Output directory: " + outputdir)); 
+            
+            debug = std::atoi(argv[4]);
+            timing = std::atoi(argv[5]);
+            saveCuts = std::atoi(argv[6]); 
             log("SVJ object created");
             end();
             logt();
             log();
-            debug = _debug;
-            saveCuts = _saveCuts; 
         }
 
         // destructor for dynamically allocated data
@@ -140,11 +148,11 @@ public:
         // sets up tfile collection and returns a pointer to it
         TFileCollection *MakeFileCollection() {
             start();
-            log("Loading File Collection from " + path);
+            log("Loading File Collection from " + inputspec);
             if (fc)
                 delete fc;
-            fc = new TFileCollection(sample.c_str(), sample.c_str(), path.c_str());
-            file = new TFile((outdir + "/output.root").c_str(), "RECREATE");
+            fc = new TFileCollection(sample.c_str(), sample.c_str(), inputspec.c_str());
+            file = new TFile((outputdir + "/" + sample + "_output.root").c_str(), "RECREATE");
             log("Success: Loaded " + std::to_string(fc->GetNFiles())  + " file(s).");
             end();
             logt();
@@ -155,10 +163,10 @@ public:
         // sets up tchain and returns a pointer to it
         TChain *MakeChain() {
             start();
-            log("Creating file chain with tree type '" + treename + "'...");
+            log("Creating file chain with tree type 'Delphes'...");
             if (chain)  
                 delete chain;
-            chain = new TChain(TString(treename));
+            chain = new TChain(TString("Delphes"));
             chain->AddFileInfoList(fc->GetList());
             nEvents = (Int_t)chain->GetEntries();
             log("Success");
@@ -383,6 +391,19 @@ public:
                 hists[i]->Write();
         }
 
+        void UpdateSelectionIndex(size_t entry) {
+            selectionIndex.push_back(entry);
+        }
+
+        void WriteSelectionIndex() {
+            std::ofstream f(outputdir + "/" + sample + "_selection.txt");
+            if (f.is_open()) {
+                for (size_t i = 0; i < selectionIndex.size(); i++){
+                    f << selectionIndex[i] << " ";
+                }
+                f.close();
+            }
+        }
 
     /// SWITCHES, TIMING, AND LOGGING
     ///
@@ -484,7 +505,7 @@ public:
     /// PUBLIC DATA
     ///
         // general init vars, parsed from argv
-        string sample, path, outdir, treename;
+        string sample, inputspec, outputdir;
 
         // number of events
         Int_t nEvents;
@@ -492,7 +513,7 @@ public:
         bool debug=true, timing=true, saveCuts=true; 
 
         vector<int> CutFlow = vector<int>(Cuts::COUNT + 1, 0);
-        int last = 1; 
+        int last = 1;
                     
 private:
     /// CON/DESTRUCTOR HELPERS
@@ -503,22 +524,6 @@ private:
                 delete v[i];
                 v[i] = nullptr;
             }
-        }
-
-        void init_vars(char **argv) {
-            log("Starting");
-
-            sample = argv[1];
-            log(string("sample: " + sample)); 
-
-            path = argv[2];
-            log(string("File list to open: " + path));
-
-            outdir = argv[6];
-            log(string("Output directory: " + outdir)); 
-
-            treename = argv[8];
-            log(string("Tree name: " + treename));
         }
 
     /// VARIABLE TRACKER HELPERS
@@ -782,4 +787,5 @@ private:
 
         // cut variables
         vector<int> cutValues = vector<int>(Cuts::COUNT, -1); 
+        vector<size_t> selectionIndex; 
 };
