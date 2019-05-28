@@ -141,6 +141,8 @@ def Convert(filename, outFileName, hlfonly):
 
     for event in tree:
 
+        selection = 
+
         electrons = []
         muons = []
         #if Nevt > 100: continue
@@ -160,7 +162,7 @@ def Convert(filename, outFileName, hlfonly):
             continue
             
         # selection & first lep
-        selected, lep, otherlep = selection(event, TrkPtMap, NeuPtMap, PhotonPtMap, Nwritten)
+        selected, lep, otherlep = 
 
         if not selected:
             Nevt += 1
@@ -331,17 +333,26 @@ def Convert(filename, outFileName, hlfonly):
         print(outFileName)
         f = h5py.File(outFileName, "w")
         f.create_dataset('HLF', data=np.asarray(HLF), compression='gzip')
-        f.create_dataset('HLF_Names', data=np.array([
-            'EvtId', 'HT', 'MET', 'DPhiMETLep', 'MT', 'nJets', 'bJets', 'allJetMass', 'LepPt', 'LepEta', \
-            'LepIsoCh', 'LepIsoGamma', 'LepIsoNeu', 'LepCharge', 'LepIsEle', 'nMu', 'allMuMass', 'allMuPt', \
-            'nEle', 'allEleMass', 'allElePt', 'nChHad', 'nNeuHad', 'nPhoton'
-            ]), compression='gzip')
+        f.create_dataset(
+            'HLF_Names',
+            data=np.array([
+                'EvtId','HT', 'MET', 'DPhiMETLep', 'MT', 'nJets', 'bJets', 'allJetMass', 'LepPt', 'LepEta',
+                'LepIsoCh', 'LepIsoGamma', 'LepIsoNeu', 'LepCharge', 'LepIsEle', 'nMu', 'allMuMass', 'allMuPt',
+                'nEle', 'allEleMass', 'allElePt', 'nChHad', 'nNeuHad', 'nPhoton'
+                ]),
+            compression='gzip'
+            )
         if not hlfonly:
             pArray = np.asarray(particles).reshape((Nwritten,(nNeuLength+nPhotonLength+nTrkLength+1+10+10), 20))
             f.create_dataset('Particles', data=pArray, compression='gzip')
-            f.create_dataset('Particles_Names', data=np.array(['EvtId', 'Energy', 'Px', 'Py', 'Pz', 'Pt', 'Eta', 'Phi', 'vtxX', 'vtxY', 'vtxZ', \
-                                                                   'ChPFIso', 'GammaPFIso', 'NeuPFIso', 'isChHad', 'isNeuHad', 'isGamma', 'isEle', 'isMu', 'Charge']),\
-                                 compression='gzip')
+            f.create_dataset(
+                'Particles_Names',
+                data=np.array([
+                    'EvtId', 'Energy', 'Px', 'Py', 'Pz', 'Pt', 'Eta', 'Phi', 'vtxX', 'vtxY', 'vtxZ',
+                    'ChPFIso', 'GammaPFIso', 'NeuPFIso', 'isChHad', 'isNeuHad', 'isGamma', 'isEle', 'isMu', 'Charge'
+                    ]),
+                compression='gzip'
+                )
         f.close()
         print("Max Number of Electrons: %i" %NeleMax)
         print("Max Number of Muons:     %i" %NmuMax)
@@ -374,11 +385,12 @@ def Convert(filename, outFileName, hlfonly):
     #    writer = csv.writer(f)
     #    writer.writerows(events)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("inputfile", action="store", help="input file path")
     parser.add_argument("outputfile", action="store", help="output file path")
-    parser.add_argument("-o", "--hlf-only", action="store_true", dest="hlf", help="hlf only flag", default=False)
+    parser.add_argument("-o", "--hlf-only", action="store_true", dest="hlf", help="store only high-level-features", default=False)
 
     if len(sys.argv) < 2:
         parser.print_help()
@@ -387,4 +399,3 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
 
     Convert(args.inputfile, args.outputfile, args.hlf)
-    #Convert(sys.argv[1], sys.argv[2], sys.argv[3])
