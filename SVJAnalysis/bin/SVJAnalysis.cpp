@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     SVJFinder core(argv);
 
     cout << endl;
-    cout << "REBLT" << endl;
+    cout << "REBUILLT" << endl;
     cout << endl; 
     // make file collection and chain
     core.MakeFileCollection();

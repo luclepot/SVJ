@@ -9,6 +9,11 @@ import glob
 import math
 import pickle
 
+# def range_input(s):
+#     try:
+#         return tuple(map(int, s.split(',')))
+#     except:
+#         raise argparse.ArgumentTypeError("argument '{}' is not of form int,int !".format(s))
 
 if sys.version_info < (2, 7):
     raise "Must use python 2.7 or greater. Have you forgotten to do cmsenv?"
@@ -22,11 +27,12 @@ parser.add_argument('-i', '--input', dest='inputdir', action='store', required=T
 parser.add_argument('-o', '--output', dest='outputdir', action='store', required=True, help='output directory (relative to this python file)')
 parser.add_argument('-n', '--name', dest='name', action='store', default='sample', help='sample save name')
 parser.add_argument('-f', '--filter', dest='filter', action='store', default='*', help='glob-style filter for root files in inputfile')
+# parser.add_argument('-r', '--range', dest='range', action='store', default=(-1,-1), type=range_input, help='subset of tree values to parse')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', default=False, help='enable debug output')
 parser.add_argument('-t', '--timing', dest='timing', action='store_true', default=False, help='enable timing output')
 parser.add_argument('-c', '--save-cuts', dest='cuts', action='store_true', default=False, help='save cut values')
 parser.add_argument('-b', '--build', dest='build', action='store_true', default=False, help='rebuild cpp files before running')
-parser.add_argument('-r', '--dry',  dest='dryrun', action='store_true', default=False, help='don\'t run analysis code')
+parser.add_argument('-z', '--dry',  dest='dryrun', action='store_true', default=False, help='don\'t run analysis code')
 parser.add_argument('-g', '--gdb', dest='gdb', action='store_true', default=False, help='run with gdb debugger :-)')
 
 args = parser.parse_args()
