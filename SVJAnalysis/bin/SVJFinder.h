@@ -390,7 +390,7 @@ public:
         void WriteSelectionIndex() {
             std::ofstream f(outdir + "/selection.txt");
             if (f.is_open()) {
-                for (size_t count = 0; count < selectionIndex.size(); count++){
+                for (size_t i = 0; i < selectionIndex.size(); i++){
                     f << selectionIndex[i] << " ";
                 }
                 f.close();
