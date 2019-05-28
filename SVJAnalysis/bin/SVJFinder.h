@@ -13,8 +13,8 @@
 #include "TFileCollection.h"
 #include "THashList.h"
 #include "TBenchmark.h"
-#include <iostream>
 #include <sstream> 
+#include <fstream> 
 #include <utility>
 #include <map>
 #include <cassert>
@@ -383,6 +383,19 @@ public:
                 hists[i]->Write();
         }
 
+        void UpdateSelectionIndex(size_t entry) {
+            selectionIndex.push_back(entry);
+        }
+
+        void WriteSelectionIndex() {
+            std::ofstream f(outdir + "/selection.txt");
+            if (f.is_open()) {
+                for (size_t count = 0; count < selectionIndex.size(); count++){
+                    f << selectionIndex[i] << " ";
+                }
+                f.close();
+            }
+        }
 
     /// SWITCHES, TIMING, AND LOGGING
     ///
@@ -492,7 +505,7 @@ public:
         bool debug=true, timing=true, saveCuts=true; 
 
         vector<int> CutFlow = vector<int>(Cuts::COUNT + 1, 0);
-        int last = 1; 
+        int last = 1;
                     
 private:
     /// CON/DESTRUCTOR HELPERS
@@ -782,4 +795,5 @@ private:
 
         // cut variables
         vector<int> cutValues = vector<int>(Cuts::COUNT, -1); 
+        vector<size_t> selectionIndex; 
 };

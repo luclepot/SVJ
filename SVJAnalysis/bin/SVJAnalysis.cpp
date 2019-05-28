@@ -156,6 +156,7 @@ int main(int argc, char **argv) {
 
             // save histograms, if passing
             if (core.Cut(Cuts::selection)) {
+                core.UpdateSelectionIndex(entry); 
                 core.Fill(Hists::dEta, fabs(Jets->at(0).Eta() - Jets->at(1).Eta())); 
                 core.Fill(Hists::dPhi, fabs(reco::deltaPhi(Jets->at(0).Phi(), Jets->at(1).Phi())));
                 core.Fill(Hists::tRatio, (*metFull_Pt) / MT2);
@@ -171,8 +172,9 @@ int main(int argc, char **argv) {
     core.end();
     core.logt();
     core.WriteHists();
+    core.WriteSelectionIndex(); 
     core.SaveCutFlow();
-    core.PrintCutFlow(); 
+    core.PrintCutFlow();
 
     return 0;
 }

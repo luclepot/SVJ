@@ -27,7 +27,7 @@ def PFIso(p, DR, PtMap, subtractPt):
     DeltaEta = PtMap[:,0] - p.Eta()
     DeltaPhi = PtMap[:,1] - p.Phi()
     pi = rt.TMath.Pi()
-    DeltaPhi = DeltaPhi - 2*pi*(DeltaPhi >  pi) + 2*pi*(DeltaPhi < -1.*pi)
+    DeltaPhi = DeltaPhi - 2*pi*(DeltaPhi > pi) + 2*pi*(DeltaPhi < -1.*pi)
     isInCone = DeltaPhi*DeltaPhi + DeltaEta*DeltaEta < DR*DR
     Iso = PtMap[isInCone, 2].sum()/p.Pt()
     if subtractPt: Iso = Iso -1
@@ -77,13 +77,13 @@ def selection(event, TrkPtMap, NeuPtMap, PhotonPtMap, evtID):
     foundMuon = None #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0, 0, 0, 0, 1, 1]
     foundEle =  None #[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0, 0, 0, 1, 0, 1]
     l = rt.TLorentzVector()
-    for ele in event.Electron:        
+    for ele in event.Electron:
         if ele.PT <= 23.:
             continue
         #if ele.PT <= 25.: continue
         l.SetPtEtaPhiM(ele.PT, ele.Eta, ele.Phi, 0.)
         pfisoCh = PFIso(l, 0.3, TrkPtMap, True) 
-        pfisoNeu = PFIso(l, 0.3, NeuPtMap, False) 
+        pfisoNeu = PFIso(l, 0.3, NeuPtMap, False)
         pfisoGamma = PFIso(l, 0.3, PhotonPtMap, False) 
         if foundEle == None and (pfisoCh+pfisoNeu+pfisoGamma)<0.45: 
             #foundEle.SetPtEtaPhiM(ele.PT, ele.Eta, ele.Phi, 0.)
@@ -99,19 +99,18 @@ def selection(event, TrkPtMap, NeuPtMap, PhotonPtMap, evtID):
         if foundMuon == None and (pfisoCh+pfisoNeu+pfisoGamma)<0.45: 
             #foundMuon.SetPtEtaPhiM(muon.PT, muon.Eta, muon.Phi, 0.)
             foundMuon = [evtID, l.E(), l.Px(), l.Py(), l.Pz(), l.Pt(), l.Eta(), l.Phi(), 0., 0., 0., pfisoCh, pfisoGamma, pfisoNeu, 0, 0, 0, 0, 1, muon.Charge]
-    if foundEle != None and foundMuon != None:
+    if foundEle is not None and foundMuon is not None:
         if foundEle[5] > foundMuon[5]:
             return True, foundEle, foundMuon
         else:
             return True, foundMuon, foundEle
-    if foundEle != None:
+    if foundEle is not None:
         return True, foundEle, foundMuon
-    if foundMuon != None:
+    if foundMuon is not None:
         return True, foundMuon, foundEle
     return False, None, None
 
 #####
-
 def Convert(filename, outFileName, hlfonly):
     
     # length constants
