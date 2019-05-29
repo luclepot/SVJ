@@ -99,7 +99,7 @@ if not os.path.exists(outputdir):
 
 with open(samplefile, "w+") as sf:
     for samplename in samplenames:
-        sf.write(samplename)
+        sf.write(samplename + '\n')
 
 cmd = 'SVJAnalysis ' + ' '.join([samplefile, args.name, outputdir, '1' if args.debug else '0', '1' if args.timing else '0', '1' if args.cuts else '0', str(int(args.subset))])
 

@@ -38,13 +38,12 @@ size_t leptonCount(vector<TLorentzMock>* leptons, vector<double>* isos) {
     return n;
 }
 
-
 int main(int argc, char **argv) {
     // declare core object and enable debug
     SVJFinder core(argv);
 
     // make file collection and chain
-    core.MakeFileCollection();
+    // core.MakeFileCollection();
     core.MakeChain();
 
     // add histogram tracking
