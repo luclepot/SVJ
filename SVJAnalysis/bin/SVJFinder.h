@@ -1,4 +1,3 @@
-#include "TChain.h"
 #include "TLeaf.h"
 #include "TLorentzVector.h"
 #include "TFile.h"
@@ -10,7 +9,6 @@
 #include <cmath>
 #include <cassert>
 #include <string>
-#include "TFileCollection.h"
 #include "THashList.h"
 #include "TBenchmark.h"
 #include <sstream> 
@@ -19,6 +17,7 @@
 #include <map>
 #include <cassert>
 #include <chrono>
+#include "ParallelTreeChain.h"
 
 using std::fabs;
 using std::chrono::microseconds;  
@@ -127,12 +126,15 @@ public:
             Debug(true); 
             log();
             logp("Quitting; cleaning up class variables...  ");
+            
             DelVector(varValues);
             DelVector(vectorVarValues);
             DelVector(LorentzVectors);
             DelVector(MockVectors);
             DelVector(MapVectors);
             DelVector(hists);
+            delete chain;
+            chain = nullptr; 
             file->Close();
             file = nullptr; 
             logr("Success");
@@ -150,29 +152,29 @@ public:
     ///
 
         // sets up tfile collection and returns a pointer to it
-        TFileCollection *MakeFileCollection() {
-            start();
-            log("Loading File Collection from " + inputspec);
-            if (fc)
-                delete fc;
-            fc = new TFileCollection(sample.c_str(), sample.c_str(), inputspec.c_str());
-            file = new TFile((outputdir + "/" + sample + "_output.root").c_str(), "RECREATE");
-            log("Success: Loaded " + std::to_string(fc->GetNFiles())  + " file(s).");
-            end();
-            logt();
-            log();
-            return fc;
-        }
+        // TFileCollection *MakeFileCollection() {
+        //     start();
+        //     log("Loading File Collection from " + inputspec);
+        //     if (fc)
+        //         delete fc;
+        //     fc = new TFileCollection(sample.c_str(), sample.c_str(), inputspec.c_str());
+            // file = new TFile((outputdir + "/" + sample + "_output.root").c_str(), "RECREATE");
+        //     log("Success: Loaded " + std::to_string(fc->GetNFiles())  + " file(s).");
+        //     end();
+        //     logt();
+        //     log();
+        //     return fc;
+        // }
 
-        // sets up tchain and returns a pointer to it
-        TChain *MakeChain() {
+        // sets up paralleltreechain and returns a pointer to it
+        ParallelTreeChain* MakeChain() {
             start();
             log("Creating file chain with tree type 'Delphes'...");
-            if (chain)  
-                delete chain;
-            chain = new TChain(TString("Delphes"));
-            chain->AddFileInfoList(fc->GetList());
+            chain = new ParallelTreeChain();
+            chain->GetTrees(inputspec); 
+            file = new TFile((outputdir + "/" + sample + "_output.root").c_str(), "RECREATE");
             nEvents = (Int_t)chain->GetEntries();
+
             if (nToRun < 0 || nToRun > nEvents)
                 nToRun = nEvents;
 
@@ -236,7 +238,7 @@ public:
             logp("Adding 1 component to vector var " + vectorVarName + "...  ");
             int i = int(vectorVarValues.size());
             vectorVarIndex[vectorVarName] = i;
-            vectorVarLeaves.push_back(chain->FindLeaf(TString(component)));
+            vectorVarLeaves.push_back(chain->FindLeaf(component));
             vector<double>* ret = new vector<double>;
             vectorVarValues.push_back(ret);
             logr("Success");
@@ -255,7 +257,7 @@ public:
             size_t i = varLeaves.size();
             varIndex[varName] = i;
             double* ret = new double;
-            varLeaves.push_back(chain->FindLeaf(TString(component)));
+            varLeaves.push_back(chain->FindLeaf(component));
             varValues.push_back(ret);
             logr("Success");
             end();
@@ -266,36 +268,39 @@ public:
     /// ENTRY LOADING
     ///
 
+        void reloadLeaves() {
+
+        }
+
         // get the ith entry of the TChain
         void GetEntry(int entry = 0) {
             assert(entry < chain->GetEntries());
             logp("Getting entry " + to_string(entry) + "...  ");
-            chain->LoadTree(entry); 
-	    chain->GetEntry(entry);
+	        int treeId = chain->GetEntry(entry);
             currentEntry = entry;
             for (size_t i = 0; i < subIndex.size(); ++i) {
                 switch(subIndex[i].second) {
                     case vectorType::Lorentz: {
-                        SetLorentz(i, subIndex[i].first);
+                        SetLorentz(i, subIndex[i].first, treeId);
                         break;
                     }
                     case vectorType::Mock: {
-                        SetMock(i, subIndex[i].first);
+                        SetMock(i, subIndex[i].first, treeId);
                         break;
                     }
                     case vectorType::Map: {
-                        SetMap(i, subIndex[i].first);
+                        SetMap(i, subIndex[i].first, treeId);
                         break;
                     }
                 }
             }
 
             for (size_t i = 0; i < varValues.size(); ++i) {
-                SetVar(i);
+                SetVar(i, treeId);
             }
 
             for (size_t i = 0; i < vectorVarValues.size(); ++i) {
-                SetVectorVar(i);
+                SetVectorVar(i, treeId);
             }
             // cout << vectorVarValues.size() << endl;
             // for (size_t i = 0; i < vectorVarValues.size(); ++i) {
@@ -310,7 +315,7 @@ public:
 
         // get the number of entries in the TChain
         Int_t GetEntries() {
-            return nEvents;  
+            return nEvents;
         }
 
     /// CUTS
@@ -528,11 +533,18 @@ private:
     /// CON/DESTRUCTOR HELPERS
     ///
         template<typename t>
+        void DelVector(vector<vector<t*>> &v) {
+            for (size_t i = 0; i < v.size(); ++i) {
+                DelVector(v[i]); 
+            }
+        }
+
+        template<typename t>
         void DelVector(vector<t*> &v) {
             for (size_t i = 0; i < v.size(); ++i) {
                 delete v[i];
                 v[i] = nullptr;
-            }
+            }            
         }
 
     /// VARIABLE TRACKER HELPERS
@@ -543,54 +555,60 @@ private:
                 throw "Vector variable '" + vectorName + "' already exists!"; 
             size_t index = compIndex.size();
             logp("Adding " + to_string(components.size()) + " components to vector " + vectorName + "...  "); 
-            compVectors.push_back(vector<TLeaf*>());
+            compVectors.push_back(vector<vector<TLeaf*>>());
             compNames.push_back(vector<string>());
-
+            // cout << endl; 
             for (size_t i = 0; i < components.size(); ++i) {
-                compVectors[index].push_back(chain->FindLeaf(components[i].c_str()));
+                auto inp = chain->FindLeaf(components[i].c_str());
+                // cout << i << " " << inp.size() << endl; 
+                compVectors[index].push_back(inp);
                 compNames[index].push_back(lastWord(components[i]));
             }
+            // cout << endl; 
+            // cout << compVectors[index][0].size()  << endl; 
+            // cout << compVectors[index].size() << endl;
+            // cout << compVectors.size() << endl; 
             compIndex[vectorName] = index;
         }
 
     /// ENTRY LOADER HELPERS
     /// 
 
-        void SetLorentz(size_t leafIndex, size_t lvIndex) {
-            vector<TLeaf*> & v = compVectors[leafIndex];
+        void SetLorentz(size_t leafIndex, size_t lvIndex, size_t treeIndex) {
+            vector<vector<TLeaf*>> & v = compVectors[leafIndex];
             vector<TLorentzVector> * ret = LorentzVectors[lvIndex];
             ret->clear();
-
-            size_t n = v[0]->GetLen(); 
+            size_t n = v[0][treeIndex]->GetLen();
+            // cout << endl << n << v[1]->GetLen() << v[2]->GetLen() << v[3]->GetLen() << endl;
             for (size_t i = 0; i < n; ++i) {
                 ret->push_back(TLorentzVector());
                 ret->at(i).SetPtEtaPhiM(
-                    v[0]->GetValue(i),
-                    v[1]->GetValue(i),
-                    v[2]->GetValue(i),
-                    v[3]->GetValue(i)
+                    v[0][treeIndex]->GetValue(i),
+                    v[1][treeIndex]->GetValue(i),
+                    v[2][treeIndex]->GetValue(i),
+                    v[3][treeIndex]->GetValue(i)
                 );
             }
         }
 
-        void SetMock(size_t leafIndex, size_t mvIndex) {
-            vector<TLeaf*> & v = compVectors[leafIndex];
+        void SetMock(size_t leafIndex, size_t mvIndex, size_t treeIndex) {
+            vector<vector<TLeaf*>> & v = compVectors[leafIndex];
             vector<TLorentzMock>* ret = MockVectors[mvIndex];            
             ret->clear();
 
-            size_t n = v[0]->GetLen(), size = v.size();
+            size_t n = v[0][treeIndex]->GetLen(), size = v.size();
             for(size_t i = 0; i < n; ++i) {
                 switch(size) {
                     case 2: {
-                        ret->push_back(TLorentzMock(v[0]->GetValue(i), v[1]->GetValue(i)));
+                        ret->push_back(TLorentzMock(v[0][treeIndex]->GetValue(i), v[1][treeIndex]->GetValue(i)));
                         break;
                     }
                     case 3: {
-                        ret->push_back(TLorentzMock(v[0]->GetValue(i), v[1]->GetValue(i), v[2]->GetValue(i)));
+                        ret->push_back(TLorentzMock(v[0][treeIndex]->GetValue(i), v[1][treeIndex]->GetValue(i), v[2][treeIndex]->GetValue(i)));
                         break;
                     }
                     case 4: {
-                        ret->push_back(TLorentzMock(v[0]->GetValue(i), v[1]->GetValue(i), v[2]->GetValue(i), v[3]->GetValue(i)));
+                        ret->push_back(TLorentzMock(v[0][treeIndex]->GetValue(i), v[1][treeIndex]->GetValue(i), v[2][treeIndex]->GetValue(i), v[3][treeIndex]->GetValue(i)));
                         break;
                     }
                     default: {
@@ -600,14 +618,14 @@ private:
             }
         }
 
-        void SetMap(size_t leafIndex, size_t mIndex) {
-            vector<TLeaf*> & v = compVectors[leafIndex];
+        void SetMap(size_t leafIndex, size_t mIndex, size_t treeIndex) {
+            vector<vector<TLeaf*>> & v = compVectors[leafIndex];
 
             // cout << mIndex << endl;
             // cout << leafIndex << endl;
             // cout << MapVectors.size() << endl; 
             vector<vector<double>>* ret = MapVectors[mIndex];
-            size_t n = v[0]->GetLen();
+            size_t n = v[0][treeIndex]->GetLen();
 
             ret->clear(); 
             ret->resize(n);
@@ -616,19 +634,19 @@ private:
                 ret->at(i).clear();
                 ret->at(i).reserve(v.size());
                 for (size_t j = 0; j < v.size(); ++j) {
-                    ret->at(i).push_back(v[j]->GetValue(i));
+                    ret->at(i).push_back(v[j][treeIndex]->GetValue(i));
                 }
             }
         }
 
-        void SetVar(size_t leafIndex) {
-            *varValues[leafIndex] = varLeaves[leafIndex]->GetValue(0);
+        void SetVar(size_t leafIndex, size_t treeIndex) {
+            *varValues[leafIndex] = varLeaves[leafIndex][treeIndex]->GetValue(0);
         }
 
-        void SetVectorVar(size_t leafIndex) {
+        void SetVectorVar(size_t leafIndex, size_t treeIndex) {
             vectorVarValues[leafIndex]->clear();
-            for (int i = 0; i < vectorVarLeaves[leafIndex]->GetLen(); ++i) {
-                vectorVarValues[leafIndex]->push_back(vectorVarLeaves[leafIndex]->GetValue(i));
+            for (int i = 0; i < vectorVarLeaves[leafIndex][treeIndex]->GetLen(); ++i) {
+                vectorVarValues[leafIndex]->push_back(vectorVarLeaves[leafIndex][treeIndex]->GetValue(i));
             }
             // log(leafIndex);
             // log(vectorVarLeaves[leafIndex]->GetLen());
@@ -760,8 +778,7 @@ private:
         std::chrono::high_resolution_clock::time_point timestart;
 
         // file data
-        TFileCollection *fc=nullptr;
-        TChain *chain=nullptr;
+        ParallelTreeChain *chain=nullptr;
         TFile *file=nullptr; 
 
         // logging data
@@ -774,12 +791,12 @@ private:
 
         // single variable data
         std::map<string, size_t> varIndex;
-        vector<TLeaf *> varLeaves;
+        vector<vector<TLeaf *>> varLeaves; // CHANGE
         vector<double*> varValues;
 
         // vector variable data
         std::map<string, size_t> vectorVarIndex;
-        vector<TLeaf *> vectorVarLeaves;
+        vector<vector<TLeaf *>> vectorVarLeaves; // CHANGE
         vector<vector<double>*> vectorVarValues;
 
         // vector component data
@@ -787,7 +804,7 @@ private:
         std::map<string, size_t> compIndex;
         vector<pair<size_t, vectorType>> subIndex;
         //   names
-        vector<vector<TLeaf*>> compVectors;
+        vector<vector<vector<TLeaf*>>> compVectors; // CHANGE
         vector<vector<string>> compNames;
         //   values
         vector< vector< TLorentzVector >*> LorentzVectors;

@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     SVJFinder core(argv);
 
     // make file collection and chain
-    core.MakeFileCollection();
+    // core.MakeFileCollection();
     core.MakeChain();
 
     // add histogram tracking
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
     double* metFull_Phi = core.AddVar("metPhi", "MissingET.Phi");
 
     // disable debug
-    // core.Debug(false);
+    core.Debug(false);
 
     // loop over the first nEntries (debug) 
     // start loop timer
