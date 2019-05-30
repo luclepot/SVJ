@@ -24,7 +24,7 @@ class Converter:
         outputdir,
         name,
         ffilter,
-        jetDR=0.8,
+        jetDR=0.8
     ):
 
         self.inputdir = inputdir
@@ -41,7 +41,14 @@ class Converter:
         self.trees = [tf.Get("Delphes") for tf in self.files]
         self.sizes = [int(t.GetEntries()) for t in self.trees]
         self.nEvents = sum(self.sizes)
+
         self.jetDR = jetDR
+
+        self.event_feature_names =  ['mJJ', 'j1Eta', 'j1Phi', 'j1Pt', 'j1M', 'j1E', 'j2Pt', 'j2M', 'j2E', 'DeltaEtaJJ', 'DeltaPhiJJ']
+        self.particle_feature_names = ['pEta', 'pPhi', 'pPt']
+        self.n_constituent_particles=100
+        self.n_jets = 2
+        self.jetvars = ['Pt', 'Eta', 'Phi', 'M', 'E']
 
         spathout = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
         spathin = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
@@ -74,16 +81,17 @@ class Converter:
     def convert(
         self,
         rng=None,
-        n_constituent_particles=100, 
     ):
         if rng is None:
             rng = (0, self.nEvents)
         nmin, nmax = rng
 
         selections_iter = self.selections[(self.selections_abs > nmin) & (self.selections_abs < nmax)]
-        # HLF = np.empty((len(selections_iter),) + self.get_HLF().shape)
+        
+        event_features = np.empty((len(selections_iter), len(self.event_feature_names)))
+        jet_constituents = np.empty((len(selections_iter), self.n_jets, self.n_constituent_particles, len(self.particle_feature_names)))
 
-        jet_constituents = np.empty((len(selections_iter), 2, n_constituent_particles, 3))
+        ftn = 0
         # selection is implicit: looping only through total selectinos
         for count,(tree_n, i) in enumerate(selections_iter):
             
@@ -92,8 +100,9 @@ class Converter:
             tree = self.trees[tree_n]
             tree.GetEntry(i)
 
-            for jetn in range(2):
-                jet = tree.Jet[jetn].P4()
+            jets = [tree.Jet[jetn].P4() for jetn in range(self.n_jets)]
+
+            for jetn,jet in enumerate(jets):
 
                 # grab
                 plist = np.concatenate([
@@ -103,12 +112,12 @@ class Converter:
                 ], axis=0)
                 
                 # sort
-                plist = plist[plist[:,2].argsort()][::-1][0:n_constituent_particles,:]
+                plist = plist[plist[:,2].argsort()][::-1][0:self.n_constituent_particles,:]
 
                 # pad && add
-                toadd= np.pad(plist, [(0, n_constituent_particles - plist.shape[0]),(0,0)], 'constant')
-                jet_constituents[count, jetn] = toadd
+                jet_constituents[count, jetn] = np.pad(plist, [(0, self.n_constituent_particles - plist.shape[0]),(0,0)], 'constant')
 
+            event_features[count] = np.fromiter(self.get_jet_features(jets), float, count=len(self.event_feature_names))
             # HLF[count] = self.get_HLF(tree)
             # pvec.append(self.GetParticles(tree.EFlowTrack, "PT > 0.1", "PT"))
             # pvec.append(self.GetParticles(tree.EFlowNeutralHadron, "ET > 0.5", "ET"))
@@ -116,7 +125,24 @@ class Converter:
 
             # particles.append(pvec)
 
-        return jet_constituents
+        return jet_constituents, event_features
+
+
+    def get_jet_features(
+        self,
+        jets
+    ):
+
+        yield (jets[0] + jets[1]).M()       # Mjj
+        yield jets[0].Eta()
+        yield jets[0].Phi()
+        for j in jets:
+            yield j.Pt()
+            yield j.M()
+            yield j.E()
+        yield jets[0].Eta() - jets[1].Eta()       # deltaeta
+        yield jets[0].DeltaPhi(jets[1])           # deltaphi
+        
 
     def get_jet_constituents(
         self,
