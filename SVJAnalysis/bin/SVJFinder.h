@@ -18,6 +18,7 @@
 #include <cassert>
 #include <chrono>
 #include "ParallelTreeChain.h"
+#include "TMath.h"
 
 using std::fabs;
 using std::chrono::microseconds;  
@@ -349,9 +350,9 @@ public:
         }
 
         void PrintCutFlow() {
-            int n = 10;
-            int ns = 10;
             int fn = 15;
+            int ns = 6 + int(log10(CutFlow[0]));
+            int n = 10;
 
             log(); 
             cout << std::setprecision(2) << std::fixed;
@@ -406,14 +407,16 @@ public:
         }
 
         void UpdateSelectionIndex(size_t entry) {
-            selectionIndex.push_back(entry);
+            chain->GetN(entry); 
+            selectionIndex.push_back(chain->currentEntry);
+            selectionTree.push_back(chain->currentTree); 
         }
 
         void WriteSelectionIndex() {
             std::ofstream f(outputdir + "/" + sample + "_selection.txt");
             if (f.is_open()) {
                 for (size_t i = 0; i < selectionIndex.size(); i++){
-                    f << selectionIndex[i] << " ";
+                    f << selectionTree[i] << "," << selectionIndex[i] << " ";
                 }
                 f.close();
             }
@@ -813,5 +816,6 @@ private:
 
         // cut variables
         vector<int> cutValues = vector<int>(Cuts::COUNT, -1); 
-        vector<size_t> selectionIndex; 
+        vector<size_t> selectionIndex;
+        vector<size_t> selectionTree; 
 };
