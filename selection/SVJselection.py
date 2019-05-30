@@ -10,7 +10,7 @@ import math
 import pickle
 
 
-LOG_PREFIX = "SVJAnalysis :: "
+LOG_PREFIX = "SVJselection :: "
 
 def log(msg=""):
     print(LOG_PREFIX + str(msg))
@@ -24,11 +24,11 @@ hline = '-'*80
 log(hline)
 log("PYTHON")
 
-# def range_input(s):
-#     try:
-#         return tuple(map(int, s.split(',')))
-#     except:
-#         raise argpparse.ArgumentTypeError("argument '{}' is not of form int,int !".format(s))
+def range_input(s):
+    try:
+        return tuple(map(int, s.split(',')))
+    except:
+        raise argpparse.ArgumentTypeError("argument '{}' is not of form int,int !".format(s))
 
 if sys.version_info < (2, 7):
     # os.system('cmsenv')
@@ -49,8 +49,8 @@ parser.add_argument('-i', '--input', dest='inputdir', action='store', required=T
 parser.add_argument('-o', '--output', dest='outputdir', action='store', required=True, help='output directory (relative to this python file)')
 parser.add_argument('-n', '--name', dest='name', action='store', default='sample', help='sample save name')
 parser.add_argument('-f', '--filter', dest='filter', action='store', default='*', help='glob-style filter for root files in inputfile')
-# parser.add_argument('-r', '--range', dest='range', action='store', default=(-1,-1), type=range_input, help='subset of tree values to parse')
-parser.add_argument('-s', '--subset', dest='subset', action='store', default=-1, type=int, help='n events to run, out of total')
+parser.add_argument('-r', '--range', dest='range', action='store', default=(-1,-1), type=range_input, help='subset of tree values to parse')
+# parser.add_argument('-s', '--subset', dest='subset', action='store', default=-1, type=int, help='n events to run, out of total')
 parser.add_argument('-d', '--debug', dest='debug', action='store_true', default=False, help='enable debug output')
 parser.add_argument('-t', '--timing', dest='timing', action='store_true', default=False, help='enable timing output')
 parser.add_argument('-c', '--save-cuts', dest='cuts', action='store_true', default=False, help='save cut values')
@@ -101,7 +101,7 @@ with open(samplefile, "w+") as sf:
     for samplename in samplenames:
         sf.write(samplename + '\n')
 
-cmd = 'SVJAnalysis ' + ' '.join([samplefile, args.name, outputdir, '1' if args.debug else '0', '1' if args.timing else '0', '1' if args.cuts else '0', str(int(args.subset))])
+cmd = 'SVJselection ' + ' '.join([samplefile, args.name, outputdir, '1' if args.debug else '0', '1' if args.timing else '0', '1' if args.cuts else '0', str(int(args.range[0])), str(int(args.range[1]))])
 
 
 if args.gdb:

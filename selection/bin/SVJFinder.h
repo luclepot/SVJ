@@ -94,6 +94,7 @@ public:
         // constructor, requires argv as input
         SVJFinder(char **argv) {
             start();
+            tStart(programstart); 
             log("ROOT");
             log();
             log("-----------------------------------");
@@ -112,7 +113,11 @@ public:
             debug = std::atoi(argv[4]);
             timing = std::atoi(argv[5]);
             saveCuts = std::atoi(argv[6]);
-            nToRun = std::stoi(argv[7]); 
+            nMin = std::stoi(argv[7]);
+            nMax = std::stoi(argv[8]); 
+
+            if (nMin < 0) 
+                nMin = 0; 
 
             log("SVJ object created");
             end();
@@ -122,7 +127,7 @@ public:
 
         // destructor for dynamically allocated data
         ~SVJFinder() {
-            start(); 
+            start();
 
             Debug(true); 
             log();
@@ -141,7 +146,12 @@ public:
             logr("Success");
             end();
             logt();
-            
+            log();
+            double pdur = tsRaw(tEnd(programstart));
+            logp("total program duration: ");
+            lograw(pdur);
+            logr("s");
+
             log(); 
             // DelVector(varLeaves);
             // DelVector(vectorVarLeaves);
@@ -176,8 +186,8 @@ public:
             file = new TFile((outputdir + "/" + sample + "_output.root").c_str(), "RECREATE");
             nEvents = (Int_t)chain->GetEntries();
 
-            if (nToRun < 0 || nToRun > nEvents)
-                nToRun = nEvents;
+            if (nMax < 0 || nMax > nEvents)
+                nMax = nEvents;
 
             log("Success");
             end();
@@ -511,12 +521,12 @@ public:
 
         // internal timer start
         void start() {
-            timestart = std::chrono::high_resolution_clock::now(); 
+            tStart(timestart); 
         }
 
         // internal timer end
         void end() {
-            duration = duration_cast<microseconds>(std::chrono::high_resolution_clock::now() - timestart).count();
+            duration = tEnd(timestart); 
         }
 
     /// PUBLIC DATA
@@ -525,7 +535,7 @@ public:
         string sample, inputspec, outputdir;
 
         // number of events
-        Int_t nEvents, nToRun;
+        Int_t nEvents, nMin, nMax;
         // internal debug switch
         bool debug=true, timing=true, saveCuts=true; 
 
@@ -659,6 +669,19 @@ private:
 
     /// SWITCH, TIMING, AND LOGGING HELPERS
     /// 
+
+        double tsRaw(double d) {
+            return d/1000000.; 
+        }
+
+        void tStart(std::chrono::high_resolution_clock::time_point & t) {
+            t = std::chrono::high_resolution_clock::now();
+        }
+
+        double tEnd(std::chrono::high_resolution_clock::time_point & t) {
+            return duration_cast<microseconds>(std::chrono::high_resolution_clock::now() - t).count(); 
+        }
+
         void log() {
             if (debug)
                 cout << LOG_PREFIX << endl; 
@@ -778,14 +801,14 @@ private:
 
         // timing data
         double duration = 0;
-        std::chrono::high_resolution_clock::time_point timestart;
+        std::chrono::high_resolution_clock::time_point timestart, programstart;
 
         // file data
         ParallelTreeChain *chain=nullptr;
         TFile *file=nullptr; 
 
         // logging data
-        const string LOG_PREFIX = "SVJAnalysis :: ";
+        const string LOG_PREFIX = "SVJselection :: ";
         std::map<vectorType, std::string> componentTypeStrings = {
             {vectorType::Lorentz, "TLorentzVector"},
             {vectorType::Mock, "MockTLorentzVector"},
