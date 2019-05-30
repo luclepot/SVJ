@@ -8,11 +8,18 @@ import sys
 import time
 import glob
 
+
 try:
     DELPHES_DIR = os.environ["DELPHES_DIR"]
 except:
     print("WARNING: Did you forget to source 'setup.sh'??")
     sys.exit(0)
+
+rt.gSystem.Load("{}/lib/libDelphes.so".format(DELPHES_DIR))
+rt.gInterpreter.Declare('#include "{}/include/modules/Delphes.h"'.format(DELPHES_DIR))
+rt.gInterpreter.Declare('#include "{}/include/classes/DelphesClasses.h"'.format(DELPHES_DIR))
+rt.gInterpreter.Declare('#include "{}/include/classes/DelphesFactory.h"'.format(DELPHES_DIR))
+rt.gInterpreter.Declare('#include "{}/include/ExRootAnalysis/ExRootTreeReader.h"'.format(DELPHES_DIR))
 
 class Converter:
 
@@ -24,11 +31,13 @@ class Converter:
         outputdir,
         name,
         ffilter,
-        jetDR=0.8
+        jetDR=0.8,
+        n_constituent_particles=100,
+
     ):
 
-        self.inputdir = inputdir
-        self.outputdir = outputdir
+        self.inputdir = Converter.smartpath(inputdir)
+        self.outputdir = Converter.smartpath(outputdir)
         self.name = name
 
         if not ffilter.endswith('*.root'):
@@ -45,10 +54,12 @@ class Converter:
         self.jetDR = jetDR
 
         self.event_feature_names =  ['mJJ', 'j1Eta', 'j1Phi', 'j1Pt', 'j1M', 'j1E', 'j2Pt', 'j2M', 'j2E', 'DeltaEtaJJ', 'DeltaPhiJJ']
-        self.particle_feature_names = ['pEta', 'pPhi', 'pPt']
-        self.n_constituent_particles=100
+        self.jet_constituent_names = ['pEta', 'pPhi', 'pPt']
+        self.n_constituent_particles=n_constituent_particles
         self.n_jets = 2
         self.jetvars = ['Pt', 'Eta', 'Phi', 'M', 'E']
+        self.event_features = None
+        self.jet_constituents = None
 
         spathout = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
         spathin = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
@@ -88,8 +99,8 @@ class Converter:
 
         selections_iter = self.selections[(self.selections_abs > nmin) & (self.selections_abs < nmax)]
         
-        event_features = np.empty((len(selections_iter), len(self.event_feature_names)))
-        jet_constituents = np.empty((len(selections_iter), self.n_jets, self.n_constituent_particles, len(self.particle_feature_names)))
+        self.event_features = np.empty((len(selections_iter), len(self.event_feature_names)))
+        self.jet_constituents = np.empty((len(selections_iter), self.n_jets, self.n_constituent_particles, len(self.jet_constituent_names)))
 
         ftn = 0
         # selection is implicit: looping only through total selectinos
@@ -115,9 +126,9 @@ class Converter:
                 plist = plist[plist[:,2].argsort()][::-1][0:self.n_constituent_particles,:]
 
                 # pad && add
-                jet_constituents[count, jetn] = np.pad(plist, [(0, self.n_constituent_particles - plist.shape[0]),(0,0)], 'constant')
+                self.jet_constituents[count, jetn] = np.pad(plist, [(0, self.n_constituent_particles - plist.shape[0]),(0,0)], 'constant')
 
-            event_features[count] = np.fromiter(self.get_jet_features(jets), float, count=len(self.event_feature_names))
+            self.event_features[count] = np.fromiter(self.get_jet_features(jets), float, count=len(self.event_feature_names))
             # HLF[count] = self.get_HLF(tree)
             # pvec.append(self.GetParticles(tree.EFlowTrack, "PT > 0.1", "PT"))
             # pvec.append(self.GetParticles(tree.EFlowNeutralHadron, "ET > 0.5", "ET"))
@@ -125,8 +136,23 @@ class Converter:
 
             # particles.append(pvec)
 
-        return jet_constituents, event_features
+        return self.jet_constituents, self.event_features
+               
+    def save(
+        self,
+        outputfile=None,
+    ):
+        outputfile = outputfile or os.path.join(self.outputdir, "{}_data.h5".format(self.name))
 
+        if not outputfile.endswith(".h5"):
+            outputfile += ".h5"
+        
+        f = h5py.File(outputfile, "w")
+        f.create_dataset('event_feature_data', data=self.event_features)
+        f.create_dataset('event_feature_names', data=self.event_feature_names)
+        f.create_dataset('jet_constituent_data', data=self.jet_constituents)
+        f.create_dataset('jet_constituent_names', data=self.jet_constituent_names)
+        f.close()
 
     def get_jet_features(
         self,
@@ -143,7 +169,6 @@ class Converter:
         yield jets[0].Eta() - jets[1].Eta()       # deltaeta
         yield jets[0].DeltaPhi(jets[1])           # deltaphi
         
-
     def get_jet_constituents(
         self,
         jet,
@@ -165,53 +190,16 @@ class Converter:
                     selected.append([deltaEta, deltaPhi, pt])
 
         return np.asarray(selected)
-
-    # def get_HLF(
-    #     self,
-    #     tree=None
-    # ):
-    #     ret = np.empty((2,4))
-    #     if tree is None:
-    #         return ret
-            
-    #     for i,jet in enumerate(tree.Jet):
-    #         if i >= 2:
-    #             break
-
-    #         ret[i] = jet.PT, jet.Phi, jet.Eta, jet.Mass
-
-    #     return ret
-
-    def PtMap(
-        self,
-        vector_to_loop,
-        req,
-        eType,
+ 
+    @staticmethod
+    def smartpath(
+        s
     ):
-        ptmap = []
-        for h in vector_to_loop:
-            if eval('h.' + req):
-                ptmap.append([h.Eta, h.Phi, eval('h.' + eType)])
-        return np.asarray(ptmap)
-                
-    def save(
-        self,
-        outputfile,
-        outputarray,
-    ):
-        if not outputfile.endswith(".h5"):
-            outputfile += ".h5"
-        
-        f = h5py.File(outputfile, "w")
-        f.create_dataset('HLF', data=np.zeros(10), compression='gzip')
-
-def smartpath(s):
-    if s.startswith('~'):
-        return s
-    return os.path.abspath(s)
+        if s.startswith('~'):
+            return s
+        return os.path.abspath(s)
 
 if __name__ == "__main__":
-
 
     def range_input(s):
         try:
@@ -220,11 +208,13 @@ if __name__ == "__main__":
             raise argparse.ArgumentTypeError("-r input not in format: int,int")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("inputdir", action="store", type=str, help="input dir path")
-    parser.add_argument("outputdir", action="store", type=str, help="output dir path")
+    parser.add_argument('-i', '--inputdir', dest="inputdir", action="store", type=str, help="input dir path", required=True)
+    parser.add_argument('-o', '--outputdir', dest="outputdir", action="store", type=str, help="output dir path", required=True)
     parser.add_argument('-n', '--name', dest='name', action='store', default='sample', help='sample save name')
     parser.add_argument('-f', '--filter', dest='filter', action='store', default='*', help='glob-style filter for root files in inputfile')
-    parser.add_argument('-r', '--range', dest='range', action='store', type=range_input, default=None)
+    parser.add_argument('-r', '--range', dest='range', action='store', type=range_input, default=None, help='range of data to parse')
+    parser.add_argument('-d', '--dr', dest='DR', action='store', type=float, default=0.8, help='dr parameter for jet finding')
+    parser.add_argument('-c', '--constituents', dest='NC', action='store', type=int, default=100, help='number of jet constituents to save')
 
     if len(sys.argv) < 2:
         parser.print_help()
@@ -232,15 +222,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args(sys.argv[1:])
 
-    inputdir = smartpath(args.inputdir) 
-    outputdir = smartpath(args.outputdir)
-
-    rt.gSystem.Load("{}/lib/libDelphes.so".format(DELPHES_DIR))
-    rt.gInterpreter.Declare('#include "{}/include/modules/Delphes.h"'.format(DELPHES_DIR))
-    rt.gInterpreter.Declare('#include "{}/include/classes/DelphesClasses.h"'.format(DELPHES_DIR))
-    rt.gInterpreter.Declare('#include "{}/include/classes/DelphesFactory.h"'.format(DELPHES_DIR))
-    rt.gInterpreter.Declare('#include "{}/include/ExRootAnalysis/ExRootTreeReader.h"'.format(DELPHES_DIR))
-
-    core = Converter(inputdir, outputdir, args.name, args.filter)
+    core = Converter(args.inputdir, args.outputdir, args.name, args.filter, args.DR, )
     ret = core.convert(rng=args.range)
-    # core.save(outputdir)
+    core.save()

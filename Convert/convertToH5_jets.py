@@ -159,12 +159,12 @@ def Convert(filenameIN, filenameOUT, sideband = False, verbose = False):
 
     return jetConstituentsList, eventFeatures
     #
-    # f = h5py.File(filenameOUT, "w")
-    # f.create_dataset('eventFeatures', data=eventFeatures, compression='gzip')
-    # f.create_dataset('jetConstituentsList', data=jetConstituentsList, compression='gzip')
-    # f.create_dataset('eventFeatureNames', data=eventFeatureNames, compression='gzip')
-    # f.create_dataset('particleFeatureNames', data=particleFeatureNames, compression='gzip')
-    # f.close()
+    f = h5py.File(filenameOUT, "w")
+    f.create_dataset('eventFeatures', data=eventFeatures, compression='gzip')
+    f.create_dataset('jetConstituentsList', data=jetConstituentsList, compression='gzip')
+    f.create_dataset('eventFeatureNames', data=eventFeatureNames, compression='gzip')
+    f.create_dataset('particleFeatureNames', data=particleFeatureNames, compression='gzip')
+    f.close()
 
 
 if __name__ == "__main__":
