@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
 
     core.start();
 
-    for (Int_t entry = 0; entry < core.nToRun; ++entry) {
+    for (Int_t entry = core.nMin; entry < core.nMax; ++entry) {
 
         // init
         core.InitCuts(); 
