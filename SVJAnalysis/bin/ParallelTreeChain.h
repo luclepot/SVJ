@@ -41,15 +41,7 @@ class ParallelTreeChain{
             return v;
         }
 
-        int GetEntry(int entry) {
-            if (entry > entries)
-                return -1;
-            getN(entry);
-            trees[currentTree]->GetEntry(currentEntry);
-            return currentTree;
-        }
-
-        void getN(int entry){
+        void GetN(int entry){
             int tn = 0;
             while (entry >= 0) 
                 entry -= sizes[tn++];
@@ -59,6 +51,14 @@ class ParallelTreeChain{
 
         size_t size() {
             return ntrees;
+        }
+
+        int GetEntry(int entry) {
+            if (entry > entries)
+                return -1;
+            GetN(entry);
+            trees[currentTree]->GetEntry(currentEntry);
+            return currentTree;
         }
 
         Int_t GetEntries() { 
@@ -78,6 +78,10 @@ class ParallelTreeChain{
             ntrees = trees.size(); 
         }
 
+        int currentEntry, currentTree; 
+
+    private:
+    
         void GetTreeNames(string filename) {
             std::ifstream file(filename.c_str());
             string s;
@@ -86,7 +90,6 @@ class ParallelTreeChain{
                     treenames.push_back(s);
         }
 
-        int currentEntry, currentTree; 
         size_t ntrees;
         Int_t entries; 
         vector<string> treenames;
