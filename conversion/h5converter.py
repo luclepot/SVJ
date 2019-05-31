@@ -14,12 +14,15 @@ class Converter:
         self,
         inputdir,
         outputdir,
+        filespec,
+        spath,
         name,
         jetDR=0.8,
         n_constituent_particles=100,
     ):
-        self.inputdir = Converter.smartpath(inputdir)
-        self.outputdir = Converter.smartpath(outputdir)
+        self.inputdir = inputdir
+        self.outputdir = outputdir
+
         self.name = name
 
         try:
@@ -45,9 +48,8 @@ class Converter:
             self.log("QUITTING")
             sys.exit(1)
 
-
-        self.filespec = self.check_for_default_file("filelist")
-        self.spath = self.check_for_default_file("selection")
+        self.filespec = filespec
+        self.spath = spath
 
         with open(filespec) as f:
             self.inputfiles = [line.strip('\n').strip() for line in f.readlines()]
@@ -85,21 +87,6 @@ class Converter:
         particle_dict = {}
 
         self.selections_abs = np.asarray([sum(self.sizes[:s[0]]) + s[1] for s in self.selections])
-
-    def check_for_default_file(
-        self,
-        file_pattern,
-        suffix="txt"
-    ):
-        fname = "{}_{}.{}".format(self.name, file_pattern, suffix)
-        spathout = os.path.join(self.outputdir, fname)
-        spathin = os.path.join(self.inputdir, fname)
-        if os.path.exists(spathout):
-            return spathout
-        elif os.path.exists(spathin):
-            return spathin            
-        else:
-            raise AttributeError("Selection file does not exist in either input/output dirs!!")
 
     def log(
         self,
@@ -214,16 +201,9 @@ class Converter:
 
         return np.asarray(selected)
  
-    @staticmethod
-    def smartpath(
-        s
-    ):
-        if s.startswith('~'):
-            return s
-        return os.path.abspath(s)
 
 if __name__ == "__main__":
-    (_, inputdir, outputdir, name, dr, nc, rmin, rmax) = sys.argv
-    core = Converter(inputdir, outputdir, name, float(dr), int(nc))
+    (_, inputdir, outputdir, filespec, pathspec, name, dr, nc, rmin, rmax) = sys.argv
+    core = Converter(inputdir, outputdir, filespec, pathspec, name, float(dr), int(nc))
     ret = core.convert((int(rmin), int(rmax)))
     core.save()

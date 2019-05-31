@@ -3,6 +3,23 @@ import sys
 from argparse import ArgumentParser
 
 BASE_COMMAND = 'env -i HOME=$HOME bash -i -c "<CMD>"'
+LOG_PREFIX = "Driver :: "
+ERROR_PREFIX = LOG_PREFIX + "ERROR: "
+
+### helper functions
+
+def log(s):
+    logbase(s, LOG_PREFIX)
+
+def error(s):
+    logbase(s, ERROR_PREFIX)
+
+def logbase(s, prefix):
+    if isinstance(s, str):
+        for line in s.split('\n'):
+            print prefix + str(line)
+    else:
+        print prefix + str(line)
 
 
 def _range_input(s):
@@ -10,6 +27,28 @@ def _range_input(s):
         return tuple(map(int, s.strip().strip(')').strip('(').split(',')))
     except:
         raise argparse.ArgumentTypeError("-r input not in format: int,int")
+
+def _smartpath(s):
+    if s.startswith('~'):
+        return s
+    return os.path.abspath(s)
+
+def _check_for_default_file(pathoptions, name, pattern, suffix="txt"):
+    fname = "{}_{}.{}".format(name, pattern, suffix)
+    
+    if isinstance(pathoptions, str):
+        pathoptions = [pathoptions]
+    
+    for path in pathoptions:
+        spath = os.path.join(path, fname)
+        if os.path.exists(spath):
+            return spath
+
+    error("file wih pattern '{}' does not exist in any of: \n\t{}".format(fname, "\n\t".join(pathoptions)))
+    error("quiting")
+    sys.exit(1)
+
+### parser setup
 
 def setup_parser():
     parser = ArgumentParser()
@@ -22,8 +61,8 @@ def setup_parser():
     
     # general criteria
     for subparser in [select, convert, train]:
-        subparser.add_argument('-i', '--input', dest="inputdir", action="store", type=str, help="input dir path", required=True)
-        subparser.add_argument('-o', '--output', dest="outputdir", action="store", type=str, help="output dir path", required=True)
+        subparser.add_argument('-i', '--input', dest="inputdir", action="store", type=_smartpath, help="input dir path", required=True)
+        subparser.add_argument('-o', '--output', dest="outputdir", action="store", type=_smartpath, help="output dir path", required=True)
         subparser.add_argument('-n', '--name', dest='name', action='store', default='sample', help='sample save name')
     
     # selection args
@@ -43,22 +82,27 @@ def setup_parser():
 
     return parser
 
+def select_main(inputdir, outputdir, name, filter, range, debug, timing, cuts, build, dryrun, gdb):
+    log("running command 'select'")
+
+    sys.exit(0)
+
 def convert_main(inputdir, outputdir, name, range, DR, NC):
+    log("running command 'convert'")
+    filespec = _check_for_default_file([inputdir, outputdir], name, 'filelist')
+    spath = _check_for_default_file([inputdir, outputdir], name, 'selection')
     setup_command = "source conversion/setup.sh"
     python_command = "python conversion/h5converter.py "
-    python_command += " ".join(map(str, [inputdir, outputdir, name, DR, NC, range[0], range[1]]))
+    python_command += " ".join(map(str, [inputdir, outputdir, filespec, spath, name, DR, NC, range[0], range[1]]))
     os.system("; ".join([setup_command, python_command]))
     sys.exit(0)
 
-def select_main(inputdir, outputdir, name, filter, range, debug, timing, cuts, build, dryrun, gdb):
-    print "select main"
-    sys.exit(0)
-
 def train_main(inputdir, outputdir, name, filter):
-    print "train main"
+    log("running command 'train'")
     sys.exit(0)
 
 if __name__=="__main__":
+    log("setting up driver")
     parser = setup_parser()
     argv = sys.argv[1:]
 
@@ -67,6 +111,7 @@ if __name__=="__main__":
     else:
         parser.print_help()
         sys.exit(0)
+
 
     args_dict = { var: vars(args)[var] for var in vars(args) if "COMMAND" not in var }
 
