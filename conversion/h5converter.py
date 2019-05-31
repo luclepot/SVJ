@@ -1,25 +1,10 @@
 import numpy as np
-import h5py
-import ROOT as rt
 import math
 import os
 import argparse
 import sys
 import time
-import glob
-
-
-try:
-    DELPHES_DIR = os.environ["DELPHES_DIR"]
-except:
-    print("WARNING: Did you forget to source 'setup.sh'??")
-    sys.exit(0)
-
-rt.gSystem.Load("{}/lib/libDelphes.so".format(DELPHES_DIR))
-rt.gInterpreter.Declare('#include "{}/include/modules/Delphes.h"'.format(DELPHES_DIR))
-rt.gInterpreter.Declare('#include "{}/include/classes/DelphesClasses.h"'.format(DELPHES_DIR))
-rt.gInterpreter.Declare('#include "{}/include/classes/DelphesFactory.h"'.format(DELPHES_DIR))
-rt.gInterpreter.Declare('#include "{}/include/ExRootAnalysis/ExRootTreeReader.h"'.format(DELPHES_DIR))
+from traceback import format_exc
 
 class Converter:
 
@@ -30,23 +15,45 @@ class Converter:
         inputdir,
         outputdir,
         name,
-        ffilter,
         jetDR=0.8,
         n_constituent_particles=100,
-
     ):
-
         self.inputdir = Converter.smartpath(inputdir)
         self.outputdir = Converter.smartpath(outputdir)
         self.name = name
 
-        if not ffilter.endswith('*.root'):
-            ffilter += '*.root'
+        try:
+            self.DELPHES_DIR = os.environ["DELPHES_DIR"]
+        except:
+            self.log("WARNING: Did you forget to source 'setup.sh'??")
+            self.log("QUITTING")
+            sys.exit(1)
 
-        self.inputfiles = glob.glob(os.path.join(inputdir, ffilter))
+        try:
+            import h5py
+            from ROOT import TFile
+            from ROOT.gSystem import Load as rtLoad
+            from ROOT.gInterpreter import Declare as rtDeclare
+            from ROOT.TMath import Pi
+            rtLoad("{}/lib/libDelphes.so".format(self.DELPHES_DIR))
+            rtDeclare('#include "{}/include/modules/Delphes.h"'.format(self.DELPHES_DIR))
+            rtDeclare('#include "{}/include/classes/DelphesClasses.h"'.format(self.DELPHES_DIR))
+            rtDeclare('#include "{}/include/classes/DelphesFactory.h"'.format(self.DELPHES_DIR))
+            rtDeclare('#include "{}/include/ExRootAnalysis/ExRootTreeReader.h"'.format(self.DELPHES_DIR))
+        except:
+            self.log(format_exc())
+            self.log("QUITTING")
+            sys.exit(1)
+
+
+        self.filespec = self.check_for_default_file("filelist")
+        self.spath = self.check_for_default_file("selection")
+
+        with open(filespec) as f:
+            self.inputfiles = [line.strip('\n').strip() for line in f.readlines()]
 
         # core tree, add files
-        self.files = [rt.TFile(f) for f in self.inputfiles]
+        self.files = [TFile(f) for f in self.inputfiles]
         self.trees = [tf.Get("Delphes") for tf in self.files]
         self.sizes = [int(t.GetEntries()) for t in self.trees]
         self.nEvents = sum(self.sizes)
@@ -79,6 +86,21 @@ class Converter:
 
         self.selections_abs = np.asarray([sum(self.sizes[:s[0]]) + s[1] for s in self.selections])
 
+    def check_for_default_file(
+        self,
+        file_pattern,
+        suffix="txt"
+    ):
+        fname = "{}_{}.{}".format(self.name, file_pattern, suffix)
+        spathout = os.path.join(self.outputdir, fname)
+        spathin = os.path.join(self.inputdir, fname)
+        if os.path.exists(spathout):
+            return spathout
+        elif os.path.exists(spathin):
+            return spathin            
+        else:
+            raise AttributeError("Selection file does not exist in either input/output dirs!!")
+
     def log(
         self,
         msg
@@ -91,12 +113,14 @@ class Converter:
 
     def convert(
         self,
-        rng=None,
+        rng=(-1,-1),
     ):
-        if rng is None:
-            rng = (0, self.nEvents)
-        nmin, nmax = rng
+        if rng[0] < 0 or rng[0] > self.nEvents:
+            rng[0] = 0
 
+        if rng[1] > self.nEvents or rng[1] < 0:
+            rng[1] = self.nEvents
+            
         selections_iter = self.selections[(self.selections_abs > nmin) & (self.selections_abs < nmax)]
         
         self.event_features = np.empty((len(selections_iter), len(self.event_feature_names)))
@@ -177,14 +201,13 @@ class Converter:
         min_value,
         eType,
     ):
-        pi = rt.TMath.Pi()
         selected = []
         for c in component:
             pt = getattr(c, eType)
             if pt > min_value:
                 deltaEta = c.Eta - jet.Eta()
                 deltaPhi = c.Phi - jet.Phi()
-                deltaPhi = deltaPhi - 2*pi*(deltaPhi >  pi) + 2*pi*(deltaPhi < -1.*pi)
+                deltaPhi = deltaPhi - 2*Pi()*(deltaPhi >  Pi()) + 2*Pi()*(deltaPhi < -1.*Pi())
 
                 if deltaEta**2. + deltaPhi**2. < dr**2.:
                     selected.append([deltaEta, deltaPhi, pt])
@@ -200,28 +223,7 @@ class Converter:
         return os.path.abspath(s)
 
 if __name__ == "__main__":
-
-    def range_input(s):
-        try:
-            return tuple(map(int, s.strip().strip(')').strip('(').split(',')))
-        except:
-            raise argparse.ArgumentTypeError("-r input not in format: int,int")
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--inputdir', dest="inputdir", action="store", type=str, help="input dir path", required=True)
-    parser.add_argument('-o', '--outputdir', dest="outputdir", action="store", type=str, help="output dir path", required=True)
-    parser.add_argument('-n', '--name', dest='name', action='store', default='sample', help='sample save name')
-    parser.add_argument('-f', '--filter', dest='filter', action='store', default='*', help='glob-style filter for root files in inputfile')
-    parser.add_argument('-r', '--range', dest='range', action='store', type=range_input, default=None, help='range of data to parse')
-    parser.add_argument('-d', '--dr', dest='DR', action='store', type=float, default=0.8, help='dr parameter for jet finding')
-    parser.add_argument('-c', '--constituents', dest='NC', action='store', type=int, default=100, help='number of jet constituents to save')
-
-    if len(sys.argv) < 2:
-        parser.print_help()
-        sys.exit(0)
-
-    args = parser.parse_args(sys.argv[1:])
-
-    core = Converter(args.inputdir, args.outputdir, args.name, args.filter, args.DR, )
-    ret = core.convert(rng=args.range)
+    (_, inputdir, outputdir, name, dr, nc, rmin, rmax) = sys.argv
+    core = Converter(inputdir, outputdir, name, float(dr), int(nc))
+    ret = core.convert((int(rmin), int(rmax)))
     core.save()
