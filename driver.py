@@ -35,7 +35,7 @@ def _smartpath(s):
     return os.path.abspath(s)
 
 def _check_for_default_file(pathoptions, name, pattern, suffix="txt"):
-    fname = "{}_{}.{}".format(name, pattern, suffix)
+    fname = "{0}_{1}.{2}".format(name, pattern, suffix)
     
     if isinstance(pathoptions, str):
         pathoptions = [pathoptions]
@@ -45,7 +45,7 @@ def _check_for_default_file(pathoptions, name, pattern, suffix="txt"):
         if os.path.exists(spath):
             return spath
 
-    error("file wih pattern '{}' does not exist in any of: \n\t{}".format(fname, "\n\t".join(pathoptions)))
+    error("file wih pattern '{0}' does not exist in any of: \n\t{1}".format(fname, "\n\t".join(pathoptions)))
     error("quiting")
     sys.exit(1)
 
@@ -98,18 +98,18 @@ def select_main(inputdir, outputdir, name, filter, range, debug, timing, cuts, b
     # get list of samples, write to text file
     criteria = os.path.join(inputdir, ffilter)
     samplenames = glob(criteria)
-    samplefile = os.path.join(outputdir, "{}_filelist.txt".format(args.name))
+    samplefile = os.path.join(outputdir, "{0}_filelist.txt".format(args.name))
 
     if len(samplenames) == 0:
-        error("No samples found matching glob crieria '{}'".format(criteria))
+        error("No samples found matching glob crieria '{0}'".format(criteria))
         sys.exit(1)
 
     if not os.path.exists(outputdir):
-        log("making ouput directory '{}'".format(outputdir))
+        log("making ouput directory '{0}'".format(outputdir))
         os.makedirs(outputdir)
 
     with open(samplefile, "w+") as sf:
-        log("writing samplefile to file '{}'".format(samplefile))
+        log("writing samplefile to file '{0}'".format(samplefile))
         for samplename in samplenames:
             sf.write(samplename + '\n')
 
@@ -147,12 +147,14 @@ if __name__=="__main__":
         parser.print_help()
         sys.exit(0)
 
+    args_dict = vars(args)
+    cmd = args_dict["COMMAND"]
+    del args_dict["COMMAND"]
+    # args_dict = { var: vars(args)[var] for var in vars(args) if "COMMAND" not in var }
 
-    args_dict = { var: vars(args)[var] for var in vars(args) if "COMMAND" not in var }
-
-    if args.COMMAND == "select":
+    if cmd == "select":
         select_main(**args_dict)
-    if args.COMMAND == "convert":
+    if cmd == "convert":
         convert_main(**args_dict)
-    if args.COMMAND == "train":
+    if cmd == "train":
         train_main(**args_dict) 

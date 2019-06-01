@@ -15,7 +15,6 @@ rt.gInterpreter.Declare('#include "{}/include/classes/DelphesClasses.h"'.format(
 rt.gInterpreter.Declare('#include "{}/include/classes/DelphesFactory.h"'.format(DELPHES_DIR))
 rt.gInterpreter.Declare('#include "{}/include/ExRootAnalysis/ExRootTreeReader.h"'.format(DELPHES_DIR))
 
-
 class Converter:
 
     LOGMSG = "Converter :: "
