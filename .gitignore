@@ -2,6 +2,9 @@
 #
 *outfull/
 *.h5
+*.root
+*.ROOT
+*.txt
 #
 # CUSTOM
 
@@ -134,10 +137,6 @@ celerybeat-schedule
 
 # SageMath parsed files
 *.sage.py
-
-*.root
-*.txt
-*.xml
 
 # Environments
 .env
