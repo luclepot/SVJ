@@ -1,20 +1,14 @@
 import numpy as np
-import h5py
-import ROOT as rt
 import math
 import os
 import argparse
 import sys
 import time
-import glob
+from traceback import format_exc
+import h5py
+import ROOT as rt
 
-
-try:
-    DELPHES_DIR = os.environ["DELPHES_DIR"]
-except:
-    print("WARNING: Did you forget to source 'setup.sh'??")
-    sys.exit(0)
-
+DELPHES_DIR = os.environ["DELPHES_DIR"]
 rt.gSystem.Load("{}/lib/libDelphes.so".format(DELPHES_DIR))
 rt.gInterpreter.Declare('#include "{}/include/modules/Delphes.h"'.format(DELPHES_DIR))
 rt.gInterpreter.Declare('#include "{}/include/classes/DelphesClasses.h"'.format(DELPHES_DIR))
@@ -29,21 +23,22 @@ class Converter:
         self,
         inputdir,
         outputdir,
+        filespec,
+        spath,
         name,
-        ffilter,
         jetDR=0.8,
         n_constituent_particles=100,
-
     ):
+        self.inputdir = inputdir
+        self.outputdir = outputdir
 
-        self.inputdir = Converter.smartpath(inputdir)
-        self.outputdir = Converter.smartpath(outputdir)
         self.name = name
 
-        if not ffilter.endswith('*.root'):
-            ffilter += '*.root'
+        self.filespec = filespec
+        self.spath = spath
 
-        self.inputfiles = glob.glob(os.path.join(inputdir, ffilter))
+        with open(filespec) as f:
+            self.inputfiles = [line.strip('\n').strip() for line in f.readlines()]
 
         # core tree, add files
         self.files = [rt.TFile(f) for f in self.inputfiles]
@@ -91,12 +86,17 @@ class Converter:
 
     def convert(
         self,
-        rng=None,
-    ):
-        if rng is None:
-            rng = (0, self.nEvents)
-        nmin, nmax = rng
+        rng=(-1,-1),
+    ):    
+        rng = list(rng)
+        if rng[0] < 0 or rng[0] > self.nEvents:
+            rng[0] = 0
 
+        if rng[1] > self.nEvents or rng[1] < 0:
+            rng[1] = self.nEvents
+
+        nmin, nmax = rng
+            
         selections_iter = self.selections[(self.selections_abs > nmin) & (self.selections_abs < nmax)]
         
         self.event_features = np.empty((len(selections_iter), len(self.event_feature_names)))
@@ -177,51 +177,22 @@ class Converter:
         min_value,
         eType,
     ):
-        pi = rt.TMath.Pi()
         selected = []
         for c in component:
             pt = getattr(c, eType)
             if pt > min_value:
                 deltaEta = c.Eta - jet.Eta()
                 deltaPhi = c.Phi - jet.Phi()
-                deltaPhi = deltaPhi - 2*pi*(deltaPhi >  pi) + 2*pi*(deltaPhi < -1.*pi)
+                deltaPhi = deltaPhi - 2*np.pi*(deltaPhi >  np.pi) + 2*np.pi*(deltaPhi < -1.*np.pi)
 
                 if deltaEta**2. + deltaPhi**2. < dr**2.:
                     selected.append([deltaEta, deltaPhi, pt])
 
         return np.asarray(selected)
  
-    @staticmethod
-    def smartpath(
-        s
-    ):
-        if s.startswith('~'):
-            return s
-        return os.path.abspath(s)
 
 if __name__ == "__main__":
-
-    def range_input(s):
-        try:
-            return tuple(map(int, s.strip().strip(')').strip('(').split(',')))
-        except:
-            raise argparse.ArgumentTypeError("-r input not in format: int,int")
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--inputdir', dest="inputdir", action="store", type=str, help="input dir path", required=True)
-    parser.add_argument('-o', '--outputdir', dest="outputdir", action="store", type=str, help="output dir path", required=True)
-    parser.add_argument('-n', '--name', dest='name', action='store', default='sample', help='sample save name')
-    parser.add_argument('-f', '--filter', dest='filter', action='store', default='*', help='glob-style filter for root files in inputfile')
-    parser.add_argument('-r', '--range', dest='range', action='store', type=range_input, default=None, help='range of data to parse')
-    parser.add_argument('-d', '--dr', dest='DR', action='store', type=float, default=0.8, help='dr parameter for jet finding')
-    parser.add_argument('-c', '--constituents', dest='NC', action='store', type=int, default=100, help='number of jet constituents to save')
-
-    if len(sys.argv) < 2:
-        parser.print_help()
-        sys.exit(0)
-
-    args = parser.parse_args(sys.argv[1:])
-
-    core = Converter(args.inputdir, args.outputdir, args.name, args.filter, args.DR, )
-    ret = core.convert(rng=args.range)
+    (_, inputdir, outputdir, filespec, pathspec, name, dr, nc, rmin, rmax) = sys.argv
+    core = Converter(inputdir, outputdir, filespec, pathspec, name, float(dr), int(nc))
+    ret = core.convert((int(rmin), int(rmax)))
     core.save()
