@@ -5,6 +5,16 @@ import argparse
 import sys
 import time
 from traceback import format_exc
+import h5py
+import ROOT as rt
+
+DELPHES_DIR = os.environ["DELPHES_DIR"]
+rt.gSystem.Load("{}/lib/libDelphes.so".format(DELPHES_DIR))
+rt.gInterpreter.Declare('#include "{}/include/modules/Delphes.h"'.format(DELPHES_DIR))
+rt.gInterpreter.Declare('#include "{}/include/classes/DelphesClasses.h"'.format(DELPHES_DIR))
+rt.gInterpreter.Declare('#include "{}/include/classes/DelphesFactory.h"'.format(DELPHES_DIR))
+rt.gInterpreter.Declare('#include "{}/include/ExRootAnalysis/ExRootTreeReader.h"'.format(DELPHES_DIR))
+
 
 class Converter:
 
@@ -25,29 +35,6 @@ class Converter:
 
         self.name = name
 
-        try:
-            self.DELPHES_DIR = os.environ["DELPHES_DIR"]
-        except:
-            self.log("WARNING: Did you forget to source 'setup.sh'??")
-            self.log("QUITTING")
-            sys.exit(1)
-
-        try:
-            import h5py
-            from ROOT import TFile
-            from ROOT.gSystem import Load as rtLoad
-            from ROOT.gInterpreter import Declare as rtDeclare
-            from ROOT.TMath import Pi
-            rtLoad("{}/lib/libDelphes.so".format(self.DELPHES_DIR))
-            rtDeclare('#include "{}/include/modules/Delphes.h"'.format(self.DELPHES_DIR))
-            rtDeclare('#include "{}/include/classes/DelphesClasses.h"'.format(self.DELPHES_DIR))
-            rtDeclare('#include "{}/include/classes/DelphesFactory.h"'.format(self.DELPHES_DIR))
-            rtDeclare('#include "{}/include/ExRootAnalysis/ExRootTreeReader.h"'.format(self.DELPHES_DIR))
-        except:
-            self.log(format_exc())
-            self.log("QUITTING")
-            sys.exit(1)
-
         self.filespec = filespec
         self.spath = spath
 
@@ -55,7 +42,7 @@ class Converter:
             self.inputfiles = [line.strip('\n').strip() for line in f.readlines()]
 
         # core tree, add files
-        self.files = [TFile(f) for f in self.inputfiles]
+        self.files = [rt.TFile(f) for f in self.inputfiles]
         self.trees = [tf.Get("Delphes") for tf in self.files]
         self.sizes = [int(t.GetEntries()) for t in self.trees]
         self.nEvents = sum(self.sizes)
@@ -101,12 +88,15 @@ class Converter:
     def convert(
         self,
         rng=(-1,-1),
-    ):
+    ):    
+        rng = list(rng)
         if rng[0] < 0 or rng[0] > self.nEvents:
             rng[0] = 0
 
         if rng[1] > self.nEvents or rng[1] < 0:
             rng[1] = self.nEvents
+
+        nmin, nmax = rng
             
         selections_iter = self.selections[(self.selections_abs > nmin) & (self.selections_abs < nmax)]
         
@@ -194,7 +184,7 @@ class Converter:
             if pt > min_value:
                 deltaEta = c.Eta - jet.Eta()
                 deltaPhi = c.Phi - jet.Phi()
-                deltaPhi = deltaPhi - 2*Pi()*(deltaPhi >  Pi()) + 2*Pi()*(deltaPhi < -1.*Pi())
+                deltaPhi = deltaPhi - 2*np.pi*(deltaPhi >  np.pi) + 2*np.pi*(deltaPhi < -1.*np.pi)
 
                 if deltaEta**2. + deltaPhi**2. < dr**2.:
                     selected.append([deltaEta, deltaPhi, pt])

@@ -1,6 +1,7 @@
 import os
 import sys
 from argparse import ArgumentParser
+from glob import glob
 
 BASE_COMMAND = 'env -i HOME=$HOME bash -i -c "<CMD>"'
 LOG_PREFIX = "Driver :: "
@@ -84,7 +85,41 @@ def setup_parser():
 
 def select_main(inputdir, outputdir, name, filter, range, debug, timing, cuts, build, dryrun, gdb):
     log("running command 'select'")
+    
+    inputdir = _smartpath(inputdir)
+    outputdir = _smartpath(outputdir)
+    
+    ffilter = str(filter)
+    rng = range
 
+    if not ffilter.endswith(".root"):
+        ffilter += ".root"
+
+    # get list of samples, write to text file
+    criteria = os.path.join(inputdir, ffilter)
+    samplenames = glob(criteria)
+    samplefile = os.path.join(outputdir, "{}_filelist.txt".format(args.name))
+
+    if len(samplenames) == 0:
+        error("No samples found matching glob crieria '{}'".format(criteria))
+        sys.exit(1)
+
+    if not os.path.exists(outputdir):
+        log("making ouput directory '{}'".format(outputdir))
+        os.makedirs(outputdir)
+
+    with open(samplefile, "w+") as sf:
+        log("writing samplefile to file '{}'".format(samplefile))
+        for samplename in samplenames:
+            sf.write(samplename + '\n')
+
+    path = os.path.abspath(os.path.dirname(__file__))
+    setup_command = "source selection/setup.sh"
+    if build:
+        setup_command += "; cd {0}; cd ../..; scram b -j 10; cd {1}".format(path, path)
+        
+    run_command = 'SVJselection ' + ' '.join([samplefile, name, outputdir] + list(map(lambda x: str(int(x)), [debug, timing, cuts, rng[0], rng[1]])))
+    os.system(BASE_COMMAND.replace("<CMD>", setup_command + "; " + run_command))
     sys.exit(0)
 
 def convert_main(inputdir, outputdir, name, range, DR, NC):
@@ -94,7 +129,7 @@ def convert_main(inputdir, outputdir, name, range, DR, NC):
     setup_command = "source conversion/setup.sh"
     python_command = "python conversion/h5converter.py "
     python_command += " ".join(map(str, [inputdir, outputdir, filespec, spath, name, DR, NC, range[0], range[1]]))
-    os.system("; ".join([setup_command, python_command]))
+    os.system(BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command])))
     sys.exit(0)
 
 def train_main(inputdir, outputdir, name, filter):
