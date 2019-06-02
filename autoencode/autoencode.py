@@ -1,6 +1,9 @@
 import numpy as np 
-import keras
+from keras.layers import Input, Dense
+from keras.models import Model
+from keras.losses import get as get_keras_loss
 import os
+import h5py
 
 class basic_autoencoder:
 
@@ -13,6 +16,22 @@ class basic_autoencoder:
         self.path = self._smartpath(path or os.path.curdir)
         self.BUILT = False
         self.TRAINED = False
+        self.samples = {}
+
+    def add_sample(
+        self,
+        file,
+    ):
+        filepath = self._smartpath(file)
+        assert os.path.exists(filepath)
+        if filepath not in self.samples:
+            self.samples[filepath] = h5py.File(filepath)
+
+    # def process_samples(
+    #     self,
+    # ):
+
+
 
     def build( 
         self,
@@ -20,44 +39,70 @@ class basic_autoencoder:
         bottleneck_dim,
         output_dim=None,
         intermediate_dims=[],
+        loss_function="mse",
     ):
         self.input_dim = input_dim
         self.output_dim = output_dim or input_dim
         self.intermediate_dims = intermediate_dims
         self.bottleneck_dim = bottleneck_dim
-        self.inputs = keras.layers.Input(shape=(self.input_dim,), name='encoder_input')
+        self.inputs = Input(shape=(self.input_dim,), name='encoder_input')
 
         if len(intermediate_dims) > 0:
             interms1 = []
-            interms1.append(keras.layers.Dense(self.intermediate_dims[0], activation='relu')(self.inputs))
+            interms1.append(Dense(self.intermediate_dims[0], activation='relu')(self.inputs))
             for i,dim in enumerate(self.intermediate_dims[1:]):
-                interms1.append(keras.layers.Dense(dim, activation='relu')(interms1[i - 1]))
+                interms1.append(Dense(dim, activation='relu')(interms1[i - 1]))
         else:
             interms1 = [self.inputs]
 
-        encoded = keras.layers.Dense(self.bottleneck_dim, activation='relu')(interms1[-1])
+        encoded = Dense(self.bottleneck_dim, activation='relu')(interms1[-1])
 
-        self.encoder = keras.models.Model(self.inputs, encoded, name='encoder')
+        self.encoder = Model(self.inputs, encoded, name='encoder')
         self.encoder.summary()
 
-        decode_inputs = keras.layers.Input(shape=(self.bottleneck_dim,), name='decoder_input')
+        decode_inputs = Input(shape=(self.bottleneck_dim,), name='decoder_input')
 
         if len(self.intermediate_dims) > 0:
             interms2 = []
-            interms2.append(keras.layers.Dense(self.intermediate_dims[0], activation='relu')(decode_inputs))
+            interms2.append(Dense(self.intermediate_dims[0], activation='relu')(decode_inputs))
             for i,dim in enumerate(intermediate_dims[1:]):
-                interms2.append(keras.layers.Dense(dim, activation='relu')(interms2[i - 1]))
+                interms2.append(Dense(dim, activation='relu')(interms2[i - 1]))
         else:
             interms2 = [decode_inputs]
 
-        self.outputs = keras.layers.Dense(self.output_dim, activation='tanh')(interms2[-1])
+        self.outputs = Dense(self.output_dim, activation='tanh')(interms2[-1])
 
-        self.decoder = keras.models.Model(decode_inputs, self.outputs, name='decoder')
+        self.decoder = Model(decode_inputs, self.outputs, name='decoder')
         self.decoder.summary()
 
         self.outputs = self.decoder(self.encoder(self.inputs))
-        self.autoencoder = keras.models.Model(self.inputs, self.outputs, name='vae')
+        self.autoencoder = Model(self.inputs, self.outputs, name='vae')
         self.autoencoder.summary()
+
+        self.loss = get_keras_loss(loss_function)(self.inputs, self.outputs)
+
+        self.autoencoder.add_loss(self.loss)
+
+        self.BUILT = True
+
+        return self.autoencoder
+
+    def load(
+        self,
+        filename=None,
+    ):
+        assert self.BUILT
+        base_filename = filename or os.path.join(self.path, self.name + "_weights.h5")
+        raise NotImplementedError
+
+    def save(
+        self, 
+        filename=None
+    ):
+        assert self.BUILT
+        assert self.TRAINED
+        base_filename = filename or os.path.join(self.path, self.name + "_weights.h5")
+        raise NotImplementedError
 
     def _smartpath(
         self,
@@ -67,9 +112,12 @@ class basic_autoencoder:
             return path
         return os.path.abspath(path)
 
-b = basic_autoencoder("test")
-b.build(10, 2)
 
+if __name__=="__main__":
+    samplepath = "../data/first10/first10_data.h5"
+    b = basic_autoencoder("testsample", path="../data/first10/")
+    b.build(10, 5)
+    b.add_sample(samplepath)
 
 # def autoencode(
 #     h5_pathname,
@@ -83,38 +131,38 @@ b.build(10, 2)
 #     sample_size,input_size = data.shape
 #     input_shape = (input_size,)
 
-#     inputs = keras.layers.Input(shape=input_shape, name='encoder_input')
+#     inputs = Input(shape=input_shape, name='encoder_input')
 
 #     if len(intermediate_dims) > 0:
 #         interms1 = []
-#         interms1.append(keras.layers.Dense(intermediate_dims[0], activation='relu')(inputs))
+#         interms1.append(Dense(intermediate_dims[0], activation='relu')(inputs))
 #         for i,dim in enumerate(intermediate_dims[1:]):
-#             interms1.append(keras.layers.Dense(dim, activation='relu')(interms1[i - 1]))
+#             interms1.append(Dense(dim, activation='relu')(interms1[i - 1]))
 #     else:
 #         interms1 = [inputs]
 
-#     encoded = keras.layers.Dense(neck_dim, activation='relu')(interms1[-1])
+#     encoded = Dense(neck_dim, activation='relu')(interms1[-1])
 
-#     encoder = keras.models.Model(inputs, encoded, name='encoder')
+#     encoder = Model(inputs, encoded, name='encoder')
 #     encoder.summary()
 
-#     decode_inputs = keras.layers.Input(shape=(neck_dim,), name='decoder_input')
+#     decode_inputs = Input(shape=(neck_dim,), name='decoder_input')
 
 #     if len(intermediate_dims) > 0:
 #         interms2 = []
-#         interms2.append(keras.layers.Dense(intermediate_dims[0], activation='relu')(decode_inputs))
+#         interms2.append(Dense(intermediate_dims[0], activation='relu')(decode_inputs))
 #         for i,dim in enumerate(intermediate_dims[1:]):
-#             interms2.append(keras.layers.Dense(dim, activation='relu')(interms2[i - 1]))
+#             interms2.append(Dense(dim, activation='relu')(interms2[i - 1]))
 #     else:
 #         interms2 = [decode_inputs]
 
-#     outputs = keras.layers.Dense(input_size, activation='tanh')(interms2[-1])
+#     outputs = Dense(input_size, activation='tanh')(interms2[-1])
 
-#     decoder = keras.models.Model(decode_inputs, outputs, name='decoder')
+#     decoder = Model(decode_inputs, outputs, name='decoder')
 #     decoder.summary()
 
 #     outputs = decoder(encoder(inputs))
-#     autoencoder = keras.models.Model(inputs, outputs, name='vae')
+#     autoencoder = Model(inputs, outputs, name='vae')
 #     autoencoder.summary()
 
 #     loss = keras.losses.mean_squared_error(
