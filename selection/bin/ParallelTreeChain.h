@@ -78,7 +78,7 @@ class ParallelTreeChain{
             ntrees = trees.size(); 
         }
 
-        int currentEntry, currentTree; 
+        int currentEntry, currentTree;
 
     private:
     
