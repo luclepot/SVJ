@@ -289,11 +289,12 @@ public:
             logp("Getting entry " + to_string(entry) + "...  ");
 	        int treeId = chain->GetEntry(entry);
             currentEntry = entry;
-            if (chain->currentEntry % 0 == 0) {
+            if (chain->currentEntry == 0) {
                 bool last = debug;
                 Debug(true);
-                log("Processing tree " + string(chain->currentTree + 1) + " of " + string(chain->size()));
+                logp("");
                 Debug(last);
+                cout << "Processing tree " << chain->currentTree + 1 << " of " << chain->size() << endl;
             }
             for (size_t i = 0; i < subIndex.size(); ++i) {
                 switch(subIndex[i].second) {
