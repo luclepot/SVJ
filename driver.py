@@ -52,6 +52,7 @@ def condor_submit(
     cmd,
     outputdir,
     name,
+    setup_cmd = None,
 ):
     log("writing queue commands")
     run_script = os.path.join(outputdir, "{0}_submit.sh".format(name))
@@ -79,7 +80,10 @@ def condor_submit(
         # f.write("request_memory = 20MB\n\n")
         f.write("queue\n")
     os.system("chmod +rwx {}".format(run_script))
-    os.system("condor_submit {}; condor_q".format(run_submit))
+    condor_cmd = "condor_submit {}; condor_q".format(run_submit)
+    if setup_cmd is not None:
+        condor_cmd = "{0}; ".format(setup_cmd) + condor_cmd
+    os.system(condor_cmd)
     sys.exit(0)
 
 def local_submit(
@@ -174,7 +178,7 @@ def select_main(inputdir, outputdir, name, batch, filter, range, debug, timing, 
                 "export SCRAM_ARCH=slc7_amd64_gcc530",
                 "eval `scramv1 runtime -sh`; ",
             ])
-            condor_submit(condor_setup + master_command, outputdir, name)
+            condor_submit(condor_setup + master_command, outputdir, name, setup_command)
         else:
             raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
 
