@@ -72,6 +72,7 @@ def condor_submit(
         f.write("error = {0}\n".format(os.path.join(outputdir, "{0}.err".format(name))))
         f.write("should_transfer_files = YES\n")
         f.write("when_to_transfer_output = ON_EXIT_OR_EVICT\n")
+        f.write("transfer_input_files = {0}\n".format(run_script))
         # f.write("transfer_output_files = Data\n")
         # f.write("request_cpus = 1\n")
         # f.write("request_disk = 20MB\n")
@@ -168,7 +169,12 @@ def select_main(inputdir, outputdir, name, batch, filter, range, debug, timing, 
     
     if batch is not None:
         if batch == "condor":
-            condor_submit(master_command, outputdir, name)
+            condor_setup = "; ".join([
+                "source /cvmfs/cms.cern.ch/cmsset_default.sh",
+                "export SCRAM_ARCH=slc7_amd64_gcc530",
+                "eval `scramv1 runtime -sh`; ",
+            ])
+            condor_submit(condor_setup + master_command, outputdir, name)
         else:
             raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
 
