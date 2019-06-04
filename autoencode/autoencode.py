@@ -2,6 +2,7 @@ import numpy as np
 from keras.layers import Input, Dense
 from keras.models import Model
 from keras.losses import get as get_keras_loss
+from collections import OrderedDict as odict
 import os
 import h5py
 
@@ -15,8 +16,12 @@ class basic_autoencoder:
         self.name = name
         self.path = self._smartpath(path or os.path.curdir)
         self.BUILT = False
+        self.PROCESSED = False
         self.TRAINED = False
-        self.samples = {}
+        self.samples = odict()
+        self.processed = odict()
+        self.data = odict()
+        self.labels = odict()
 
     def add_sample(
         self,
@@ -27,11 +32,60 @@ class basic_autoencoder:
         if filepath not in self.samples:
             self.samples[filepath] = h5py.File(filepath)
 
-    # def process_samples(
-    #     self,
-    # ):
+    @staticmethod
+    def add_key(key, keycheck, sfile, d):
+        if keycheck == key:
+            if key not in d:
+                d[key] = np.asarray(sfile[key])
+            else:
+                if d[key].dtype.kind == 'S':
+                    assert d[key].shape == sfile[key].shape
+                    assert all([k1 == k2 for k1,k2 in zip(d[key], sfile[key])])
+                else:
+                    assert d[key].shape[1:] == sfile[key].shape[1:]
+                    d[key] = np.concatenate([d[key], sfile[key]])
 
+    def process_samples(
+        self,
+        save_result=False,
+    ):
 
+        for sample_path, sample_file in self.samples.items():
+            if os.path.abspath(sample_path) in self.processed:
+                continue
+
+            for key in sample_file.keys():
+                self.add_key(key, "event_feature_data", sample_file, self.data)
+                self.add_key(key, "event_feature_names", sample_file, self.labels)
+                self.add_key(key, "jet_constituent_data", sample_file, self.data)
+                self.add_key(key, "jet_constituent_names", sample_file, self.labels)
+            
+            self.processed[os.path.abspath(sample_path)] = True
+
+        if save_result:
+            f = h5py.File(os.path.join(self.path, "{0}_combined_data.h5".format(self.name)), "w")
+            for key,data in self.data.items():
+                f.create_dataset(key, data=data)
+            for key,data in self.labels.items():
+                f.create_dataset(key, data=data)
+            f.close()
+
+        self.PROCESSED = True
+
+    def build_training_dataset(
+        self,
+    ):
+        assert self.PROCESSED
+
+        # make sure there are equal numbers of samples for all data
+        ssizes = set([x.shape[0] for x in self.data.values()])
+        assert len(ssizes) == 1
+        ssize = ssizes.keys()[0]
+
+        for i in range(ssize):
+            for j in range(len(self.data)):
+
+            
 
     def build( 
         self,
@@ -112,12 +166,14 @@ class basic_autoencoder:
             return path
         return os.path.abspath(path)
 
-
 if __name__=="__main__":
     samplepath = "../data/first10/first10_data.h5"
     b = basic_autoencoder("testsample", path="../data/first10/")
     b.build(10, 5)
     b.add_sample(samplepath)
+    b.add_sample("../data/output/smallsample_data.h5")
+    b.process_samples()
+    # print ret.values()[1].shape
 
 # def autoencode(
 #     h5_pathname,
