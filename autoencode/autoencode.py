@@ -1,9 +1,10 @@
 import numpy as np 
 from keras.layers import Input, Dense
 from keras.models import Model
-from keras.losses import get as get_keras_loss
+import keras.optimizers
 from collections import OrderedDict as odict
 import os
+from operator import mul
 import h5py
 
 class basic_autoencoder:
@@ -17,6 +18,7 @@ class basic_autoencoder:
         self.path = self._smartpath(path or os.path.curdir)
         self.BUILT = False
         self.PROCESSED = False
+        self.BUILT_TRAINING_DATASET = False
         self.TRAINED = False
         self.samples = odict()
         self.processed = odict()
@@ -49,7 +51,6 @@ class basic_autoencoder:
         self,
         save_result=False,
     ):
-
         for sample_path, sample_file in self.samples.items():
             if os.path.abspath(sample_path) in self.processed:
                 continue
@@ -78,25 +79,36 @@ class basic_autoencoder:
         assert self.PROCESSED
 
         # make sure there are equal numbers of samples for all data
-        ssizes = set([x.shape[0] for x in self.data.values()])
-        assert len(ssizes) == 1
-        ssize = ssizes.keys()[0]
+        samples = set([x.shape[0] for x in self.data.values()])
+        assert len(samples) == 1
+        sample_size = samples.pop()
 
-        for i in range(ssize):
-            for j in range(len(self.data)):
+        sizes = [reduce(mul, x.shape[1:], 1) for x in self.data.values()]
+        splits = [0,] + [sum(sizes[:i+1]) for i in range(len(sizes))]
+    
+        self.train_dataset = np.empty((sample_size, sum(sizes)))
 
-            
+        for i, datum in enumerate(self.data.values()):
+            self.train_dataset[:,splits[i]:splits[i + 1]] = datum.reshape(datum.shape[0], sizes[i])
 
-    def build( 
+        self.dmin, self.dmax = self.train_dataset.min(axis=0), self.train_dataset.max(axis=0)
+        self.normalized = (self.train_dataset - self.dmin)/(self.dmax - self.dmin)
+
+        self.BUILT_TRAINING_DATASET = True
+
+    def build(
         self,
-        input_dim,
         bottleneck_dim,
-        output_dim=None,
         intermediate_dims=[],
         loss_function="mse",
     ):
-        self.input_dim = input_dim
-        self.output_dim = output_dim or input_dim
+
+        self.build_training_dataset()
+
+        assert self.BUILT_TRAINING_DATASET
+
+        self.n_samples, self.input_dim = self.train_dataset.shape
+        self.output_dim = self.input_dim
         self.intermediate_dims = intermediate_dims
         self.bottleneck_dim = bottleneck_dim
         self.inputs = Input(shape=(self.input_dim,), name='encoder_input')
@@ -112,7 +124,7 @@ class basic_autoencoder:
         encoded = Dense(self.bottleneck_dim, activation='relu')(interms1[-1])
 
         self.encoder = Model(self.inputs, encoded, name='encoder')
-        self.encoder.summary()
+        # self.encoder.summary()
 
         decode_inputs = Input(shape=(self.bottleneck_dim,), name='decoder_input')
 
@@ -127,19 +139,46 @@ class basic_autoencoder:
         self.outputs = Dense(self.output_dim, activation='tanh')(interms2[-1])
 
         self.decoder = Model(decode_inputs, self.outputs, name='decoder')
-        self.decoder.summary()
+        # self.decoder.summary()
 
         self.outputs = self.decoder(self.encoder(self.inputs))
         self.autoencoder = Model(self.inputs, self.outputs, name='vae')
+        # self.autoencoder.compile('adam', 'mse', metrics=['accuracy'])
+
+        # self.loss = get_keras_loss(loss_function)(self.inputs, self.outputs)
+        # self.autoencoder.add_loss(self.loss)
+        self.loss = loss_function
         self.autoencoder.summary()
-
-        self.loss = get_keras_loss(loss_function)(self.inputs, self.outputs)
-
-        self.autoencoder.add_loss(self.loss)
 
         self.BUILT = True
 
         return self.autoencoder
+
+    def train(
+        self,
+        validation_split=0.25,
+        epochs=1,
+        verbose=True,
+        batch_size=1,
+        optimizer='adam',
+        shuffle=True
+    ):
+        assert self.BUILT
+
+        self.autoencoder.compile(keras.optimizers.SGD(lr=0.01), 'mse')
+        self.autoencoder.fit(
+            self.normalized,
+            self.normalized,
+            epochs=epochs,
+            # batch_size=batch_size, 
+            verbose=verbose,
+            validation_split=validation_split,
+            steps_per_epoch=int(np.ceil(self.n_samples*(1-validation_split)/batch_size)),
+            validation_steps=int(np.ceil(self.n_samples*validation_split/batch_size)),
+            shuffle=shuffle,
+            )
+
+        self.autoencoder.save_weights(os.path.join(self.path, "{0}_weights.h5".format(self.name)))
 
     def load(
         self,
@@ -169,10 +208,11 @@ class basic_autoencoder:
 if __name__=="__main__":
     samplepath = "../data/first10/first10_data.h5"
     b = basic_autoencoder("testsample", path="../data/first10/")
-    b.build(10, 5)
     b.add_sample(samplepath)
     b.add_sample("../data/output/smallsample_data.h5")
     b.process_samples()
+    b.build(10)
+    b.train(epochs=100, batch_size=41, validation_split=0.333333333333333333)
     # print ret.values()[1].shape
 
 # def autoencode(
