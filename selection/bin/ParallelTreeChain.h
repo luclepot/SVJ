@@ -8,6 +8,8 @@
 
 using std::string;
 using std::vector;
+using std::cout; 
+using std::endl; 
 
 
 class ParallelTreeChain{
@@ -71,9 +73,14 @@ class ParallelTreeChain{
             for (size_t i = 0; i < treenames.size(); ++i) {
                 files.push_back(new TFile(treenames[i].c_str()));
                 trees.push_back((TTree*)files[i]->Get("Delphes"));
-                sizes.push_back(trees[i]->GetEntries());
-                trees[i]->GetEntry(0);
-                entries += sizes[i];
+                if (!trees[i]) {
+                    trees.pop_back();
+                }
+                else {
+                    sizes.push_back(trees[i]->GetEntries());
+                    trees[i]->GetEntry(0);
+                    entries += sizes[i];
+                }
             }   
             ntrees = trees.size(); 
         }
