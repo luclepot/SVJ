@@ -40,7 +40,12 @@ class basic_autoencoder:
             self.samples[filepath] = h5py.File(filepath)
 
     @staticmethod
-    def add_key(key, keycheck, sfile, d):
+    def add_key(
+        key,
+        keycheck,
+        sfile,
+        d
+    ):
         if keycheck == key:
             if key not in d:
                 d[key] = np.asarray(sfile[key])
@@ -101,11 +106,22 @@ class basic_autoencoder:
 
         self.BUILT_TRAINING_DATASET = True
 
-    def reconstruct_output(
+    def reconstruct_dataset(
         self,
-        output_dataset,
+        dataset,
     ):
-        
+        assert self.BUILT_TRAINING_DATASET
+        denorm = dataset*(self.dmax - self.dmin)
+        denorm += self.dmin
+
+        sizes = [reduce(mul, x.shape[1:], 1) for x in self.data.values()]
+        splits = [0,] + [sum(sizes[:i+1]) for i in range(len(sizes))]
+
+        recon = odict()
+        for i, (key, value) in enumerate(self.data.items()):
+            recon[key] = denorm[:,splits[i]:splits[i + 1]]
+
+        return recon
 
     def build(
         self,
@@ -214,6 +230,7 @@ class basic_autoencoder:
         self.train_params['batch_size'] = batch_size
         self.train_params['optimizer'] = optimizer
         self.train_params['learning_rate'] = learning_rate
+        print self.train_params
         self.TRAINED = True
 
     def plot_training_history(
@@ -229,9 +246,10 @@ class basic_autoencoder:
         *args,
         **kwargs
     ):
-        assert i < self.normalized.shape[0]
-        n = np.sqrt(self.normalized.shape[1])
-        assert np.ciel(n) == np.floor(n) ## assert IS SQUARE (lol)
+        assert i < self.reps.shape[0]
+        n = np.sqrt(self.reps.shape[1])
+        assert np.ceil(n) == np.floor(n) ## assert IS SQUARE (lol)
+        n = int(n)
         plt.pcolormesh(self.reps[i].reshape(n,n), *args, **kwargs)
         plt.colorbar()
         plt.show()        
@@ -255,6 +273,7 @@ class basic_autoencoder:
         base_filename = self.base_fname()
         if os.path.exists(base_filename):
             self.autoencoder.load_weights(base_filename)
+            self.reps = self.encoder.predict(self.normalized)
             return True
         print "no weights found with filename " + base_filename
         return False
@@ -285,10 +304,46 @@ class basic_autoencoder:
             return path
         return os.path.abspath(path)
 
+    def compare_features(
+        self,
+        bins=20,
+        feature_key=None,
+        max_features=20,
+    ):
+        assert self.TRAINED
+        feature_key = feature_key or "event_feature"
+        labels,true = self.labels[feature_key + "_names"], self.data[feature_key + "_data"].T
+        pred = self.reconstruct_dataset(self.autoencoder.predict(self.normalized))[feature_key + "_data"].T
+
+        gmax, gmin = max(true.max(), pred.max()), min(true.min(), pred.min())
+
+
+
+        for i in range(min(len(true), max_features)):
+            plt.hist(true[i], range=(gmin,gmax), histtype="step", label=labels[i] + " true")
+            plt.hist(pred[i], range=(gmin,gmax), histtype="step", label=labels[i] + " pred")
+            plt.show()       
+
+def sc2(data,alpha=0.5, size=0.1, caxis=2):
+    d = data.T
+    assert(4 > data.shape[1] > 1)
+    ncaxes = [i for i in range(d.shape[0]) if i != caxis or d.shape[0] < 3]
+    plt.scatter(*[d[i] for i in ncaxes], s=size, c=None if d.shape[0] < 3 else d[caxis], alpha=alpha)
+    plt.show()
+
+def sc3(data):
+    d = data.T
+    assert(5 > data.shape[1] > 2)
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.scatter(d[0], d[1], d[2], c=None if d.shape[0] < 4 else d[3], alpha=0.2)
+    plt.show()
+
+
 if __name__=="__main__":
     samplepath = "../data/first10/first10_data.h5"
     samplepath = "../data/full/0_data.h5"
-    b = basic_autoencoder("large", path="")
+    b = basic_autoencoder("test", path="")
     b.add_sample("../data/full/0_data.h5")
     b.add_sample("../data/full/2_data.h5")
     b.add_sample("../data/full/5_data.h5")
@@ -299,9 +354,13 @@ if __name__=="__main__":
     # b.add_sample("../data/output/smallsample_data.h5")
     b.process_samples()
     b.build(9, loss_function="binary_crossentropy")
-    b.train(epochs=100, batch_size=50, validation_split=0.3, learning_rate=0.01, optimizer="adadelta")
+    if not b.load():
+        b.train(epochs=100, batch_size=50, validation_split=0.3, learning_rate=0.01, optimizer="adadelta")
+    else:
+        b.load()
+
     # b.plot_training_history()
-    b.plot_rep_distributions(hide_zeros=False)
+    # b.plot_rep_distributions(hide_zeros=False)
     # print ret.values()[1].shape
 
 # def autoencode(
