@@ -42,7 +42,8 @@ class Converter:
 
         # core tree, add files
         self.files = [rt.TFile(f) for f in self.inputfiles]
-        self.trees = [tf.Get("Delphes") for tf in self.files]
+        self.trees = [tf.Get("Delphes") for tf in self.files if tf.GetListOfKeys().Contains("Delphes")]
+        self.log(self.trees)
         self.sizes = [int(t.GetEntries()) for t in self.trees]
         self.nEvents = sum(self.sizes)
 
