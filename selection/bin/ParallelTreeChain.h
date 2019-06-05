@@ -69,17 +69,21 @@ class ParallelTreeChain{
 
         void GetTrees(string filename) {
             GetTreeNames(filename);
-            entries = 0; 
-            for (size_t i = 0; i < treenames.size(); ++i) {
-                files.push_back(new TFile(treenames[i].c_str()));
-                trees.push_back((TTree*)files[i]->Get("Delphes"));
-                if (!trees[i]) {
-                    trees.pop_back();
-                }
-                else {
+            entries = 0;
+            int i = 0;
+            for (size_t tn = 0; tn < treenames.size(); ++tn) {
+                files.push_back(new TFile(treenames[tn].c_str()));
+                bool hasDelphes = files[i]->GetListOfKeys()->Contains("Delphes");
+                if(hasDelphes) {
+                    trees.push_back((TTree*)files[i]->Get("Delphes"));
+                    cout << hasDelphes << " " << treenames[i] << " " << trees[i] << " " << endl;
                     sizes.push_back(trees[i]->GetEntries());
                     trees[i]->GetEntry(0);
                     entries += sizes[i];
+                    i++; 
+                }
+                else {
+                    files.pop_back(); 
                 }
             }   
             ntrees = trees.size(); 
