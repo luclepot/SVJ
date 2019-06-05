@@ -306,23 +306,33 @@ class basic_autoencoder:
 
     def compare_features(
         self,
-        bins=20,
+        bins=30,
         feature_key=None,
         max_features=20,
+        cols=4,
     ):
-        assert self.TRAINED
+        # assert self.TRAINED
         feature_key = feature_key or "event_feature"
         labels,true = self.labels[feature_key + "_names"], self.data[feature_key + "_data"].T
         pred = self.reconstruct_dataset(self.autoencoder.predict(self.normalized))[feature_key + "_data"].T
 
-        gmax, gmin = max(true.max(), pred.max()), min(true.min(), pred.min())
+        print labels
+        print true.shape
+        print pred.shape
 
+        n = min(len(true), max_features)
+        rows = self.rows(cols, n)
 
+        for i in range(n):
+            gmax, gmin = max(true[i].max(), pred[i].max()), min(true[i].min(), pred[i].min())
+            plt.subplot(rows, cols, i + 1)
+            plt.hist(true[i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " true")
+            plt.hist(pred[i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " pred")
+        plt.legend()
+        plt.show()
 
-        for i in range(min(len(true), max_features)):
-            plt.hist(true[i], range=(gmin,gmax), histtype="step", label=labels[i] + " true")
-            plt.hist(pred[i], range=(gmin,gmax), histtype="step", label=labels[i] + " pred")
-            plt.show()       
+    def rows(self, cols,n):
+        return n/cols + bool(n%cols)
 
 def sc2(data,alpha=0.5, size=0.1, caxis=2):
     d = data.T
@@ -353,12 +363,13 @@ if __name__=="__main__":
 
     # b.add_sample("../data/output/smallsample_data.h5")
     b.process_samples()
-    b.build(9, loss_function="binary_crossentropy")
+    b.build(3, loss_function="binary_crossentropy")
     if not b.load():
         b.train(epochs=100, batch_size=50, validation_split=0.3, learning_rate=0.01, optimizer="adadelta")
     else:
         b.load()
-
+    # b.save()
+    b.compare_features()
     # b.plot_training_history()
     # b.plot_rep_distributions(hide_zeros=False)
     # print ret.values()[1].shape
