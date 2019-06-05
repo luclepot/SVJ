@@ -193,7 +193,7 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun):
     spath = _check_for_default_file([inputdir, outputdir], name, 'selection')
     setup_command = "source " + os.path.abspath("conversion/setup.sh")
     python_command = "python " + os.path.abspath("conversion/h5converter.py")
-    python_command += " ".join(map(str, [inputdir, outputdir, filespec, spath, name, DR, NC, range[0], range[1]]))
+    python_command += " " + " ".join(map(str, [inputdir, outputdir, filespec, spath, name, DR, NC, range[0], range[1]]))
 
     master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
 
