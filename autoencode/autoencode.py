@@ -6,6 +6,7 @@ from collections import OrderedDict as odict
 import os
 from operator import mul
 import h5py
+import matplotlib.pyplot as plt
 
 class basic_autoencoder:
 
@@ -96,6 +97,12 @@ class basic_autoencoder:
 
         self.BUILT_TRAINING_DATASET = True
 
+    # def reconstruct_output(
+    #     self,
+    #     output_dataset,
+    # ):
+
+
     def build(
         self,
         bottleneck_dim,
@@ -124,7 +131,7 @@ class basic_autoencoder:
         encoded = Dense(self.bottleneck_dim, activation='relu')(interms1[-1])
 
         self.encoder = Model(self.inputs, encoded, name='encoder')
-        # self.encoder.summary()
+        self.encoder.summary()
 
         decode_inputs = Input(shape=(self.bottleneck_dim,), name='decoder_input')
 
@@ -139,7 +146,7 @@ class basic_autoencoder:
         self.outputs = Dense(self.output_dim, activation='tanh')(interms2[-1])
 
         self.decoder = Model(decode_inputs, self.outputs, name='decoder')
-        # self.decoder.summary()
+        self.decoder.summary()
 
         self.outputs = self.decoder(self.encoder(self.inputs))
         self.autoencoder = Model(self.inputs, self.outputs, name='vae')
@@ -161,12 +168,13 @@ class basic_autoencoder:
         verbose=True,
         batch_size=1,
         optimizer='adam',
-        shuffle=True
+        shuffle=True,
+        learning_rate=0.005
     ):
         assert self.BUILT
 
-        self.autoencoder.compile(keras.optimizers.SGD(lr=0.01), 'mse')
-        self.autoencoder.fit(
+        self.autoencoder.compile(getattr(keras.optimizers, optimizer)(lr=learning_rate), 'mse')
+        self.history = self.autoencoder.fit(
             self.normalized,
             self.normalized,
             epochs=epochs,
@@ -178,8 +186,23 @@ class basic_autoencoder:
             shuffle=shuffle,
             )
 
+        self.reps = self.encoder.predict(self.normalized)
         self.autoencoder.save_weights(os.path.join(self.path, "{0}_weights.h5".format(self.name)))
+        self.TRAINED = True
 
+    def plot_training_history(
+        self,
+    ):
+        for key,value in b.history.history.items():
+            plt.plot(value, label=key)
+        plt.legend(); plt.show()
+
+    def plot_rep(
+        self,
+        i,
+    ):
+        assert i < self.normalized.shape[0]
+        
     def load(
         self,
         filename=None,
@@ -205,14 +228,17 @@ class basic_autoencoder:
             return path
         return os.path.abspath(path)
 
+
 if __name__=="__main__":
     samplepath = "../data/first10/first10_data.h5"
-    b = basic_autoencoder("testsample", path="../data/first10/")
+    samplepath = "../data/full/0_data.h5"
+    b = basic_autoencoder("testsample", path="")
     b.add_sample(samplepath)
-    b.add_sample("../data/output/smallsample_data.h5")
+    # b.add_sample("../data/output/smallsample_data.h5")
     b.process_samples()
-    b.build(10)
-    b.train(epochs=100, batch_size=41, validation_split=0.333333333333333333)
+    b.build(9, [200,50], loss_function="mean_absolute_error")
+    b.train(epochs=25, batch_size=20, validation_split=0.25, learning_rate=0.01)
+    b.plot_training_history()
     # print ret.values()[1].shape
 
 # def autoencode(
