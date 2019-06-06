@@ -9,6 +9,132 @@ import os
 from operator import mul
 import h5py
 import matplotlib.pyplot as plt
+import glob
+
+class base_autoencoder:
+
+    def __init__(
+        self,
+        name,
+        path=None
+    ):
+        self.name = name
+        self.path = self._smartpath(path or os.path.curdir)
+        self.samples = odict()
+        self.sample_keys = None
+        self.data = odict()
+
+    def add_sample(
+        self,
+        sample_path,
+    ):
+        filepath = self._smartpath(sample_path)
+        assert os.path.exists(filepath)
+        if filepath not in self.samples:
+            self.samples[filepath] = h5py.File(filepath)
+            if self.sample_keys is None:
+                self.sample_keys = set(self.samples[filepath].keys())
+            else:
+                self.sample_keys = self.sample_keys.intersection(set(self.samples[filepath].keys()))
+            self._update_data(self.samples[filepath], self.samples[filepath].keys())
+
+    def get_dataset(
+        self,
+        keys=None,
+    ):
+        if keys is None:
+            raise AttributeError("please choose data keys to add to sample dataset! \noptions: {0}".format(list(self.sample_keys)))
+        assert hasattr(keys, "__iter__") or isinstance(keys, str), "keys must be iterable of strings!"
+
+        if isinstance(keys, str):
+            keys = [keys]
+
+        data_dict = self.data.copy()
+        shapes = []
+        for key in data_dict:
+            keep = False
+            for subkey in keys:
+                if glob.fnmatch.fnmatch(key, subkey):
+                    keep = True
+            if not keep:
+                del data_dict[key]
+            else:
+                shapes.append(data_dict[key].shape)
+
+        samples = set([x.shape[0] for x in data_dict.values()])
+        assert len(samples) == 1
+        sample_size = samples.pop()
+
+        sizes = [reduce(mul, x.shape[1:], 1) for x in data_dict.values()]
+        splits = [0,] + [sum(sizes[:i+1]) for i in range(len(sizes))]
+
+        dataset = np.empty((sample_size, sum(sizes)))
+
+        for i, datum in enumerate(data_dict.values()):
+            dataset[:,splits[i]:splits[i + 1]] = datum.reshape(datum.shape[0], sizes[i])
+
+        return dataset, data_dict
+
+    def normalize(
+        self,
+        dataset,
+    ):
+        dmin, dmax = dataset.min(axis=0), dataset.max(axis=0)
+        return (dataset - dmin)/(dmax - dmin)
+
+        # return data_dict, shapes
+        # # make sure there are equal numbers of samples for all data
+        # samples = set([x.shape[0] for x in self.data.values()])
+        # assert len(samples) == 1
+        # sample_size = samples.pop()
+
+        # sizes = [reduce(mul, x.shape[1:], 1) for x in self.data.values()]
+        # splits = [0,] + [sum(sizes[:i+1]) for i in range(len(sizes))]
+    
+        # self.train_dataset = np.empty((sample_size, sum(sizes)))
+
+        # for i, datum in enumerate(self.data.values()):
+        #     self.train_dataset[:,splits[i]:splits[i + 1]] = datum.reshape(datum.shape[0], sizes[i])
+
+        # self.dmin, self.dmax = self.train_dataset.min(axis=0), self.train_dataset.max(axis=0)
+        # self.normalized = (self.train_dataset - self.dmin)/(self.dmax - self.dmin)
+
+        # self.BUILT_TRAINING_DATASET = True
+
+
+    def _update_data(
+        self,
+        sample_file,
+        keys_to_add,
+    ):
+        for key in keys_to_add:
+            if key in sample_file.keys():
+                self._add_key(key, sample_file, self.data)
+        
+    @staticmethod
+    def _add_key(
+        key,
+        sfile,
+        d
+    ):
+        if key not in d:
+            d[key] = np.asarray(sfile[key])
+        else:
+            if d[key].dtype.kind == 'S':
+                assert d[key].shape == sfile[key].shape
+                assert all([k1 == k2 for k1,k2 in zip(d[key], sfile[key])])
+            else:
+                assert d[key].shape[1:] == sfile[key].shape[1:]
+                d[key] = np.concatenate([d[key], sfile[key]])
+    
+    def _smartpath(
+        self,
+        path,
+    ):
+        if path.startswith("~/"):
+            return path
+        return os.path.abspath(path)
+
 
 class basic_autoencoder:
 
@@ -70,7 +196,7 @@ class basic_autoencoder:
                 self.add_key(key, "event_feature_names", sample_file, self.labels)
                 self.add_key(key, "jet_constituent_data", sample_file, self.data)
                 self.add_key(key, "jet_constituent_names", sample_file, self.labels)
-            
+
             self.processed[os.path.abspath(sample_path)] = True
 
         if save_result:
@@ -127,6 +253,7 @@ class basic_autoencoder:
         self,
         bottleneck_dim,
         intermediate_dims=[],
+        output_data=None,
         loss_function="mse",
         kinit="random_uniform",
         binit="random_uniform",
@@ -137,6 +264,9 @@ class basic_autoencoder:
     ):
 
         self.build_training_dataset()
+
+        if output_data is None:
+            output_data = self.data.keys()
 
         assert self.BUILT_TRAINING_DATASET
 
@@ -199,37 +329,48 @@ class basic_autoencoder:
 
     def train(
         self,
+        input_data=None,
+        output_data=None,
         validation_split=0.25,
         epochs=1,
         verbose=True,
         batch_size=1,
         optimizer='adam',
         shuffle=True,
-        learning_rate=0.005
+        learning_rate=0.0003
     ):
         assert self.BUILT
+
+        if input_data is None:
+            input_data = self.normalized
+        
+        if output_data is None:
+            output_data = self.normalized
+
+        n_samples = len(input_data)
 
         if optimizer in ['adagrad', 'adadelta']:
             learning_rate = 1.0
         self.autoencoder.compile(getattr(keras.optimizers, optimizer)(lr=learning_rate), self.loss)
         self.history = self.autoencoder.fit(
-            self.normalized,
-            self.normalized,
+            input_data,
+            output_data,
             epochs=epochs,
             # batch_size=batch_size, 
             verbose=verbose,
             validation_split=validation_split,
-            steps_per_epoch=int(np.ceil(self.n_samples*(1-validation_split)/batch_size)),
-            validation_steps=int(np.ceil(self.n_samples*validation_split/batch_size)),
+            steps_per_epoch=int(np.ceil(n_samples*(1-validation_split)/batch_size)),
+            validation_steps=int(np.ceil(n_samples*validation_split/batch_size)),
             shuffle=shuffle
             )
 
-        self.reps = self.encoder.predict(self.normalized)
+        self.reps = self.encoder.predict(input_data)
         self.train_params['validation_split'] = validation_split
         self.train_params['epochs'] = epochs
         self.train_params['batch_size'] = batch_size
         self.train_params['optimizer'] = optimizer
         self.train_params['learning_rate'] = learning_rate
+        self.train_params['n_samples'] = n_samples
         print self.train_params
         self.TRAINED = True
 
@@ -296,14 +437,6 @@ class basic_autoencoder:
     ):
         return os.path.join(self.path, self.name + "_weights.h5")
 
-    def _smartpath(
-        self,
-        path,
-    ):
-        if path.startswith("~/"):
-            return path
-        return os.path.abspath(path)
-
     def compare_features(
         self,
         bins=30,
@@ -316,9 +449,9 @@ class basic_autoencoder:
         labels,true = self.labels[feature_key + "_names"], self.data[feature_key + "_data"].T
         pred = self.reconstruct_dataset(self.autoencoder.predict(self.normalized))[feature_key + "_data"].T
 
-        print labels
-        print true.shape
-        print pred.shape
+        # print labels
+        # print true.shape
+        # print pred.shape
 
         n = min(len(true), max_features)
         rows = self.rows(cols, n)
@@ -326,8 +459,8 @@ class basic_autoencoder:
         for i in range(n):
             gmax, gmin = max(true[i].max(), pred[i].max()), min(true[i].min(), pred[i].min())
             plt.subplot(rows, cols, i + 1)
-            plt.hist(true[i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " true")
-            plt.hist(pred[i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " pred")
+            plt.hist(true[i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + labels[i] + " true")
+            plt.hist(pred[i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + labels[i] + " pred")
         plt.legend()
         plt.show()
 
@@ -349,27 +482,24 @@ def sc3(data):
     ax.scatter(d[0], d[1], d[2], c=None if d.shape[0] < 4 else d[3], alpha=0.2)
     plt.show()
 
-
 if __name__=="__main__":
-    samplepath = "../data/first10/first10_data.h5"
-    samplepath = "../data/full/0_data.h5"
-    b = basic_autoencoder("test", path="")
-    b.add_sample("../data/full/0_data.h5")
-    b.add_sample("../data/full/2_data.h5")
-    b.add_sample("../data/full/5_data.h5")
-    b.add_sample("../data/full/6_data.h5")
-    b.add_sample("../data/full/7_data.h5")
-    b.add_sample("../data/full/8_data.h5")
+    samplepath = "../data/SVJfull/*_data.h5"
+    filelist = glob.glob(samplepath)
 
-    # b.add_sample("../data/output/smallsample_data.h5")
-    b.process_samples()
-    b.build(3, loss_function="binary_crossentropy")
-    if not b.load():
-        b.train(epochs=100, batch_size=50, validation_split=0.3, learning_rate=0.01, optimizer="adadelta")
-    else:
-        b.load()
-    # b.save()
-    b.compare_features()
+    # b = base_autoencoder()
+
+    # # b = basic_autoencoder("test1", path="")
+    # for f in filelist:
+    #     b.add_sample(f)
+    # # b.add_sample("../data/output/smallsample_data.h5")
+    # b.process_samples()
+    # b.build(9, loss_function="mse")
+    # if not b.load():
+    #     b.train(epochs=100, batch_size=50, validation_split=0.3, learning_rate=0.01, optimizer="adadelta")
+    # else:
+    #     b.load()
+    # # b.save()
+    # b.compare_features()
     # b.plot_training_history()
     # b.plot_rep_distributions(hide_zeros=False)
     # print ret.values()[1].shape
