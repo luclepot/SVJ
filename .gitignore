@@ -5,6 +5,11 @@
 *.root
 *.ROOT
 *.txt
+*.err
+*.log
+*.out
+*_submit.sh
+*_condor.submit
 #
 # CUSTOM
 

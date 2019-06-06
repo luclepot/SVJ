@@ -42,7 +42,7 @@ class Converter:
 
         # core tree, add files
         self.files = [rt.TFile(f) for f in self.inputfiles]
-        self.trees = [tf.Get("Delphes") for tf in self.files]
+        self.trees = [tf.Get("Delphes") for tf in self.files if tf.GetListOfKeys().Contains("Delphes")]
         self.sizes = [int(t.GetEntries()) for t in self.trees]
         self.nEvents = sum(self.sizes)
 
@@ -87,7 +87,7 @@ class Converter:
     def convert(
         self,
         rng=(-1,-1),
-    ):    
+    ):
         rng = list(rng)
         if rng[0] < 0 or rng[0] > self.nEvents:
             rng[0] = 0
@@ -101,6 +101,10 @@ class Converter:
         
         self.event_features = np.empty((len(selections_iter), len(self.event_feature_names)))
         self.jet_constituents = np.empty((len(selections_iter), self.n_jets, self.n_constituent_particles, len(self.jet_constituent_names)))
+        self.log("selecting on range {0}".format(rng))
+        # self.log("selections: {}".format(selections_iter))
+        self.log("event feature shapes: {}".format(self.event_features.shape))
+        self.log("jet constituent shapes: {}".format(self.jet_constituents.shape))
 
         ftn = 0
         # selection is implicit: looping only through total selectinos
@@ -110,7 +114,6 @@ class Converter:
 
             tree = self.trees[tree_n]
             tree.GetEntry(i)
-
             jets = [tree.Jet[jetn].P4() for jetn in range(self.n_jets)]
 
             for jetn,jet in enumerate(jets):
@@ -187,7 +190,9 @@ class Converter:
 
                 if deltaEta**2. + deltaPhi**2. < dr**2.:
                     selected.append([deltaEta, deltaPhi, pt])
-
+        
+        if len(selected) == 0:
+            return np.zeros((0,3))
         return np.asarray(selected)
  
 
