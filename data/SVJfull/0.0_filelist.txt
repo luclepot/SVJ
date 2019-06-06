@@ -1,0 +1,8 @@
+/eos/cms/store/cmst3/group/dehep/TOPGEN/Delphes/qcd_sqrtshatTeV_13TeV_PU20/qcd_sqrtshatTeV_13TeV_PU20_1.root
+/eos/cms/store/cmst3/group/dehep/TOPGEN/Delphes/qcd_sqrtshatTeV_13TeV_PU20/qcd_sqrtshatTeV_13TeV_PU20_2.root
+/eos/cms/store/cmst3/group/dehep/TOPGEN/Delphes/qcd_sqrtshatTeV_13TeV_PU20/qcd_sqrtshatTeV_13TeV_PU20_3.root
+/eos/cms/store/cmst3/group/dehep/TOPGEN/Delphes/qcd_sqrtshatTeV_13TeV_PU20/qcd_sqrtshatTeV_13TeV_PU20_4.root
+/eos/cms/store/cmst3/group/dehep/TOPGEN/Delphes/qcd_sqrtshatTeV_13TeV_PU20/qcd_sqrtshatTeV_13TeV_PU20_6.root
+/eos/cms/store/cmst3/group/dehep/TOPGEN/Delphes/qcd_sqrtshatTeV_13TeV_PU20/qcd_sqrtshatTeV_13TeV_PU20_7.root
+/eos/cms/store/cmst3/group/dehep/TOPGEN/Delphes/qcd_sqrtshatTeV_13TeV_PU20/qcd_sqrtshatTeV_13TeV_PU20_8.root
+/eos/cms/store/cmst3/group/dehep/TOPGEN/Delphes/qcd_sqrtshatTeV_13TeV_PU20/qcd_sqrtshatTeV_13TeV_PU20_9.root
