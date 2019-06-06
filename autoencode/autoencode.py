@@ -349,8 +349,8 @@ def demo():
     for sample in glob.glob("../data/SVJfull/*_data.h5"):
         b.add_sample(sample)
 
-    x,x_dict = b.get_dataset('*data*')
-    y,y_dict = b.get_dataset('*data*')
+    x,x_dict = b.get_dataset('*feature_data*')
+    y,y_dict = b.get_dataset('*feature_data*')
 
     ae = base_autoencoder()
 
