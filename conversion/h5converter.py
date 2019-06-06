@@ -48,6 +48,7 @@ class Converter:
 
         self.jetDR = jetDR
 
+        ## ADD MET
         self.event_feature_names =  ['mJJ', 'j1Eta', 'j1Phi', 'j1Pt', 'j1M', 'j1E', 'j2Pt', 'j2M', 'j2E', 'DeltaEtaJJ', 'DeltaPhiJJ']
         self.jet_constituent_names = ['pEta', 'pPhi', 'pPt']
         self.n_constituent_particles=n_constituent_particles
