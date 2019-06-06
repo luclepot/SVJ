@@ -87,7 +87,7 @@ class Converter:
     def convert(
         self,
         rng=(-1,-1),
-    ):    
+    ):
         rng = list(rng)
         if rng[0] < 0 or rng[0] > self.nEvents:
             rng[0] = 0
@@ -102,7 +102,7 @@ class Converter:
         self.event_features = np.empty((len(selections_iter), len(self.event_feature_names)))
         self.jet_constituents = np.empty((len(selections_iter), self.n_jets, self.n_constituent_particles, len(self.jet_constituent_names)))
         self.log("selecting on range {0}".format(rng))
-        self.log("selections: {}".format(selections_iter))
+        # self.log("selections: {}".format(selections_iter))
         self.log("event feature shapes: {}".format(self.event_features.shape))
         self.log("jet constituent shapes: {}".format(self.jet_constituents.shape))
 
