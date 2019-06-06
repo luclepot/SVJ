@@ -76,7 +76,6 @@ class ParallelTreeChain{
                 bool hasDelphes = files[i]->GetListOfKeys()->Contains("Delphes");
                 if(hasDelphes) {
                     trees.push_back((TTree*)files[i]->Get("Delphes"));
-                    cout << hasDelphes << " " << treenames[i] << " " << trees[i] << " " << endl;
                     sizes.push_back(trees[i]->GetEntries());
                     trees[i]->GetEntry(0);
                     entries += sizes[i];
