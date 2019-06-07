@@ -10,6 +10,8 @@ from operator import mul
 import h5py
 import matplotlib.pyplot as plt
 import glob
+from sklearn.model_selection import train_test_split
+
 
 class logger:
 
@@ -93,6 +95,7 @@ class data_loader(logger):
                 self.sample_keys = set(self.samples[filepath].keys())
             else:
                 self.sample_keys = self.sample_keys.intersection(set(self.samples[filepath].keys()))
+
             self._update_data(self.samples[filepath], self.samples[filepath].keys())
 
     def get_dataset(
@@ -117,6 +120,13 @@ class data_loader(logger):
                 del data_dict[key]
             else:
                 shapes.append(data_dict[key].shape)
+
+        types = [v.dtype.kind for v in data_dict.values()]
+        is_string = [t == 'S' for t in types]
+        if any(is_string):
+            if all(is_string):
+                return data_dict.values(), data_dict
+            raise ArgumentError, "Cannot ask for mixed type datasets! types: {0}".format(types)
 
         self.log("Grabbing dataset with keys {0}".format(list(data_dict.keys())))
 
@@ -190,7 +200,6 @@ class data_loader(logger):
     ):
         return dataset*musigma[1] + musigma[0]
         
-
     def _update_data(
         self,
         sample_file,
@@ -241,6 +250,7 @@ class base_autoencoder(logger):
         self.encoder = None
         self.decoder = None
         self.autoencoder = None
+        self.history = None
 
     def __str__(
         self,
@@ -316,6 +326,8 @@ class base_autoencoder(logger):
     def build(
         self,
         encoding_index=None,
+        optimizer='adam',
+        loss='mse'
     ):
 
         assert len(self.layers) >= 3, "need to have input, bottleneck, output!"
@@ -341,7 +353,103 @@ class base_autoencoder(logger):
         self.decoder = Model(encoded_input, outputs, name='decoder')
         self.autoencoder = Model(inputs, self.decoder(self.encoder(inputs)), name='autoencoder')
 
+        self.autoencoder.compile(optimizer, loss)
+
         return self.encoder,self.decoder,self.autoencoder
+
+    def fit(
+        self,
+        x,
+        y,
+        validation_data,
+        batch_size=10,
+        *args,
+        **kwargs
+    ):
+
+        if self.autoencoder is None: 
+            raise AttributeError, "Model not yet built!"
+
+        try:
+            self.history = self.autoencoder.fit(
+                x=x,
+                y=y,
+                steps_per_epoch=int(np.ceil(len(x)/batch_size)),
+                validation_steps=int(np.ceil(len(validation_data[0])/batch_size)),
+                validation_data=validation_data,
+                *args,
+                **kwargs
+            )
+        except KeboardInterrupt:
+            return None
+
+        return self.history
+
+    def _rows(
+        self,
+        cols,
+        n
+    ):
+        return n/cols + bool(n%cols)
+
+    def _smartpath(
+        self,
+        path,
+    ):
+        if path.startswith("~/"):
+            return path
+        return os.path.abspath(path)
+
+    def compare_features(
+        self,
+        true,
+        pred,
+        bins=30,
+        max_features=20,
+        cols=4,
+        labels=None,
+        **kwargs
+    ):
+
+        n = min(true.shape[1], max_features)
+        rows = self._rows(cols, n)
+
+        if labels is None:
+            labels = ["var {0}".format(i) for i in range(n)]
+
+        for i in range(n):
+            gmax, gmin = max(true[:,i].max(), pred[:,i].max()), min(true[:,i].min(), pred[:,i].min())
+            plt.subplot(rows, cols, i + 1)
+            plt.hist(true[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " true", **kwargs)
+            plt.hist(pred[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " pred", **kwargs)
+            plt.legend()
+        plt.show()
+
+    def save(
+        self,
+        path,
+    ):
+        path = self._smartpath(path)
+        path = self._smartpath(path)
+        if not os.path.exists(path):
+            os.mkdirs(path)
+        to_save = ['autoencoder', 'encoder', 'decoder']
+        filenames = [os.path.join(path, model + '.h5') for model in to_save]
+        for filename,typename in zip(filenames, to_save):
+            if os.path.exists(self._smartpath(filename)):
+                raise AttributeError, "Model already exists at file '{}'!!".format(filename)
+            getattr(self, typename).save(filename)
+
+    def load(
+        self,
+        path,
+    ):
+        to_load = ['autoencoder', 'encoder', 'decoder']
+        filenames = [os.path.join(path, model + '.h5') for model in to_load]
+        for filename,typename in zip(filenames, to_load):
+            if not os.path.exists(self._smartpath(filename)):
+                raise AttributeError, "Model does not exist at file '{}'!!".format(filename)
+            setattr(self, typename, keras.models.load_model(filename))
 
 def demo():
     b = data_loader(True)
@@ -349,22 +457,33 @@ def demo():
     for sample in glob.glob("../data/SVJfull/*_data.h5"):
         b.add_sample(sample)
 
-    x,x_dict = b.get_dataset('*feature_data*')
-    y,y_dict = b.get_dataset('*feature_data*')
+    x, x_dict = b.get_dataset('*event_feature_data*')
+    x_train, x_test = train_test_split(x, test_size=0.25, random_state=42)
+    x_norm_train, x_minmax_train = b.norm_min_max(x_train)
+    x_norm_test, x_minmax_test = b.norm_min_max(x_test)
 
-    ae = base_autoencoder()
+    # ae = base_autoencoder()
+    # ae.add(x.shape[1], 'relu')
+    # ae.add(20, 'relu')
+    # ae.add(5, 'relu')
+    # ae.add(20, 'relu')
+    # ae.add(x.shape[1], 'relu')
 
-    ae.add(1000)
-    ae.add(400)
-    ae.add(9)
-    ae.add(10)
-    ae.add(300)
-    ae.add(1000)
+    # encoder,decoder,autoencoder = ae.build(optimizer='adadelta', loss="mse")
 
-    print ae
+    # autoencoder.summary()
 
-    encoder,decoder,autoencoder = ae.build()
-    autoencoder.summary()
+    # history = ae.fit(
+    #     x=x_norm_train,
+    #     y=x_norm_train,
+    #     validation_data=(x_norm_test,x_norm_test),
+    #     batch_size=50,
+    #     shuffle=False,
+    #     epochs=100,
+    # )
+
+    # ae.compare_features(x_norm_train, autoencoder.predict(x_norm_train))
+    return locals()
 
 
 class LEGACY:
@@ -415,15 +534,6 @@ class LEGACY:
                     else:
                         assert d[key].shape[1:] == sfile[key].shape[1:]
                         d[key] = np.concatenate([d[key], sfile[key]])
-
-        def _smartpath(
-            self,
-            path,
-        ):
-            if path.startswith("~/"):
-                return path
-            return os.path.abspath(path)
-
 
         def process_samples(
             self,
