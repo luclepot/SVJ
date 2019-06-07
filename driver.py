@@ -106,13 +106,13 @@ def setup_parser():
     
     # general criteria
     for subparser in [select, convert, train]:
-        subparser.add_argument('-i', '--input', dest="inputdir", action="store", type=_smartpath, help="input dir path", required=True)
         subparser.add_argument('-o', '--output', dest="outputdir", action="store", type=_smartpath, help="output dir path", required=True)
         subparser.add_argument('-n', '--name', dest='name', action='store', default='sample', help='sample save name')
         subparser.add_argument('-j', '--batch-job', dest='batch', action='store', default=None, help='attempt to run as a batch job on the indicated service')
         subparser.add_argument('-z', '--dry',  dest='dryrun', action='store_true', default=False, help='don\'t run analysis code')
     
     # selection args
+    select.add_argument('-i', '--input', dest="inputdir", action="store", type=_smartpath, help="input dir path", required=True)
     select.add_argument('-f', '--filter', dest='filter', action='store', default='*', help='glob-style filter for root files in inputfile')
     select.add_argument('-r', '--range', dest='range', action='store', default=(-1,-1), type=_range_input, help='subset of tree values to parse')
     select.add_argument('-d', '--debug', dest='debug', action='store_true', default=False, help='enable debug output')
@@ -122,7 +122,7 @@ def setup_parser():
     select.add_argument('-g', '--gdb', dest='gdb', action='store_true', default=False, help='run with gdb debugger :-)')
     # conversion args
     convert.add_argument('-d', '--dr', dest='DR', action='store', type=float, default=0.8, help='dr parameter for jet finding')
-    convert.add_argument('-c', '--constituents', dest='NC', action='store', type=int, default=100, help='number of jet constituents to save')
+    convert.add_argument('-c', '--constituents', dest='NC', action='store', type=int, default=-1, help='number of jet constituents to save')
     convert.add_argument('-r', '--range', dest='range', action='store', type=_range_input, default=(-1,-1), help='range of data to parse')
     # training arg
 
@@ -187,13 +187,20 @@ def select_main(inputdir, outputdir, name, batch, filter, range, debug, timing, 
 
     local_submit(master_command)
 
-def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun):
+def convert_main(outputdir, name, batch, range, DR, NC, dryrun):
     log("running command 'convert'")
-    filespec = _check_for_default_file([inputdir, outputdir], name, 'filelist')
-    spath = _check_for_default_file([inputdir, outputdir], name, 'selection')
+    filespec = _check_for_default_file([outputdir], name, 'filelist')
+    spath = _check_for_default_file([outputdir], name, 'selection')
+    
+    save_constituents = 1
+    n_constituents = NC
+    if n_constituents < 0:
+        n_constituents = 100
+        save_constituents = 0
+    
     setup_command = "source " + os.path.abspath("conversion/setup.sh")
     python_command = "python " + os.path.abspath("conversion/h5converter.py")
-    python_command += " " + " ".join(map(str, [inputdir, outputdir, filespec, spath, name, DR, NC, range[0], range[1]]))
+    python_command += " " + " ".join(map(str, [outputdir, filespec, spath, name, DR, n_constituents, range[0], range[1], save_constituents]))
 
     master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
 
@@ -213,7 +220,7 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun):
     os.system(master_command)
     sys.exit(0)
 
-def train_main(inputdir, outputdir, name, batch, filter):
+def train_main(outputdir, name, batch, filter):
     log("running command 'train'")
     sys.exit(0)
 
