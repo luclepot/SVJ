@@ -55,14 +55,17 @@ class Converter:
             'j1Pt',
             'j1M',
             'j1E',
+            'j1mult',
+            'j1ptd',
+            'j1axis2',
             'j2Pt',
             'j2M',
             'j2E',
+            'j2mult',
+            'j2ptd',
+            'j2axis2',
             'DeltaEtaJJ',
             'DeltaPhiJJ',
-            'mult',
-            'ptd',
-            'axis2'
         ]
         self.jet_constituent_names = ['pEta', 'pPhi', 'pPt']
 
@@ -175,8 +178,7 @@ class Converter:
                 self.jet_constituents[count, jetn] = np.pad(plist, [(0, self.n_constituent_particles - plist.shape[0]),(0,0)], 'constant')
                 track_index[jetn,:len(subindex)] = subindex
 
-            self.event_features[count] = np.fromiter(self.get_jet_features(tree.Jet), float, count=len(self.event_feature_names))
-            return tree, track_index
+            self.event_features[count] = np.fromiter(self.get_jet_features(tree, track_index), float, count=len(self.event_feature_names))
             
         if self.save_constituents:
             return self.jet_constituents, self.event_features
@@ -202,32 +204,78 @@ class Converter:
 
     def get_jet_features(
         self,
-        jets
+        tree,
+        track_index,
     ):
-        j1,j2 = jets[0].P4(), jets[1].P4()
+        j1,j2 = tree.Jet[0].P4(), tree.Jet[1].P4()
         # yield (j1 + j2).M()       # Mjj
         yield j1.Eta()
         yield j1.Phi()
         yield j1.Pt()
         yield j1.M()
         yield j1.E()
+        for value in self.jets_axis2_pt2(j1, tree, track_index[0]):
+            yield value
         yield j2.Pt()
         yield j2.M()
         yield j2.E()
+        for value in self.jets_axis2_pt2(j2, tree, track_index[1]):
+            yield value
         yield j1.Eta() - j2.Eta()       # deltaeta
         yield j1.DeltaPhi(j2)           # deltaphi
-        for value in self.get_jet_values():
-            yield value
-        yield 0 # ptd
-        yield 0 # axis2
 
-    # def get_mult(self, jet):
-
-    def get_jet_values(
+    def jets_axis2_pt2(
         self,
+        jet,
+        tree,
+        track_index
     ):
+        ret = np.empty((self.n_jets,3))
+        mult = 0
+        sum_weight = 0
+        sum_pt = 0
+        sum_deta = 0
+        sum_dphi = 0
+        sum_deta2 = 0
+        sum_detadphi = 0 
+        sum_dphi2 = 0
+        
+        for i, eft in track_index:
+            if i < 0:
+                break
+            c = getattr(tree, core.EFlow_types[eft][0])[i].P4()
+            if eft == 0 and c.Pt() > 1.0:
+                # means that the particle has charge, increase jet multiplicity
+                mult += 1
 
-        return 1.0, 2.0, 3.0
+            deta = c.Eta() - jet.Eta()
+            dphi = c.DeltaPhi(jet)
+            cpt = c.Pt()
+            weight = cpt*cpt
+
+            sum_weight += weight
+            sum_pt += cpt
+            sum_deta += deta*weight
+            sum_dphi += dphi*weight
+            sum_deta2 += deta*deta*weight
+            sum_detadphi += deta*dphi*weight
+            sum_dphi2 += dphi*dphi*weight
+
+        a,b,c,ave_deta,ave_dphi,ave_deta2,ave_dphi2=0,0,0,0,0,0,0
+
+        if sum_weight > 0:
+            ave_deta = sum_deta/sum_weight
+            ave_dphi = sum_dphi/sum_weight
+            ave_deta2 = sum_deta2/sum_weight
+            ave_dphi2 = sum_dphi2/sum_weight
+            a = ave_deta2 - ave_deta*ave_deta                                                    
+            b = ave_dphi2 - ave_dphi*ave_dphi                                                    
+            c = -(sum_detadphi/sum_weight - ave_deta*ave_dphi)
+        
+        delta = np.sqrt(np.abs((a - b)*(a - b) + 4*c*c))
+        axis2 = np.sqrt(0.5*(a+b-delta)) if a + b - delta > 0 else 0
+        ptD = np.sqrt(sum_weight)/sum_pt if sum_weight > 0 else 0
+        return mult, ptD, axis2
         
     def get_jet_constituents(
         self,
@@ -253,9 +301,8 @@ class Converter:
                     indicies.append([i, rep])
         
         if len(selected) == 0:
-            return np.zeros((0,3))
+            return np.zeros((0,3)), -np.ones((0,2))
         return np.asarray(selected), np.asarray(indicies)
-
 
 if __name__ == "__main__":
     if len(sys.argv) == 10:
@@ -272,58 +319,4 @@ if __name__ == "__main__":
         except:
             print "dang"
             core = Converter("../data/hlfSVJ", "../data/hlfSVJ/0.0_filelist.txt", "../data/hlfSVJ/0.0_selection.txt","0.0")
-            tree,track_index = core.convert((0, 2000))
-
-
-        def jets_axis2_pt2(
-            track_index,
-            tree,
-            n_jets=2,
-        ):
-            for jetn in range(n_jets):
-                mult = 0
-                sum_weight = 0
-                sum_pt = 0
-                sum_deta = 0
-                sum_dphi = 0
-                sum_deta2 = 0
-                sum_detadphi = 0 
-                sum_dphi2 = 0
-
-                jet = tree.Jet[jetn].P4()
-                for i, eft in track_index[jetn]:
-                    if i < 0:
-                        break
-                    c = getattr(tree, core.EFlow_types[eft][0])[i].P4()
-                    if eft == 0 and c.Pt() > 1.0:
-                        # means that the particle has charge, increase jet multiplicity
-                        mult += 1
-
-                    deta = c.Eta() - jet.Eta()
-                    dphi = c.DeltaPhi(jet)
-                    cpt = c.Pt()
-                    weight = cpt*cpt
-
-                    sum_weight += weight
-                    sum_pt += cpt
-                    sum_deta += deta*weight
-                    sum_dphi += dphi*weight
-                    sum_deta2 += deta*deta*weight
-                    sum_detadphi += deta*dphi*weight
-                    sum_dphi2 += dphi*dphi*weight
-
-                a,b,c,ave_deta,ave_dphi,ave_deta2,ave_dphi2=0,0,0,0,0,0,0
-
-                if sum_weight > 0:
-                    ave_deta = sum_deta/sum_weight
-                    ave_dphi = sum_dphi/sum_weight
-                    ave_deta2 = sum_deta2/sum_weight
-                    ave_dphi2 = sum_dphi2/sum_weight
-                    a = ave_deta2 - ave_deta*ave_deta                                                    
-                    b = ave_dphi2 - ave_dphi*ave_dphi                                                    
-                    c = -(sum_detadphi/sum_weight - ave_deta*ave_dphi)
-                
-                delta = np.sqrt(np.abs((a - b)*(a - b) + 4*c*c))
-                axis2 = np.sqrt(0.5*(a+b-delta)) if a + b - delta > 0 else 0
-                ptD = np.sqrt(sum_weight)/sum_pt if sum_weight > 0 else 0
-                yield [mult, ptD, axis2]
+            ret = core.convert((0, 2000))
