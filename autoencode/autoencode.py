@@ -11,7 +11,7 @@ import h5py
 import matplotlib.pyplot as plt
 import glob
 from sklearn.model_selection import train_test_split
-
+import pandas as pd
 
 class logger:
 
@@ -66,6 +66,87 @@ class logger:
         else:
             out += prefix + str(line) + '\n'
         return out
+
+class data_table:
+
+    NUMPY_COPY_ELTS = [
+        "size",
+        "shape",
+    ]
+    def __init__(
+        self,
+        data,
+        headers=None,
+    ):
+        self.data = data
+        self.headers = headers if headers is not None else ["dist " + str(i + 1) for i in range(self.data.shape[1])]
+        assert len(self.data.shape) == 2, "data must be matrix!"
+        assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
+        assert len(self.data) > 0, "n samples must be greater than zero"
+        self.df = pd.DataFrame(self.data, columns=self.headers)
+        
+        for elt in self.NUMPY_COPY_ELTS:
+            setattr(self, elt, getattr(self.data, elt))
+
+    def __getattr__(
+        self,
+        attr,
+    ):
+        if hasattr(self.df, attr):
+            return self.df.__getattr__(attr)
+        else:
+            raise AttributeError, "no dataframe or data_table attribute matching '{}'".format(attr)
+
+    def __str__(
+        self,
+    ):
+        return self.df.__str__()
+
+    def __repr__(
+        self,
+    ):
+        return self.df.__repr__()
+
+    def plot(
+        self,
+        values,
+        bins=15,
+        rng=None,
+        cols=4,
+    ):
+        if isinstance(values, str):
+            values = [key for key in self.headers if glob.fnmatch.fnmatch(key, values)]
+        if not hasattr(values, "__iter__"):
+            values = [values]
+        for i in range(len(values)):
+            if isinstance(values[i], int):
+                values[i] = self.headers[values[i]]
+        
+        n = len(values)
+        rows = self._rows(cols, n)
+
+        if n < cols:
+            cols = n
+            rows = 1
+
+        plot_data = [self.df[v] for v in values] 
+
+        for i in range(n):
+            plt.subplot(rows, cols, i + 1)
+            plt.hist(plot_data[i], bins=bins, range=rng, histtype='step', label=plot_data[i].name)
+            plt.xlabel(plot_data[i].name, fontsize=9)
+            plt.xticks(size=7)
+            plt.yticks(size=7)
+
+        plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01)
+        plt.show()
+    
+    def _rows(
+        self,
+        cols,
+        n
+    ):
+        return n/cols + bool(n%cols)
 
 class data_loader(logger):
 
@@ -125,7 +206,7 @@ class data_loader(logger):
         is_string = [t == 'S' for t in types]
         if any(is_string):
             if all(is_string):
-                return data_dict.values(), data_dict
+                return np.concatenate(data_dict.values()), data_dict
             raise ArgumentError, "Cannot ask for mixed type datasets! types: {0}".format(types)
 
         self.log("Grabbing dataset with keys {0}".format(list(data_dict.keys())))
@@ -165,6 +246,19 @@ class data_loader(logger):
         self.log("Saving current dataset to file '{0}'".format(filepath))
         f.close()
         return 0
+
+    def make_table(
+        self,
+        value_keys,
+        header_keys=None,
+    ):
+        values, vdict = self.get_dataset(value_keys)
+        headers, hdict = None if header_keys is None else self.get_dataset(header_keys) 
+
+        assert len(values.shape) == 2, "data must be 2-dimensional and numeric!"
+        assert values.shape[1] == headers.shape[0], "data must have the same number of columns as there are headers!!"
+
+        return data_table(values, headers)
 
     def norm_min_max(
         self,
@@ -208,6 +302,7 @@ class data_loader(logger):
         for key in keys_to_add:
             if key in sample_file.keys():
                 self._add_key(key, sample_file, self.data)
+            
         
     @staticmethod
     def _add_key(
@@ -287,42 +382,6 @@ class base_autoencoder(logger):
         
         self.layers.append([name, nodes, activation, reg, bias_init, kernel_init])
 
-    def _find_bottleneck(
-        self,
-        layers,
-    ):
-        imin = 0
-        lmin = layers[0][1]
-        for i,layer in enumerate(layers):
-            if layer[1] < lmin:
-                imin = i
-                lmin = layer[1]
-        return imin
-
-    def _add_layers(
-        self,
-        layers,
-        base_layer,
-    ):
-        lnext = base_layer
-        for layer in layers:
-            temp = lnext
-            lnext = Dense(layer[1], activation=layer[2], activity_regularizer=layer[3], name=layer[0], bias_initializer=layer[4], kernel_initializer=layer[5])(temp)
-        return lnext
-
-    def _add_layer(
-        self,
-        layer,
-        base_layer,
-    ):
-        return Dense(layer[1], activation=layer[2], activity_regularizer=layer[3], name=layer[0], bias_initializer=layer[4], kernel_initializer=layer[5])(base_layer)
-
-    def _input(
-        self,
-        layer,
-    ):
-        return Input(shape=(layer[1],), name=layer[0])
-
     def build(
         self,
         encoding_index=None,
@@ -385,21 +444,6 @@ class base_autoencoder(logger):
 
         return self.history
 
-    def _rows(
-        self,
-        cols,
-        n
-    ):
-        return n/cols + bool(n%cols)
-
-    def _smartpath(
-        self,
-        path,
-    ):
-        if path.startswith("~/"):
-            return path
-        return os.path.abspath(path)
-
     def compare_features(
         self,
         true,
@@ -423,6 +467,7 @@ class base_autoencoder(logger):
             plt.hist(true[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " true", **kwargs)
             plt.hist(pred[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " pred", **kwargs)
             plt.legend()
+
         plt.show()
 
     def save(
@@ -451,40 +496,93 @@ class base_autoencoder(logger):
                 raise AttributeError, "Model does not exist at file '{}'!!".format(filename)
             setattr(self, typename, keras.models.load_model(filename))
 
+    def _find_bottleneck(
+        self,
+        layers,
+    ):
+        imin = 0
+        lmin = layers[0][1]
+        for i,layer in enumerate(layers):
+            if layer[1] < lmin:
+                imin = i
+                lmin = layer[1]
+        return imin
+
+    def _add_layers(
+        self,
+        layers,
+        base_layer,
+    ):
+        lnext = base_layer
+        for layer in layers:
+            temp = lnext
+            lnext = Dense(layer[1], activation=layer[2], activity_regularizer=layer[3], name=layer[0], bias_initializer=layer[4], kernel_initializer=layer[5])(temp)
+        return lnext
+
+    def _add_layer(
+        self,
+        layer,
+        base_layer,
+    ):
+        return Dense(layer[1], activation=layer[2], activity_regularizer=layer[3], name=layer[0], bias_initializer=layer[4], kernel_initializer=layer[5])(base_layer)
+
+    def _input(
+        self,
+        layer,
+    ):
+        return Input(shape=(layer[1],), name=layer[0])
+
+    def _rows(
+        self,
+        cols,
+        n
+    ):
+        return n/cols + bool(n%cols)
+
+    def _smartpath(
+        self,
+        path,
+    ):
+        if path.startswith("~/"):
+            return path
+        return os.path.abspath(path)
+
 def demo():
     b = data_loader(True)
 
-    for sample in glob.glob("../data/SVJfull/*_data.h5"):
+    for sample in glob.glob("../data/hlfSVJ/*_data.h5"):
         b.add_sample(sample)
+    
+    return b, b.make_table("*data", "*names")
+    # x, x_dict = b.get_dataset('*event_feature_data*')
+    # x_train, x_test = train_test_split(x, test_size=0.25, random_state=42)
+    # x_norm_train, x_minmax_train = b.norm_min_max(x_train)
+    # x_norm_test, x_minmax_test = b.norm_min_max(x_test)
 
-    x, x_dict = b.get_dataset('*event_feature_data*')
-    x_train, x_test = train_test_split(x, test_size=0.25, random_state=42)
-    x_norm_train, x_minmax_train = b.norm_min_max(x_train)
-    x_norm_test, x_minmax_test = b.norm_min_max(x_test)
+    # # ae = base_autoencoder()
+    # # ae.add(x.shape[1], 'relu')
+    # # ae.add(20, 'relu')
+    # # ae.add(5, 'relu')
+    # # ae.add(20, 'relu')
+    # # ae.add(x.shape[1], 'relu')
 
-    # ae = base_autoencoder()
-    # ae.add(x.shape[1], 'relu')
-    # ae.add(20, 'relu')
-    # ae.add(5, 'relu')
-    # ae.add(20, 'relu')
-    # ae.add(x.shape[1], 'relu')
+    # # encoder,decoder,autoencoder = ae.build(optimizer='adadelta', loss="mse")
 
-    # encoder,decoder,autoencoder = ae.build(optimizer='adadelta', loss="mse")
+    # # autoencoder.summary()
 
-    # autoencoder.summary()
+    # # history = ae.fit(
+    # #     x=x_norm_train,
+    # #     y=x_norm_train,
+    # #     validation_data=(x_norm_test,x_norm_test),
+    # #     batch_size=50,
+    # #     shuffle=False,
+    # #     epochs=100,
+    # # )
 
-    # history = ae.fit(
-    #     x=x_norm_train,
-    #     y=x_norm_train,
-    #     validation_data=(x_norm_test,x_norm_test),
-    #     batch_size=50,
-    #     shuffle=False,
-    #     epochs=100,
-    # )
+    # # ae.compare_features(x_norm_train, autoencoder.predict(x_norm_train))
+    # return locals()
 
-    # ae.compare_features(x_norm_train, autoencoder.predict(x_norm_train))
-    return locals()
-
+b, dt = demo()
 
 class LEGACY:
 
