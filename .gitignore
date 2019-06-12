@@ -10,6 +10,7 @@
 *.out
 *_submit.sh
 *_condor.submit
+*.json
 #
 # CUSTOM
 
