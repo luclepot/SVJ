@@ -395,6 +395,25 @@ public:
                 i++;
             }
             CutFlowHist->Write(); 
+
+            std::ofstream f(outputdir + "/" + sample + "_cutflow.txt");
+            if (f.is_open()) {
+                vector<string> cutNames;
+                for (auto elt : Cuts::CutName) {
+                    cutNames.push_back(elt.second);
+                }
+                WriteVector(f, CutFlow);
+                WriteVector(f, cutNames);
+                f.close(); 
+            }
+        }
+
+        template<typename t>
+        void WriteVector(std::ostream & out, vector<t> & vec, string delimiter=", ") {
+            for (size_t i = 0; i < vec.size() - 1; ++i) {
+                out << vec[i] << delimiter;
+            }
+            out << vec.back() << endl;
         }
 
         // void PrintAllCuts() {
