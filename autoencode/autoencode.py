@@ -12,6 +12,39 @@ import matplotlib.pyplot as plt
 import glob
 from sklearn.model_selection import train_test_split
 import pandas as pd
+import random 
+
+
+def _rows(
+    cols,
+    n
+):
+    return n/cols + bool(n%cols)
+
+def compare_features(
+    true,
+    pred,
+    bins=30,
+    max_features=20,
+    cols=4,
+    labels=None,
+    **kwargs
+):
+
+    n = min(true.shape[1], max_features)
+    rows = _rows(cols, n)
+
+    if labels is None:
+        labels = ["var {0}".format(i) for i in range(n)]
+
+    for i in range(n):
+        gmax, gmin = max(true[:,i].max(), pred[:,i].max()), min(true[:,i].min(), pred[:,i].min())
+        plt.subplot(rows, cols, i + 1)
+        plt.hist(true[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " true", **kwargs)
+        plt.hist(pred[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " pred", **kwargs)
+        plt.legend()
+
+    plt.show()
 
 class logger:
 
@@ -69,15 +102,13 @@ class logger:
 
 class data_table:
 
-    NUMPY_COPY_ELTS = [
-        "size",
-        "shape",
-    ]
     def __init__(
         self,
         data,
         headers=None,
+        name=None
     ):
+        self.name = name or "untitled"
         self.data = data
         self.headers = headers if headers is not None else ["dist " + str(i + 1) for i in range(self.data.shape[1])]
         assert len(self.data.shape) == 2, "data must be matrix!"
@@ -85,9 +116,6 @@ class data_table:
         assert len(self.data) > 0, "n samples must be greater than zero"
         self.df = pd.DataFrame(self.data, columns=self.headers)
         
-        for elt in self.NUMPY_COPY_ELTS:
-            setattr(self, elt, getattr(self.data, elt))
-
     def __getattr__(
         self,
         attr,
@@ -107,12 +135,24 @@ class data_table:
     ):
         return self.df.__repr__()
 
+    def train_test_split(
+        self,
+        test_fraction=0.25
+    ):
+        dtrain, dtest = train_test_split(self, test_size=test_fraction)
+        return (data_table(np.asarray(dtrain), np.asarray(dtrain.columns), "train"),
+            data_table(np.asarray(dtest), np.asarray(dtest.columns), "test"))
+
     def plot(
         self,
         values,
+        others=[],
         bins=15,
         rng=None,
         cols=4,
+        ticksize=8,
+        fontsize=10,
+        normed=0,
     ):
         if isinstance(values, str):
             values = [key for key in self.headers if glob.fnmatch.fnmatch(key, values)]
@@ -122,6 +162,10 @@ class data_table:
             if isinstance(values[i], int):
                 values[i] = self.headers[values[i]]
         
+        for i in range(len(others)):
+            if not isinstance(others[i], data_table):
+                others[i] = data_table(others[i], headers=self.headers)
+
         n = len(values)
         rows = self._rows(cols, n)
 
@@ -129,15 +173,28 @@ class data_table:
             cols = n
             rows = 1
 
-        plot_data = [self.df[v] for v in values] 
+        plot_data = [self[v] for v in values]
+        plot_others = [[other[v] for v in values] for other in others]
+
+        if rng is None:
+            rng = [(p.min(), p.max()) for p in plot_data]
+        elif len(rng) == 2 and all([not hasattr(r, "__iter__") for r in rng]):
+            rng = [rng for i in range(len(plot_data))]
+
+        weights = None
 
         for i in range(n):
             plt.subplot(rows, cols, i + 1)
-            plt.hist(plot_data[i], bins=bins, range=rng, histtype='step', label=plot_data[i].name)
-            plt.xlabel(plot_data[i].name, fontsize=9)
-            plt.xticks(size=7)
-            plt.yticks(size=7)
-
+            # weights = np.ones_like(plot_data[i])/float(len(plot_data[i]))
+            plt.hist(plot_data[i], bins=bins, range=rng[i], histtype='step', normed=normed, label=self.name, weights=weights)
+            for j in range(len(others)):
+                # weights = np.ones_like(plot_others[j][i])/float(len(plot_others[j][i]))
+                plt.hist(plot_others[j][i], bins=bins, range=rng[i], histtype='step', label=others[j].name, normed=normed, weights=weights)
+            plt.xlabel(plot_data[i].name, fontsize=fontsize)
+            plt.xticks(size=ticksize)
+            plt.yticks(size=ticksize)
+        
+        plt.legend()
         plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01)
         plt.show()
     
@@ -162,6 +219,7 @@ class data_loader(logger):
         self.data = odict()
         self.size = 0
         self.shapes = []
+        self.table = None
 
     def add_sample(
         self,
@@ -178,6 +236,7 @@ class data_loader(logger):
                 self.sample_keys = self.sample_keys.intersection(set(self.samples[filepath].keys()))
 
             self._update_data(self.samples[filepath], self.samples[filepath].keys())
+            self.table = self.make_table("*data", "*names", "main sample")
 
     def get_dataset(
         self,
@@ -247,10 +306,18 @@ class data_loader(logger):
         f.close()
         return 0
 
+    def plot(
+        self,
+        *args,
+        **kwargs
+    ):
+        return self.table.plot(*args, **kwargs)
+
     def make_table(
         self,
         value_keys,
         header_keys=None,
+        name=None,
     ):
         values, vdict = self.get_dataset(value_keys)
         headers, hdict = None if header_keys is None else self.get_dataset(header_keys) 
@@ -258,24 +325,27 @@ class data_loader(logger):
         assert len(values.shape) == 2, "data must be 2-dimensional and numeric!"
         assert values.shape[1] == headers.shape[0], "data must have the same number of columns as there are headers!!"
 
-        return data_table(values, headers)
+        return data_table(values, headers, name)
 
     def norm_min_max(
         self,
         dataset,
+        ab=(0,1)
     ):
         if isinstance(dataset, basestring) or isinstance(dataset, list):
             dataset = self.get_dataset(dataset)
-
+        a,b = ab
         rng = dataset.min(axis=0), dataset.max(axis=0)
-        return (dataset - rng[0])/(rng[1] - rng[0]), rng
+        return (b-a)*(dataset - rng[0])/(rng[1] - rng[0]) + a, rng
 
     def inorm_min_max(
         self,
         dataset,
         rng,
+        ab=(0,1)
     ):
-        return dataset*(rng[1] - rng[0]) + rng[0]
+        a,b = ab
+        return ((dataset - a)/(b - a))*(rng[1] - rng[0]) + rng[0]
         
     def norm_mean_std(
         self,
@@ -302,8 +372,7 @@ class data_loader(logger):
         for key in keys_to_add:
             if key in sample_file.keys():
                 self._add_key(key, sample_file, self.data)
-            
-        
+             
     @staticmethod
     def _add_key(
         key,
@@ -439,36 +508,10 @@ class base_autoencoder(logger):
                 *args,
                 **kwargs
             )
-        except KeboardInterrupt:
+        except KeyboardInterrupt:
             return None
 
         return self.history
-
-    def compare_features(
-        self,
-        true,
-        pred,
-        bins=30,
-        max_features=20,
-        cols=4,
-        labels=None,
-        **kwargs
-    ):
-
-        n = min(true.shape[1], max_features)
-        rows = self._rows(cols, n)
-
-        if labels is None:
-            labels = ["var {0}".format(i) for i in range(n)]
-
-        for i in range(n):
-            gmax, gmin = max(true[:,i].max(), pred[:,i].max()), min(true[:,i].min(), pred[:,i].min())
-            plt.subplot(rows, cols, i + 1)
-            plt.hist(true[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " true", **kwargs)
-            plt.hist(pred[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " pred", **kwargs)
-            plt.legend()
-
-        plt.show()
 
     def save(
         self,
@@ -532,13 +575,6 @@ class base_autoencoder(logger):
     ):
         return Input(shape=(layer[1],), name=layer[0])
 
-    def _rows(
-        self,
-        cols,
-        n
-    ):
-        return n/cols + bool(n%cols)
-
     def _smartpath(
         self,
         path,
@@ -547,42 +583,106 @@ class base_autoencoder(logger):
             return path
         return os.path.abspath(path)
 
-def demo():
+def basic_run(bn, optimizer, loss, act, epochs, batch):
     b = data_loader(True)
+    b.add_sample("../data/hlfSVJ/full.h5")
 
-    for sample in glob.glob("../data/hlfSVJ/*_data.h5"):
-        b.add_sample(sample)
-    
-    return b, b.make_table("*data", "*names")
-    # x, x_dict = b.get_dataset('*event_feature_data*')
-    # x_train, x_test = train_test_split(x, test_size=0.25, random_state=42)
-    # x_norm_train, x_minmax_train = b.norm_min_max(x_train)
-    # x_norm_test, x_minmax_test = b.norm_min_max(x_test)
+    x, x_dict = b.get_dataset('*event_feature_data*')
+    x_train, x_test = train_test_split(x, test_size=0.5, random_state=42)
+    # x_norm_train, x_minmax_train = (x - x.min())/(x.max() - x.min()), (x.max(), x.min())
+    # x_norm_test, x_minmax_test = (x - x.min())/(x.max() - x.min()), (x.max(), x.min())
 
-    # # ae = base_autoencoder()
-    # # ae.add(x.shape[1], 'relu')
-    # # ae.add(20, 'relu')
-    # # ae.add(5, 'relu')
-    # # ae.add(20, 'relu')
-    # # ae.add(x.shape[1], 'relu')
+    x_norm_train, x_minmax_train = b.norm_min_max(x_train, ab=(-1.,1.))
+    x_norm_test, x_minmax_test = b.norm_min_max(x_test, ab=(-1.,1.))
 
-    # # encoder,decoder,autoencoder = ae.build(optimizer='adadelta', loss="mse")
+    ae = base_autoencoder()
+    ae.add(x.shape[1], 'relu')
+    ae.add(50, 'relu')
+    ae.add(50, 'relu')
+    ae.add(bn, 'relu')
+    ae.add(50, 'relu')
+    ae.add(50, 'relu')
+    ae.add(x.shape[1], act)
 
-    # # autoencoder.summary()
+    encoder,decoder,autoencoder = ae.build(optimizer=optimizer, loss=loss)
 
-    # # history = ae.fit(
-    # #     x=x_norm_train,
-    # #     y=x_norm_train,
-    # #     validation_data=(x_norm_test,x_norm_test),
-    # #     batch_size=50,
-    # #     shuffle=False,
-    # #     epochs=100,
-    # # )
+    autoencoder.summary()
 
-    # # ae.compare_features(x_norm_train, autoencoder.predict(x_norm_train))
+    history = ae.fit(
+        x=x_norm_train,
+        y=x_norm_train,
+        validation_data=(x_norm_test,x_norm_test),
+        batch_size=batch,
+        shuffle=False,
+        epochs=epochs,
+    )
+
+    # comp = data_table(x_norm_train, b.table.headers, "true")
+    # comp.plot(
+    #     "*",
+    #     others=[data_table(autoencoder.predict(x_norm_train), comp.headers, "predicted")],
+    #     normed=False,
+    #     bins=50
+    # )
+
+    # ae.compare_features(x_norm_train, autoencoder.predict(x_norm_train))
+    return {
+        "history": history.history,
+        "true": x_norm_train.tolist(),
+        "pred": autoencoder.predict(x_norm_train).tolist(),
+    }
     # return locals()
 
-b, dt = demo()
+def rand_search(n):
+    def r(l):
+        return l[random.randint(0, len(l) - 1)]
+    optimizers = ['adam', 'adagrad']
+    losses = ['mean_squared_error','mean_absolute_error']
+    activations = ['linear', 'tanh']
+    bottlenecks = [4,5,6,7,8]
+    batches = [10,50,100]
+    epochs = [40]
+    pdict = odict()
+    
+    import json
+
+    for i in range(n):
+
+        opt = r(optimizers)
+        loss = r(losses)
+        act = r(activations)
+        bn = r(bottlenecks)
+        batch = r(batches)
+        epoch = r(epochs)
+
+        strname = "{}-{}-{}-{}-{}-{}".format(bn, opt, loss, act, batch, epoch)
+
+        if strname in pdict:
+            continue
+
+        pdict[strname] = {}
+
+        pdict[strname]['params'] = {
+            'optimizer': opt,
+            'loss': loss,
+            'activation': act,
+            'bottleneck': bn,
+            'epochs': epoch,
+            'batchsize': batch,
+        }
+
+        print strname
+
+        pdict[strname]['out'] = basic_run(bn, opt, loss, act, epoch, batch)
+
+        if os.path.exists("pdict.json"):
+            old = json.load(open("pdict.json"))
+            pdict.update(old)
+        json.dump(pdict, open("pdict.json", 'w+'))
+
+        print pdict.keys()
+
+# b = rand_search(100)
 
 class LEGACY:
 
