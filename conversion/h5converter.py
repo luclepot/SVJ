@@ -50,23 +50,31 @@ class Converter:
 
         ## ADD MET
         self.event_feature_names =  [
+
             'j1Eta',
             'j1Phi',
             'j1Pt',
             'j1M',
-            'j1E',
+            'j1E', # REMOVE
             'j1mult',
             'j1ptd',
             'j1axis2',
+            # DELTAPHI BETWEEN MET/JET # ADD
+            # MET FOR EVENT # ADD
+
+            # 'j2Eta', # ADD
+            # 'j2Phi', # ADD
             'j2Pt',
             'j2M',
-            'j2E',
+            'j2E', # REMOVE
             'j2mult',
             'j2ptd',
             'j2axis2',
-            'DeltaEtaJJ',
-            'DeltaPhiJJ',
+
+            'DeltaEtaJJ', # REMOVE
+            'DeltaPhiJJ', # REMOVE
         ]
+
         self.jet_constituent_names = ['pEta', 'pPhi', 'pPt']
 
         self.EFlow_types = [
