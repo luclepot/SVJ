@@ -16,6 +16,8 @@ import random
 import os
 import json
 import traceback
+from datetime import datetime
+import dateutils
 
 def _smartpath(
     path,
@@ -61,8 +63,8 @@ class logger:
     def __init__(
         self,
     ):
-        self.LOG_PREFIX = "Base Logger :: "
-        self.ERROR_PREFIX = "ERROR: "
+        self._LOG_PREFIX = "logger :: "
+        self._ERROR_PREFIX = "ERROR: "
         self.VERBOSE = True
 
     def log(
@@ -72,10 +74,10 @@ class logger:
     ):
         if string:
             if self.VERBOSE:
-                return self._log_str(s, self.LOG_PREFIX)
+                return self._log_str(s, self._LOG_PREFIX)
             return ''
         if self.VERBOSE: 
-            self._log_base(s, self.LOG_PREFIX)
+            self._log_base(s, self._LOG_PREFIX)
 
     def error(
         self,
@@ -83,8 +85,8 @@ class logger:
         string=False,
     ):
         if string:
-            return self._log_str(s, self.LOG_PREFIX + self.ERROR_PREFIX)    
-        self._log_base(s, self.LOG_PREFIX + self.ERROR_PREFIX)
+            return self._log_str(s, self._LOG_PREFIX + self._ERROR_PREFIX)    
+        self._log_base(s, self._LOG_PREFIX + self._ERROR_PREFIX)
 
     def _log_base(
         self,
@@ -222,7 +224,7 @@ class data_loader(logger):
         verbose=True
     ):
         logger.__init__(self)
-        self.LOG_PREFIX = "DataLoader :: "
+        self._LOG_PREFIX = "data_loader :: "
         self.VERBOSE = verbose
         self.samples = odict()
         self.sample_keys = None
@@ -408,7 +410,7 @@ class base_autoencoder(logger):
         verbose=True,
     ):
         logger.__init__(self)
-        self.LOG_PREFIX = "Autoencoder :: "
+        self._LOG_PREFIX = "base_autoencoder :: "
         self.VERBOSE = verbose
         self.name = name
         self.layers = []
@@ -485,7 +487,7 @@ class base_autoencoder(logger):
 
         self.autoencoder.compile(optimizer, loss)
 
-        return self.encoder,self.decoder,self.autoencoder
+        return self.encoder, self.decoder, self.autoencoder
 
     def fit(
         self,
@@ -580,28 +582,55 @@ class base_autoencoder(logger):
 
     # return locals()
 
-class h5_element_wrapper:
+class h5_element_wrapper(logger):
     def __init__(
         self,
         h5file,
         group,
         name,
         istype=None,
+        verbose=True,
+        overwrite=False
     ):
+        self._LOG_PREFIX = "h5_elt '{}' :: ".format(name)
+        self.VERBOSE = verbose
+
         self.h5file = h5file
         self.group = group
         self.name = name
+        self.fnamefull = self.h5file.filename
+        self.fname = os.path.basename(self.fnamefull)
 
-        if self.group not in self.h5file:
+        if self.group not in self.h5file.keys():
+            self.log("creating group '{}' in file '{}'".format(self.group, self.fname))
             self.h5file.create_group(self.group)
 
-        if self.name not in self.h5file[self.group]:
+        if self.name not in self.h5file[self.group].keys():
+            self.log("creating dataset '{}/{}' in file '{}'".format(self.group, self.name, self.fname))
             self.h5file[self.group].create_dataset(self.name,(0,))
+
+        elif overwrite:
+            del self.h5file[self.group][self.name]
+            self.log("recreating dataset '{}/{}' in file '{}'".format(self.group, self.name, self.fname))
+            self.h5file[self.group].create_dataset(self.name,(0,))
+        else:
+            self.log("loading dataset '{}/{}' from file '{}'".format(self.group, self.name, self.fname))
 
         self.core = self.h5file[self.group][self.name]
 
         self.comp = np.asarray if istype is None else self.dict_comp
         self.conv = np.asarray if istype is None else istype
+        self.rep = self.conv(self.core)
+
+    def __str__(
+        self
+    ):
+        return str(self.rep)
+
+    def __repr__(
+        self,
+    ):
+        return repr(self.rep)
 
     def dict_comp(
         self,
@@ -613,23 +642,34 @@ class h5_element_wrapper:
         self,
         new_data,
     ):
-        del self.h5file[self.group][self.name]
+        if self.name in self.h5file[self.group]:
+            del self.h5file[self.group][self.name]
         self.h5file[self.group].create_dataset(name=self.name, data=self.comp(new_data))
         self.core = self.h5file[self.group][self.name]
+        self.rep = self.conv(self.core)
 
-    def get(
+    def h5(
         self,
     ):
-        return self.conv(self.core)
+        return self.core
+
+    def empty(
+        self,
+    ):
+        return len(self) == 0
 
     def __getattr__(
         self,
         attr,
     ):
-        return getattr(self.core, attr)
+        return getattr(self.rep, attr)
 
-class trainer_shell(logger):
-    
+class training_shell(logger):
+    """
+    Wraps training/testing/evaluation activity for a model in an h5 file saver, which keeps all
+    training inputs/outputs, model performance stats, model weights, etc.
+    """
+
     ### LIFE/DEATH
 
     def __init__(
@@ -640,41 +680,51 @@ class trainer_shell(logger):
     ):
         logger.__init__(self)
 
-        self.LOG_PREFIX = "MODEL TRAINER :: "
+        self._LOG_PREFIX = "train_shell :: "
         self.VERBOSE = verbose
 
         self.config_file = _smartpath(name)
+    
         
         if not self.config_file.endswith(".h5"):
             self.config_file += ".h5"
-
+            
         preexisting = os.path.exists(self.config_file) and not overwrite
         self.file = None
 
         if self.locked(self.config_file):
-            self.throw("filename '{}' is already being edited in another instance!!".format(self.config_file))
+            self._throw("filename '{}' is already being edited in another instance!!".format(self.config_file))
 
         self.file = h5py.File(self.config_file)
 
-        self.lock_file(self.config_file)
-           
+        self._lock_file(self.config_file)
+
         try:
             file_attrs = {
-                "params": (["training", "config"], odict),
-                "data": (["true", "pred", "history", "model"], None)
+                "params": (["training", "config"], dict),
+                "data": (["true", "pred", "metrics", "metric_names"], None)
             }
             
             for attr in file_attrs:
-                setattr(self, attr, self.file[attr] if preexisting and attr in self.file else self.file.create_group(attr))
                 for subattr in file_attrs[attr][0]:
-                    setattr(self, subattr, h5_element_wrapper(self.file, attr, subattr, file_attrs[attr][1]))
+                    setattr(self, subattr, h5_element_wrapper(self.file, attr, subattr, file_attrs[attr][1], overwrite=overwrite))
+                setattr(self, attr, self.file[attr])
                         
-
         except Exception as e:
             self.error(traceback.format_exc())
-            self.throw(e, unlock=True)
+            self._throw(e, unlock=True)
 
-    def throw(
+        cdict = self.config.copy()
+        
+        if not preexisting:
+            cdict = odict()
+            cdict['name'] = name
+            cdict['trained'] = ''
+            cdict['model_file'] = ''
+        
+        self.config.update(cdict)
+
+    def _throw(
         self,
         msg,
         exc=AttributeError,
@@ -691,7 +741,7 @@ class trainer_shell(logger):
         if self.file is not None:
             self.file.close()
         if unlock:
-            self.unlock_file(self.config_file)
+            self._unlock_file(self.config_file)
 
     def __del__(
         self,
@@ -700,13 +750,13 @@ class trainer_shell(logger):
 
     ### LOCKING
 
-    def lock_file(
+    def _lock_file(
         self,
         fname,
     ):
         open(self._get_lock(fname), "w+").close()
 
-    def unlock_file(
+    def _unlock_file(
         self,
         fname,
     ):
@@ -724,82 +774,65 @@ class trainer_shell(logger):
     ):
         return os.path.join(os.path.dirname(fname), ".lock." + os.path.basename(fname))
 
-    ### LOADING
-
-    def dict_to_np(
-        self,
-        dict_in,
-    ):
-        return np.asarray([dict_in.keys(), dict_in.values()], dtype="object").T
-        
-    def np_to_dict(
-        self,
-        np_in,
-        ordered=True
-    ):
-        if ordered:
-            return odict(np_in)
-        return dict(np_in)
-
-    def update(
-        self,
-        data,
-        group,
-        name,
-        overwrite=False
-    ):
-        if name in group:
-            if overwrite:
-                del group[name]
-            else:
-                self.throw("name '{}' already exists in data group '{}'!".format(name, group.name))
-
-        if isinstance(data, dict) or isinstance(data, odict):
-            data = dict_to_np(data)
-
-        group.create_dataset(data=data, name=name)
-
-    def update(
-        self,
-        dset,
-        dnew,
-        overwrite=False,
-    ):
-        if dset.shape != (0,):
-            if overwrite:
-                del dset
-
-    def get(
-        group,
-        name,
-        ordered=True
-    ):
-        ret = self.file[group][name]
-        if 'S' in ret.dtype:
-            return self.np_to_dict(ret, ordered)
-        return ret
-
-    ### WRAPPERS
+    ### ACTUAL WRAPPERS
 
     def train(
         self,
+        x,
+        y,
+        model=None,
+        epochs=10,
+        batch_size=32,
+        force=False
     ):
+        if self.config['trained']:
+            if not force:
+                self._throw("Model already trained, with timestamp {}!!".format(self.config['trained']))
+            self.log("forcing already trained model to re-train")
+            if os.path.exists(self.config['model_file']):
+                new_model = keras.models.load_model(self.config['model_file'])
+                if model is not None:
+                    assert model.get_params() == new_model.get_params(), 'input and saved models must be the same!'
+                model = new_model
+    
+        start = datetime.now()
+        history = []
         try:
-            self.history = self.autoencoder.fit(
-                x=x,
-                y=y,
-                steps_per_epoch=int(np.ceil(len(x)/batch_size)),
-                validation_steps=int(np.ceil(len(validation_data[0])/batch_size)),
-                validation_data=validation_data,
-                *args,
-                **kwargs
-            )
+            for epoch in range(epochs):
+                history.append(
+                        model.fit(
+                        x=x,
+                        y=y,
+                        steps_per_epoch=int(np.ceil(len(x)/batch_size)),
+                        validation_steps=int(np.ceil(len(validation_data[0])/batch_size)),
+                        validation_data=validation_data,
+                        initial_epoch=epoch,
+                        epochs=epoch + 1,
+
+                    ).history.values()
+                )
             
         except:
-            self.error()
-            return None
+            self.error(traceback.format_exc())
+                    
+        end = datetime.now()
 
-        return self.history
+        model_file = self.config_file.replace(".h5", "_model.h5")
+        model.save(model_file)
+
+        cdict = self.config.copy()
+        cdict['model_file'] = model_file
+        cdict['trained'] = str(start) + " ::: " + str(end)
+        self.config.update(cdict)
+
+        tdict = self.training.copy()
+        tdict['time'] = str(end - start)
+
+        self.training.update(tdict)
+
+        # return self.history
+
+    
 
 def rand_search(n):
     def r(l):
