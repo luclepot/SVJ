@@ -13,35 +13,45 @@ import glob
 from sklearn.model_selection import train_test_split
 import pandas as pd
 import random 
+import os
+import json
+import traceback
 
-
-def _rows(
-    cols,
-    n
+def _smartpath(
+    path,
 ):
-    return n/cols + bool(n%cols)
+    if path.startswith("~/"):
+        return path
+    return os.path.abspath(path)
 
 def compare_features(
     true,
-    pred,
+    preds,
     bins=30,
     max_features=20,
     cols=4,
+    dataset_names=None,
     labels=None,
     **kwargs
 ):
-
     n = min(true.shape[1], max_features)
-    rows = _rows(cols, n)
+    rows = n/cols + bool(n%cols)
 
     if labels is None:
         labels = ["var {0}".format(i) for i in range(n)]
 
+    if not hasattr(preds, "__iter__"):
+        preds = [preds]
+
+    if dataset_names is None:
+        dataset_names = ["pred {}".format(i) for i in range(len(preds))]
+
     for i in range(n):
         gmax, gmin = max(true[:,i].max(), pred[:,i].max()), min(true[:,i].min(), pred[:,i].min())
         plt.subplot(rows, cols, i + 1)
-        plt.hist(true[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " true", **kwargs)
-        plt.hist(pred[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " pred", **kwargs)
+        plt.hist(true[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " true", **kwargs)
+        for pred in preds:
+            plt.hist(pred[:,i], bins=bins, range=(gmin,gmax), histtype="step", label=labels[i] + " " + " pred", **kwargs)
         plt.legend()
 
     plt.show()
@@ -85,7 +95,7 @@ class logger:
             for line in s.split('\n'):
                 print prefix + str(line)
         else:
-            print prefix + str(line)
+            print prefix + str(s)
 
     def _log_str(
         self,
@@ -225,7 +235,7 @@ class data_loader(logger):
         self,
         sample_path,
     ):
-        filepath = self._smartpath(sample_path)
+        filepath = _smartpath(sample_path)
         assert os.path.exists(filepath)
         if filepath not in self.samples:
             self.log("Adding sample at path '{}'".format(filepath))
@@ -290,7 +300,7 @@ class data_loader(logger):
         force=False,
     ):
         """saves the current sample sets as one h5 file to the filepath specified"""
-        filepath = self._smartpath(filepath)
+        filepath = _smartpath(filepath)
         if not filepath.endswith('.h5'):
             filepath += '.h5'
 
@@ -390,14 +400,6 @@ class data_loader(logger):
                 assert d[key].shape[1:] == sfile[key].shape[1:]
                 d[key] = np.concatenate([d[key], sfile[key]])
     
-    def _smartpath(
-        self,
-        path,
-    ):
-        if path.startswith("~/"):
-            return path
-        return os.path.abspath(path)
-
 class base_autoencoder(logger):
 
     def __init__(
@@ -508,6 +510,7 @@ class base_autoencoder(logger):
                 *args,
                 **kwargs
             )
+
         except KeyboardInterrupt:
             return None
 
@@ -517,14 +520,14 @@ class base_autoencoder(logger):
         self,
         path,
     ):
-        path = self._smartpath(path)
-        path = self._smartpath(path)
+        path = _smartpath(path)
+        path = _smartpath(path)
         if not os.path.exists(path):
             os.mkdirs(path)
         to_save = ['autoencoder', 'encoder', 'decoder']
         filenames = [os.path.join(path, model + '.h5') for model in to_save]
         for filename,typename in zip(filenames, to_save):
-            if os.path.exists(self._smartpath(filename)):
+            if os.path.exists(_smartpath(filename)):
                 raise AttributeError, "Model already exists at file '{}'!!".format(filename)
             getattr(self, typename).save(filename)
 
@@ -535,7 +538,7 @@ class base_autoencoder(logger):
         to_load = ['autoencoder', 'encoder', 'decoder']
         filenames = [os.path.join(path, model + '.h5') for model in to_load]
         for filename,typename in zip(filenames, to_load):
-            if not os.path.exists(self._smartpath(filename)):
+            if not os.path.exists(_smartpath(filename)):
                 raise AttributeError, "Model does not exist at file '{}'!!".format(filename)
             setattr(self, typename, keras.models.load_model(filename))
 
@@ -575,63 +578,228 @@ class base_autoencoder(logger):
     ):
         return Input(shape=(layer[1],), name=layer[0])
 
-    def _smartpath(
-        self,
-        path,
-    ):
-        if path.startswith("~/"):
-            return path
-        return os.path.abspath(path)
-
-def basic_run(bn, optimizer, loss, act, epochs, batch):
-    b = data_loader(True)
-    b.add_sample("../data/hlfSVJ/full.h5")
-
-    x, x_dict = b.get_dataset('*event_feature_data*')
-    x_train, x_test = train_test_split(x, test_size=0.5, random_state=42)
-    # x_norm_train, x_minmax_train = (x - x.min())/(x.max() - x.min()), (x.max(), x.min())
-    # x_norm_test, x_minmax_test = (x - x.min())/(x.max() - x.min()), (x.max(), x.min())
-
-    x_norm_train, x_minmax_train = b.norm_min_max(x_train, ab=(-1.,1.))
-    x_norm_test, x_minmax_test = b.norm_min_max(x_test, ab=(-1.,1.))
-
-    ae = base_autoencoder()
-    ae.add(x.shape[1], 'relu')
-    ae.add(50, 'relu')
-    ae.add(50, 'relu')
-    ae.add(bn, 'relu')
-    ae.add(50, 'relu')
-    ae.add(50, 'relu')
-    ae.add(x.shape[1], act)
-
-    encoder,decoder,autoencoder = ae.build(optimizer=optimizer, loss=loss)
-
-    autoencoder.summary()
-
-    history = ae.fit(
-        x=x_norm_train,
-        y=x_norm_train,
-        validation_data=(x_norm_test,x_norm_test),
-        batch_size=batch,
-        shuffle=False,
-        epochs=epochs,
-    )
-
-    # comp = data_table(x_norm_train, b.table.headers, "true")
-    # comp.plot(
-    #     "*",
-    #     others=[data_table(autoencoder.predict(x_norm_train), comp.headers, "predicted")],
-    #     normed=False,
-    #     bins=50
-    # )
-
-    # ae.compare_features(x_norm_train, autoencoder.predict(x_norm_train))
-    return {
-        "history": history.history,
-        "true": x_norm_train.tolist(),
-        "pred": autoencoder.predict(x_norm_train).tolist(),
-    }
     # return locals()
+
+class h5_element_wrapper:
+    def __init__(
+        self,
+        h5file,
+        group,
+        name,
+        istype=None,
+    ):
+        self.h5file = h5file
+        self.group = group
+        self.name = name
+
+        if self.group not in self.h5file:
+            self.h5file.create_group(self.group)
+
+        if self.name not in self.h5file[self.group]:
+            self.h5file[self.group].create_dataset(self.name,(0,))
+
+        self.core = self.h5file[self.group][self.name]
+
+        self.comp = np.asarray if istype is None else self.dict_comp
+        self.conv = np.asarray if istype is None else istype
+
+    def dict_comp(
+        self,
+        dict_in,
+    ):
+        return np.asarray([dict_in.keys(), dict_in.values()], dtype="S").T
+
+    def update(
+        self,
+        new_data,
+    ):
+        del self.h5file[self.group][self.name]
+        self.h5file[self.group].create_dataset(name=self.name, data=self.comp(new_data))
+        self.core = self.h5file[self.group][self.name]
+
+    def get(
+        self,
+    ):
+        return self.conv(self.core)
+
+    def __getattr__(
+        self,
+        attr,
+    ):
+        return getattr(self.core, attr)
+
+class trainer_shell(logger):
+    
+    ### LIFE/DEATH
+
+    def __init__(
+        self,
+        name,
+        verbose=True,
+        overwrite=False,
+    ):
+        logger.__init__(self)
+
+        self.LOG_PREFIX = "MODEL TRAINER :: "
+        self.VERBOSE = verbose
+
+        self.config_file = _smartpath(name)
+        
+        if not self.config_file.endswith(".h5"):
+            self.config_file += ".h5"
+
+        preexisting = os.path.exists(self.config_file) and not overwrite
+        self.file = None
+
+        if self.locked(self.config_file):
+            self.throw("filename '{}' is already being edited in another instance!!".format(self.config_file))
+
+        self.file = h5py.File(self.config_file)
+
+        self.lock_file(self.config_file)
+           
+        try:
+            file_attrs = {
+                "params": (["training", "config"], odict),
+                "data": (["true", "pred", "history", "model"], None)
+            }
+            
+            for attr in file_attrs:
+                setattr(self, attr, self.file[attr] if preexisting and attr in self.file else self.file.create_group(attr))
+                for subattr in file_attrs[attr][0]:
+                    setattr(self, subattr, h5_element_wrapper(self.file, attr, subattr, file_attrs[attr][1]))
+                        
+
+        except Exception as e:
+            self.error(traceback.format_exc())
+            self.throw(e, unlock=True)
+
+    def throw(
+        self,
+        msg,
+        exc=AttributeError,
+        unlock=False,
+    ):
+        self.close(unlock)
+        self.error(msg)
+        raise exc, msg
+
+    def close(
+        self,
+        unlock=False,
+    ):
+        if self.file is not None:
+            self.file.close()
+        if unlock:
+            self.unlock_file(self.config_file)
+
+    def __del__(
+        self,
+    ):
+        self.close(unlock=True)
+
+    ### LOCKING
+
+    def lock_file(
+        self,
+        fname,
+    ):
+        open(self._get_lock(fname), "w+").close()
+
+    def unlock_file(
+        self,
+        fname,
+    ):
+        os.remove(self._get_lock(fname))
+
+    def locked(
+        self,
+        fname,
+    ):
+        return os.path.exists(self._get_lock(fname))
+
+    def _get_lock(
+        self,
+        fname,
+    ):
+        return os.path.join(os.path.dirname(fname), ".lock." + os.path.basename(fname))
+
+    ### LOADING
+
+    def dict_to_np(
+        self,
+        dict_in,
+    ):
+        return np.asarray([dict_in.keys(), dict_in.values()], dtype="object").T
+        
+    def np_to_dict(
+        self,
+        np_in,
+        ordered=True
+    ):
+        if ordered:
+            return odict(np_in)
+        return dict(np_in)
+
+    def update(
+        self,
+        data,
+        group,
+        name,
+        overwrite=False
+    ):
+        if name in group:
+            if overwrite:
+                del group[name]
+            else:
+                self.throw("name '{}' already exists in data group '{}'!".format(name, group.name))
+
+        if isinstance(data, dict) or isinstance(data, odict):
+            data = dict_to_np(data)
+
+        group.create_dataset(data=data, name=name)
+
+    def update(
+        self,
+        dset,
+        dnew,
+        overwrite=False,
+    ):
+        if dset.shape != (0,):
+            if overwrite:
+                del dset
+
+    def get(
+        group,
+        name,
+        ordered=True
+    ):
+        ret = self.file[group][name]
+        if 'S' in ret.dtype:
+            return self.np_to_dict(ret, ordered)
+        return ret
+
+    ### WRAPPERS
+
+    def train(
+        self,
+    ):
+        try:
+            self.history = self.autoencoder.fit(
+                x=x,
+                y=y,
+                steps_per_epoch=int(np.ceil(len(x)/batch_size)),
+                validation_steps=int(np.ceil(len(validation_data[0])/batch_size)),
+                validation_data=validation_data,
+                *args,
+                **kwargs
+            )
+            
+        except:
+            self.error()
+            return None
+
+        return self.history
 
 def rand_search(n):
     def r(l):
@@ -694,7 +862,7 @@ class LEGACY:
             path=None,
         ):
             self.name = name
-            self.path = self._smartpath(path or os.path.curdir)
+            self.path = _smartpath(path or os.path.curdir)
             self.BUILT = False
             self.PROCESSED = False
             self.BUILT_TRAINING_DATASET = False
@@ -710,7 +878,7 @@ class LEGACY:
             self,
             file,
         ):
-            filepath = self._smartpath(file)
+            filepath = _smartpath(file)
             assert os.path.exists(filepath)
             if filepath not in self.samples:
                 self.samples[filepath] = h5py.File(filepath)
