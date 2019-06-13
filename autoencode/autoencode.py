@@ -17,7 +17,7 @@ import os
 import json
 import traceback
 from datetime import datetime
-import dateutils
+import dateutil
 
 def _smartpath(
     path,
@@ -459,7 +459,8 @@ class base_autoencoder(logger):
         self,
         encoding_index=None,
         optimizer='adam',
-        loss='mse'
+        loss='mse',
+        metrics=['accuracy']
     ):
 
         assert len(self.layers) >= 3, "need to have input, bottleneck, output!"
@@ -485,7 +486,7 @@ class base_autoencoder(logger):
         self.decoder = Model(encoded_input, outputs, name='decoder')
         self.autoencoder = Model(inputs, self.decoder(self.encoder(inputs)), name='autoencoder')
 
-        self.autoencoder.compile(optimizer, loss)
+        self.autoencoder.compile(optimizer, loss, metrics=metrics)
 
         return self.encoder, self.decoder, self.autoencoder
 
@@ -702,7 +703,13 @@ class training_shell(logger):
         try:
             file_attrs = {
                 "params": (["training", "config"], dict),
-                "data": (["true", "pred", "metrics", "metric_names"], None)
+                "data": ([
+                    "x_train", "x_test",
+                    "y_train", "y_test", 
+                    "pred_train", "pred_test",
+                    "reps_train", "reps_test",
+                    "metrics", "metric_names"
+                    ], None)
             }
             
             for attr in file_attrs:
@@ -738,9 +745,10 @@ class training_shell(logger):
         self,
         unlock=False,
     ):
-        if self.file is not None:
-            self.file.close()
         if unlock:
+            if self.file is not None:
+                self.file.close()
+                self.file = None
             self._unlock_file(self.config_file)
 
     def __del__(
@@ -754,13 +762,17 @@ class training_shell(logger):
         self,
         fname,
     ):
+        self.log("locking file '{}'".format(fname))
         open(self._get_lock(fname), "w+").close()
 
     def _unlock_file(
         self,
         fname,
     ):
-        os.remove(self._get_lock(fname))
+        to_remove = self._get_lock(fname)
+        if os.path.exists(to_remove):
+            self.log("unlocking file '{}'".format(os.path.basename(fname)))
+            os.remove(to_remove)
 
     def locked(
         self,
@@ -778,13 +790,16 @@ class training_shell(logger):
 
     def train(
         self,
-        x,
-        y,
+        x_train,
+        y_train=None,
+        x_test=None,
+        y_test=None,
         model=None,
         epochs=10,
         batch_size=32,
         force=False
     ):
+
         if self.config['trained']:
             if not force:
                 self._throw("Model already trained, with timestamp {}!!".format(self.config['trained']))
@@ -792,29 +807,56 @@ class training_shell(logger):
             if os.path.exists(self.config['model_file']):
                 new_model = keras.models.load_model(self.config['model_file'])
                 if model is not None:
-                    assert model.get_params() == new_model.get_params(), 'input and saved models must be the same!'
+                    assert model.get_config() == new_model.get_config(), 'input and saved models must be the same!'
                 model = new_model
+        
+        if model is None:
+            self._throw("no model provided and none found!!")
     
         start = datetime.now()
-        history = []
+
+        if y_train is None:
+            y_train = x_train
+        
+        if x_test is None:
+            x_test = np.zeros((0,) + x_train.shape[1:])
+
+        if y_test is None:
+            y_test = np.zeros((0,) + y_train.shape[1:])
+
+        assert x_test.shape[0] == y_test.shape[0]
+        assert x_train.shape[0] == y_train.shape[0]
+        assert x_test.shape[1] == x_train.shape[1]
+        assert y_test.shape[1] == y_train.shape[1]
+
+        history = odict()
+        trained = False
+
         try:
             for epoch in range(epochs):
-                history.append(
-                        model.fit(
-                        x=x,
-                        y=y,
-                        steps_per_epoch=int(np.ceil(len(x)/batch_size)),
-                        validation_steps=int(np.ceil(len(validation_data[0])/batch_size)),
-                        validation_data=validation_data,
-                        initial_epoch=epoch,
-                        epochs=epoch + 1,
+                nhistory = model.fit(
+                    x=x_train,
+                    y=y_train,
+                    steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
+                    validation_steps=int(np.ceil(len(x_test)/batch_size)),
+                    validation_data=[x_test, y_test],
+                    initial_epoch=epoch,
+                    epochs=epoch + 1,
+                    verbose=1,
+                ).history
 
-                    ).history.values()
-                )
-            
+                if epoch == 0:
+                    for metric in nhistory:
+                        history[metric] = np.empty(epochs)
+
+                for metric in nhistory:
+                    history[metric][epoch] = nhistory[metric][0]
+
         except:
             self.error(traceback.format_exc())
-                    
+            if all([len(v) == 0 for v in history]):
+                self._throw("quitting")
+
         end = datetime.now()
 
         model_file = self.config_file.replace(".h5", "_model.h5")
@@ -827,8 +869,17 @@ class training_shell(logger):
 
         tdict = self.training.copy()
         tdict['time'] = str(end - start)
+        tdict['epochs'] = epochs
+        tdict['batch_size'] = batch_size
 
         self.training.update(tdict)
+
+        self.x_train.update(x_train)
+        self.y_train.update(y_train)
+        self.x_test.update(x_test)
+        self.y_test.update(y_test)
+        self.metrics.update(np.asarray(history.values()))
+        self.metric_names.update(np.asarray(history.keys()))
 
         # return self.history
 
