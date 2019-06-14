@@ -4,9 +4,11 @@ from operator import mul
 import h5py
 import glob
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 import os
 import traceback
+import matplotlib.pyplot as plt
 
 class logger:
     """
@@ -44,9 +46,9 @@ class logger:
         ERROR_PREFIX = "ERROR: ",
         VERBOSE = True,
     ):
-        self._LOG_PREFIX = "logger :: "
-        self._ERROR_PREFIX = "ERROR: "
-        self.VERBOSE = True
+        self._LOG_PREFIX = LOG_PREFIX
+        self._ERROR_PREFIX = ERROR_PREFIX
+        self.VERBOSE = VERBOSE
 
     def log(
         self, 
@@ -93,7 +95,10 @@ class logger:
             out += prefix + str(line) + '\n'
         return out
 
-class data_table:
+class data_table(logger):
+    
+    TABLE_COUNT = 0
+
     """
     wrapper for the pandas data table. 
     allows for quick variable plotting and train/test/splitting.
@@ -103,15 +108,55 @@ class data_table:
         self,
         data,
         headers=None,
-        name=None
+        name=None,
+        verbose=1
     ):
-        self.name = name or "untitled"
+        logger.__init__(self, "data_table :: ", verbose)
+        self.name = name or "untitled {}".format(data_table.TABLE_COUNT)    
+        data_table.TABLE_COUNT += 1
         self.data = data
         self.headers = headers if headers is not None else ["dist " + str(i + 1) for i in range(self.data.shape[1])]
         assert len(self.data.shape) == 2, "data must be matrix!"
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
         assert len(self.data) > 0, "n samples must be greater than zero"
         self.df = pd.DataFrame(self.data, columns=self.headers)
+        self.scaler = MinMaxScaler((0,1))
+        self.scaler.fit(self.df)
+
+    def norm(
+        self,
+        data=None,
+        rng=None,
+    ):
+        if rng is not None:
+            self.scaler = MinMaxScaler(rng)
+            self.scaler.fit(self.df)
+        
+        if data is None:
+            data = self
+        
+        assert isinstance(data, data_table), "data must be data_table type"
+
+        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name="'{}' normed to '{}' on range '{}'".format(data.name,self.name,self.scaler.feature_range))
+        ret.scaler = self.scaler
+        return ret
+
+    def inorm(
+        self,
+        rng=None,
+        data=None, 
+    ):
+        if rng is not None:
+            self.scaler = MinMaxScaler(rng)
+            self.scaler.fit(self.df)
+
+        if data is None:
+            data = self
+
+        assert isinstance(data, data_table), "data must be data_table type"
+        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name="'{}' inv_normed to '{}' on range '{}'".format(data.name,self.name,self.scaler.feature_range))
+        ret.scaler = self.scaler
+        return ret
         
     def __getattr__(
         self,
@@ -139,17 +184,18 @@ class data_table:
         dtrain, dtest = train_test_split(self, test_size=test_fraction)
         return (data_table(np.asarray(dtrain), np.asarray(dtrain.columns), "train"),
             data_table(np.asarray(dtest), np.asarray(dtest.columns), "test"))
-
+    
     def plot(
         self,
-        values,
         others=[],
+        values="*",
         bins=15,
         rng=None,
         cols=4,
         ticksize=8,
         fontsize=10,
         normed=0,
+        figloc="upper right"
     ):
         if isinstance(values, str):
             values = [key for key in self.headers if glob.fnmatch.fnmatch(key, values)]
@@ -159,6 +205,9 @@ class data_table:
             if isinstance(values[i], int):
                 values[i] = self.headers[values[i]]
         
+        if not isinstance(others, list) or isinstance(others, tuple):
+            others = [others]
+
         for i in range(len(others)):
             if not isinstance(others[i], data_table):
                 others[i] = data_table(others[i], headers=self.headers)
@@ -180,18 +229,22 @@ class data_table:
 
         weights = None
 
+        self.log("plotting distrubution(s) for table(s) {}".format([self.name,] + [o.name for o in others]))
+        fig = plt.Figure()
         for i in range(n):
-            plt.subplot(rows, cols, i + 1)
+            ax = plt.subplot(rows, cols, i + 1)
             # weights = np.ones_like(plot_data[i])/float(len(plot_data[i]))
-            plt.hist(plot_data[i], bins=bins, range=rng[i], histtype='step', normed=normed, label=self.name, weights=weights)
+            ax.hist(plot_data[i], bins=bins, range=rng[i], histtype='step', normed=normed, label=self.name, weights=weights)
             for j in range(len(others)):
                 # weights = np.ones_like(plot_others[j][i])/float(len(plot_others[j][i]))
-                plt.hist(plot_others[j][i], bins=bins, range=rng[i], histtype='step', label=others[j].name, normed=normed, weights=weights)
+                ax.hist(plot_others[j][i], bins=bins, range=rng[i], histtype='step', label=others[j].name, normed=normed, weights=weights)
+
             plt.xlabel(plot_data[i].name, fontsize=fontsize)
             plt.xticks(size=ticksize)
             plt.yticks(size=ticksize)
-        
-        plt.legend()
+
+        handles,labels = ax.get_legend_handles_labels()
+        plt.figlegend(handles, labels, loc="center right")
         plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01)
         plt.show()
     
@@ -210,9 +263,11 @@ class data_loader(logger):
 
     def __init__(
         self,
+        name,
         verbose=True
     ):
         logger.__init__(self)
+        self.name = name
         self._LOG_PREFIX = "data_loader :: "
         self.VERBOSE = verbose
         self.samples = odict()
@@ -238,7 +293,7 @@ class data_loader(logger):
 
             self._update_data(self.samples[filepath], self.samples[filepath].keys())
             try:
-                self.table = self.make_table("*data", "*names", "main sample")
+                self.table = self.make_table(self.name, "*data", "*names")
             except:
                 self.error(traceback.format_exc())
                 self.error("Couldn't make datatable with added elements!")
@@ -312,63 +367,64 @@ class data_loader(logger):
         f.close()
         return 0
 
-    def plot(
-        self,
-        *args,
-        **kwargs
-    ):
-        return self.table.plot(*args, **kwargs)
+    # def plot(
+    #     self,
+    #     *args,
+    #     **kwargs
+    # ):
+    #     return self.table.plot(*args, **kwargs)
 
     def make_table(
         self,
-        value_keys,
-        header_keys=None,
         name=None,
+        value_keys="*data",
+        header_keys="*names",
     ):
         values, vdict = self.get_dataset(value_keys)
         headers, hdict = None if header_keys is None else self.get_dataset(header_keys) 
+        name = name or self.name
 
         assert len(values.shape) == 2, "data must be 2-dimensional and numeric!"
         assert values.shape[1] == headers.shape[0], "data must have the same number of columns as there are headers!!"
 
         return data_table(values, headers, name)
 
-    def norm_min_max(
-        self,
-        dataset,
-        ab=(0,1)
-    ):
-        if isinstance(dataset, basestring) or isinstance(dataset, list):
-            dataset = self.get_dataset(dataset)
-        a,b = ab
-        rng = dataset.min(axis=0), dataset.max(axis=0)
-        return (b-a)*(dataset - rng[0])/(rng[1] - rng[0]) + a, rng
+    # def norm_min_max(
+    #     self,
+    #     dataset,
+    #     ab=(0,1)
+    # ):
+    #     if isinstance(dataset, basestring) or isinstance(dataset, list):
+    #         dataset = self.get_dataset(dataset)
+    #     a,b = ab
+    #     rng = dataset.min(axis=0), dataset.max(axis=0)
+    #     return (b-a)*(dataset - rng[0])/(rng[1] - rng[0]) + a, rng
 
-    def inorm_min_max(
-        self,
-        dataset,
-        rng,
-        ab=(0,1)
-    ):
-        a,b = ab
-        return ((dataset - a)/(b - a))*(rng[1] - rng[0]) + rng[0]
+    # def inorm_min_max(
+    #     self,
+    #     dataset,
+    #     rng,
+    #     ab=(0,1)
+    # ):
+    #     a,b = ab
+    #     return ((dataset - a)/(b - a))*(rng[1] - rng[0]) + rng[0]
         
-    def norm_mean_std(
-        self,
-        dataset,
-    ):
-        if isinstance(dataset, basestring) or isinstance(dataset, list):
-            dataset = self.get_dataset(dataset)
+    # def norm_mean_std(
+    #     self,
+    #     dataset,
+    # ):
+    #     if isinstance(dataset, basestring) or isinstance(dataset, list):
+    #         dataset = self.get_dataset(dataset)
 
-        musigma = dataset.mean(axis=0), dataset.std(axis=0)
-        return (dataset - musigma[0])/(musigma[1]), musigma
+    #     musigma = dataset.mean(axis=0), dataset.std(axis=0)
+    #     return (dataset - musigma[0])/(musigma[1]), musigma
 
-    def inorm_mean_std(
-        self,
-        dataset,
-        musigma,
-    ):
-        return dataset*musigma[1] + musigma[0]
+    # def inorm_mean_std(
+    #     self,
+    #     dataset,
+    #     musigma,
+    # ):
+    #     return dataset*musigma[1] + musigma[0]
         
     def _update_data(
         self,
