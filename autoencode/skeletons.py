@@ -5,6 +5,8 @@ from collections import OrderedDict as odict
 import os
 import traceback
 from datetime import datetime
+from utils import logger, smartpath
+import h5py
 
 class h5_element_wrapper(logger):
     def __init__(
@@ -107,8 +109,8 @@ class training_skeleton(logger):
         self._LOG_PREFIX = "train_shell :: "
         self.VERBOSE = verbose
 
-        self.config_file = _smartpath(name)
-    
+        self.config_file = smartpath(name)
+        self.path = os.path.dirname(self.config_file)
         
         if not self.config_file.endswith(".h5"):
             self.config_file += ".h5"
@@ -160,7 +162,8 @@ class training_skeleton(logger):
         exc=AttributeError,
         unlock=False,
     ):
-        self.close(unlock)
+        if unlock:
+            self.close()
         self.error(msg)
         raise exc, msg
 
@@ -168,11 +171,16 @@ class training_skeleton(logger):
         self,
         unlock=False,
     ):
-        if unlock:
+        try:
             if self.file is not None:
                 self.file.close()
                 self.file = None
+        except:
+            pass
+        try:
             self._unlock_file(self.config_file)
+        except:
+            pass
 
     def __del__(
         self,
@@ -314,15 +322,10 @@ class autoencoder_skeleton(logger):
         verbose=True,
     ):
         logger.__init__(self)
-        self._LOG_PREFIX = "base_autoencoder :: "
+        self._LOG_PREFIX = "autoencoder_skeleton :: "
         self.VERBOSE = verbose
         self.name = name
         self.layers = []
-
-        self.encoder = None
-        self.decoder = None
-        self.autoencoder = None
-        self.history = None
 
     def __str__(
         self,
@@ -386,68 +389,68 @@ class autoencoder_skeleton(logger):
         outputs = self._add_layer(output_layer, self._add_layers(outer_interms, encoded_input))
 
         # make keras models for encoder, decoder, and autoencoder
-        self.encoder = Model(inputs, encoded, name='encoder')
-        self.decoder = Model(encoded_input, outputs, name='decoder')
-        self.autoencoder = Model(inputs, self.decoder(self.encoder(inputs)), name='autoencoder')
+        encoder = Model(inputs, encoded, name='encoder')
+        decoder = Model(encoded_input, outputs, name='decoder')
+        autoencoder = Model(inputs, decoder(encoder(inputs)), name='autoencoder')
 
-        self.autoencoder.compile(optimizer, loss, metrics=metrics)
+        autoencoder.compile(optimizer, loss, metrics=metrics)
 
-        return self.encoder, self.decoder, self.autoencoder
+        return encoder, decoder, autoencoder
 
-    def fit(
-        self,
-        x,
-        y,
-        validation_data,
-        batch_size=10,
-        *args,
-        **kwargs
-    ):
+    # def fit(
+    #     self,
+    #     x,
+    #     y,
+    #     validation_data,
+    #     batch_size=10,
+    #     *args,
+    #     **kwargs
+    # ):
 
-        if self.autoencoder is None: 
-            raise AttributeError, "Model not yet built!"
+    #     if self.autoencoder is None: 
+    #         raise AttributeError, "Model not yet built!"
 
-        try:
-            self.history = self.autoencoder.fit(
-                x=x,
-                y=y,
-                steps_per_epoch=int(np.ceil(len(x)/batch_size)),
-                validation_steps=int(np.ceil(len(validation_data[0])/batch_size)),
-                validation_data=validation_data,
-                *args,
-                **kwargs
-            )
+    #     try:
+    #         self.history = self.autoencoder.fit(
+    #             x=x,
+    #             y=y,
+    #             steps_per_epoch=int(np.ceil(len(x)/batch_size)),
+    #             validation_steps=int(np.ceil(len(validation_data[0])/batch_size)),
+    #             validation_data=validation_data,
+    #             *args,
+    #             **kwargs
+    #         )
 
-        except KeyboardInterrupt:
-            return None
+    #     except KeyboardInterrupt:
+    #         return None
 
-        return self.history
+    #     return self.history
 
-    def save(
-        self,
-        path,
-    ):
-        path = _smartpath(path)
-        path = _smartpath(path)
-        if not os.path.exists(path):
-            os.mkdirs(path)
-        to_save = ['autoencoder', 'encoder', 'decoder']
-        filenames = [os.path.join(path, model + '.h5') for model in to_save]
-        for filename,typename in zip(filenames, to_save):
-            if os.path.exists(_smartpath(filename)):
-                raise AttributeError, "Model already exists at file '{}'!!".format(filename)
-            getattr(self, typename).save(filename)
+    # def save(
+    #     self,
+    #     path,
+    # ):
+    #     path = smartpath(path)
+    #     path = smartpath(path)
+    #     if not os.path.exists(path):
+    #         os.mkdirs(path)
+    #     to_save = ['autoencoder', 'encoder', 'decoder']
+    #     filenames = [os.path.join(path, model + '.h5') for model in to_save]
+    #     for filename,typename in zip(filenames, to_save):
+    #         if os.path.exists(smartpath(filename)):
+    #             raise AttributeError, "Model already exists at file '{}'!!".format(filename)
+    #         getattr(self, typename).save(filename)
 
-    def load(
-        self,
-        path,
-    ):
-        to_load = ['autoencoder', 'encoder', 'decoder']
-        filenames = [os.path.join(path, model + '.h5') for model in to_load]
-        for filename,typename in zip(filenames, to_load):
-            if not os.path.exists(_smartpath(filename)):
-                raise AttributeError, "Model does not exist at file '{}'!!".format(filename)
-            setattr(self, typename, keras.models.load_model(filename))
+    # def load(
+    #     self,
+    #     path,
+    # ):
+    #     to_load = ['autoencoder', 'encoder', 'decoder']
+    #     filenames = [os.path.join(path, model + '.h5') for model in to_load]
+    #     for filename,typename in zip(filenames, to_load):
+    #         if not os.path.exists(smartpath(filename)):
+    #             raise AttributeError, "Model does not exist at file '{}'!!".format(filename)
+    #         setattr(self, typename, keras.models.load_model(filename))
 
     def _find_bottleneck(
         self,
