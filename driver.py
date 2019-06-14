@@ -7,7 +7,7 @@ BASE_COMMAND = 'env -i HOME=$HOME bash -i -c "<CMD>"'
 LOG_PREFIX = "Driver :: "
 ERROR_PREFIX = LOG_PREFIX + "ERROR: "
 
-### helper functionsls 
+### helper functions 
 
 def log(s):
     logbase(s, LOG_PREFIX)
