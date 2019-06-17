@@ -10,6 +10,10 @@ import os
 import traceback
 import matplotlib.pyplot as plt
 
+plt.rcParams['figure.figsize'] = (10,10)
+plt.rcParams.update({'font.size': 18})
+
+
 class logger:
     """
     good logging parent class.
@@ -143,8 +147,8 @@ class data_table(logger):
 
     def inorm(
         self,
-        rng=None,
         data=None, 
+        rng=None,
     ):
         if rng is not None:
             self.scaler = MinMaxScaler(rng)
@@ -154,6 +158,7 @@ class data_table(logger):
             data = self
 
         assert isinstance(data, data_table), "data must be data_table type"
+
         ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name="'{}' inv_normed to '{}' on range '{}'".format(data.name,self.name,self.scaler.feature_range))
         ret.scaler = self.scaler
         return ret
@@ -179,9 +184,10 @@ class data_table(logger):
 
     def train_test_split(
         self,
-        test_fraction=0.25
+        test_fraction=0.25,
+        random_state=None,
     ):
-        dtrain, dtest = train_test_split(self, test_size=test_fraction)
+        dtrain, dtest = train_test_split(self, test_size=test_fraction, random_state=random_state)
         return (data_table(np.asarray(dtrain), np.asarray(dtrain.columns), "train"),
             data_table(np.asarray(dtest), np.asarray(dtest.columns), "test"))
     
@@ -195,7 +201,9 @@ class data_table(logger):
         ticksize=8,
         fontsize=10,
         normed=0,
-        figloc="upper right"
+        figloc="upper right",
+        figsize=(10,10),
+        alpha=0.7,
     ):
         if isinstance(values, str):
             values = [key for key in self.headers if glob.fnmatch.fnmatch(key, values)]
@@ -230,21 +238,22 @@ class data_table(logger):
         weights = None
 
         self.log("plotting distrubution(s) for table(s) {}".format([self.name,] + [o.name for o in others]))
-        fig = plt.Figure()
+        plt.rcParams['figure.figsize'] = figsize
+
         for i in range(n):
             ax = plt.subplot(rows, cols, i + 1)
             # weights = np.ones_like(plot_data[i])/float(len(plot_data[i]))
-            ax.hist(plot_data[i], bins=bins, range=rng[i], histtype='step', normed=normed, label=self.name, weights=weights)
+            ax.hist(plot_data[i], bins=bins, range=rng[i], histtype='step', normed=normed, label=self.name, weights=weights, alpha=alpha)
             for j in range(len(others)):
                 # weights = np.ones_like(plot_others[j][i])/float(len(plot_others[j][i]))
-                ax.hist(plot_others[j][i], bins=bins, range=rng[i], histtype='step', label=others[j].name, normed=normed, weights=weights)
+                ax.hist(plot_others[j][i], bins=bins, range=rng[i], histtype='step', label=others[j].name, normed=normed, weights=weights, alpha=alpha)
 
             plt.xlabel(plot_data[i].name, fontsize=fontsize)
             plt.xticks(size=ticksize)
             plt.yticks(size=ticksize)
 
         handles,labels = ax.get_legend_handles_labels()
-        plt.figlegend(handles, labels, loc="center right")
+        plt.figlegend(handles, labels, loc=figloc)
         plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01)
         plt.show()
     
