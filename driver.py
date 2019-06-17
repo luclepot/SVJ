@@ -121,6 +121,7 @@ def setup_parser():
     select.add_argument('-b', '--build', dest='build', action='store_true', default=False, help='rebuild cpp files before running')
     select.add_argument('-g', '--gdb', dest='gdb', action='store_true', default=False, help='run with gdb debugger :-)')
     # conversion args
+    convert.add_argument('-i', '--input', dest="inputdir", action="store", type=_smartpath, help="input dir path", required=False, default=None)    
     convert.add_argument('-d', '--dr', dest='DR', action='store', type=float, default=0.8, help='dr parameter for jet finding')
     convert.add_argument('-c', '--constituents', dest='NC', action='store', type=int, default=-1, help='number of jet constituents to save')
     convert.add_argument('-r', '--range', dest='range', action='store', type=_range_input, default=(-1,-1), help='range of data to parse')
@@ -187,10 +188,12 @@ def select_main(inputdir, outputdir, name, batch, filter, range, debug, timing, 
 
     local_submit(master_command)
 
-def convert_main(outputdir, name, batch, range, DR, NC, dryrun):
+def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun):
     log("running command 'convert'")
-    filespec = _check_for_default_file([outputdir], name, 'filelist')
-    spath = _check_for_default_file([outputdir], name, 'selection')
+    if inputdir is None:
+        inputdir = outputdir
+    filespec = _check_for_default_file([inputdir], name, 'filelist')
+    spath = _check_for_default_file([inputdir], name, 'selection')
     
     save_constituents = 1
     n_constituents = NC
@@ -216,7 +219,7 @@ def convert_main(outputdir, name, batch, range, DR, NC, dryrun):
             condor_submit(condor_setup + master_command, outputdir, name, setup_command)
         else:
             raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
-        
+    
     os.system(master_command)
     sys.exit(0)
 
