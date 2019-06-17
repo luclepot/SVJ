@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
 
             // ratio between calculated mt2 of dijet system and missing momentum is not negligible
             core.Cut(
-                (*metFull_Pt) / MT2 > 0.15,
+                (*metFull_Pt) / MT2 > 0.025, //0.15,
                 Cuts::metRatio
                 );
 
@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
 
             // tighter MET ratio
             core.Cut(
-                (*metFull_Pt) / MT2 > 0.25,
+                (*metFull_Pt) / MT2 > 0.05, //0.25,
                 Cuts::metRatioTight
                 );
                  
