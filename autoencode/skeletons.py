@@ -1,6 +1,6 @@
 import numpy as np 
 from keras.layers import Input, Dense
-from keras.models import Model
+from keras.models import Model, load_model
 from collections import OrderedDict as odict
 import os
 import traceback
@@ -236,7 +236,7 @@ class training_skeleton(logger):
                 self._throw("Model already trained, with timestamp {}!!".format(self.config['trained']))
             self.log("forcing already trained model to re-train")
             if os.path.exists(self.config['model_file']):
-                new_model = keras.models.load_model(self.config['model_file'])
+                new_model = load_model(self.config['model_file'])
                 if model is not None:
                     assert model.get_config() == new_model.get_config(), 'input and saved models must be the same!'
                 model = new_model
@@ -253,7 +253,11 @@ class training_skeleton(logger):
             x_test = np.zeros((0,) + x_train.shape[1:])
 
         if y_test is None:
-            y_test = np.zeros((0,) + y_train.shape[1:])
+            y_test = np.zeros_like(x_test)
+
+
+        print x_train.shape, y_train.shape
+        print x_test.shape, y_test.shape
 
         assert x_test.shape[0] == y_test.shape[0]
         assert x_train.shape[0] == y_train.shape[0]
@@ -278,7 +282,7 @@ class training_skeleton(logger):
 
                 if epoch == 0:
                     for metric in nhistory:
-                        history[metric] = np.empty(epochs)
+                        history[metric] = -1.*np.ones(epochs)
 
                 for metric in nhistory:
                     history[metric][epoch] = nhistory[metric][0]
