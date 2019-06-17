@@ -55,7 +55,10 @@ class Converter:
             'j1Phi',
             'j1Pt',
             'j1M',
-            'j2NChargedOverNNeutrals',
+            'j1ChargedFraction',
+            'j1NeutralsFraction',
+            'j1NChargedOverNNeutrals',
+
             # 'j1E', # REMOVE/
             # 'j1mult',
             'j1ptd',
@@ -67,6 +70,8 @@ class Converter:
             'j2Phi', # ADD
             'j2Pt',
             'j2M',
+            'j2ChargedFraction',
+            'j2NeutralsFraction',
             'j2NChargedOverNNeutrals',
             # 'j2E', # REMOVE
             # 'j2mult',
@@ -229,7 +234,12 @@ class Converter:
         yield j1.Phi()
         yield j1.Pt()
         yield j1.M()
-        yield float(tree.Jet[0].NCharged) / float(tree.Jet[0].NNeutrals) 
+
+        nc, nn = map(float, [tree.Jet[0].NCharged, tree.Jet[0].NNeutrals])
+        n_total = nc + nn
+        yield nc / n_total if n_total > 0 else np.inf
+        yield nn / n_total if n_total > 0 else np.inf
+        yield nc / nn if nn > 0 else np.inf
         # yield j1.E()
         for value in self.jets_axis2_pt2(j1, tree, track_index[0]):
             yield value
@@ -238,7 +248,13 @@ class Converter:
         yield j2.Phi() 
         yield j2.Pt()
         yield j2.M()
-        yield float(tree.Jet[1].NCharged) / float(tree.Jet[0].NNeutrals) 
+
+        nc, nn = map(float, [tree.Jet[1].NCharged, tree.Jet[1].NNeutrals])
+        n_total = nc + nn
+        yield nc / n_total if n_total > 0 else np.inf
+        yield nn / n_total if n_total > 0 else np.inf
+        yield nc / nn if nn > 0 else np.inf
+
         # yield j2.E()
         for value in self.jets_axis2_pt2(j2, tree, track_index[1]):
             yield value
