@@ -46,6 +46,10 @@ class Converter:
         self.sizes = [int(t.GetEntries()) for t in self.trees]
         self.nEvents = sum(self.sizes)
 
+        self.log("Found {0} files".format(len(self.files)))
+        self.log("Found {0} delphes trees".format(len(self.trees)))
+        self.log("Found {0} total events".format(self.nEvents))
+
         self.jetDR = jetDR
 
         ## ADD MET
@@ -118,6 +122,7 @@ class Converter:
 
         self.save_constituents = save_constituents
         self.selections_abs = np.asarray([sum(self.sizes[:s[0]]) + s[1] for s in self.selections])
+        self.log("found {0} selected events".format(len(self.selections_abs)))
 
     def log(
         self,
@@ -134,6 +139,7 @@ class Converter:
         rng=(-1,-1)
     ):
         rng = list(rng)
+
         if rng[0] < 0 or rng[0] > self.nEvents:
             rng[0] = 0
 
