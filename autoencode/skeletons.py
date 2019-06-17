@@ -231,19 +231,34 @@ class training_skeleton(logger):
         force=False
     ):
 
+        # if already trained
         if self.config['trained']:
-            if not force:
-                self._throw("Model already trained, with timestamp {}!!".format(self.config['trained']))
-            self.log("forcing already trained model to re-train")
             if os.path.exists(self.config['model_file']):
                 new_model = load_model(self.config['model_file'])
-                if model is not None:
-                    assert model.get_config() == new_model.get_config(), 'input and saved models must be the same!'
-                model = new_model
+                if model is None:
+                    model = new_model
+                    self.log("using saved model at file '{}'".format(self.config['model_file']))
+                else:
+                    if not force:
+                        model = new_model
+                        self.error("IGNORING PASSED PARAMETER 'model'")
+                        self.log("using saved model at file '{}'".format(self.config['model_file']))
+                    else:
+                        if isinstance(model, str):
+                            model = load_model(model)
+                        self.log("using model passed as function argument")
+            else:
+                if model is None:
+                    self._throw("no model passed, and saved model at file '{}' not found!".format(self.config['model_file']))
+                if isinstance(model, str):
+                    model = load_model(model)
+                self.log("using model passed as function argument")
         
         if model is None:
-            self._throw("no model provided and none found!!")
+            self._throw("no model passed and no saved model found!!")
     
+        model.summary()
+
         start = datetime.now()
 
         if y_train is None:
@@ -253,7 +268,7 @@ class training_skeleton(logger):
             x_test = np.zeros((0,) + x_train.shape[1:])
 
         if y_test is None:
-            y_test = np.zeros_like(x_test)
+            y_test = x_test.copy()
 
 
         print x_train.shape, y_train.shape
@@ -296,6 +311,7 @@ class training_skeleton(logger):
 
         model_file = self.config_file.replace(".h5", "_model.h5")
         model.save(model_file)
+        self.log("model saved to file '{}'".format(model_file))
 
         cdict = self.config.copy()
         cdict['model_file'] = model_file
@@ -316,7 +332,7 @@ class training_skeleton(logger):
         self.metrics.update(np.asarray(history.values()))
         self.metric_names.update(np.asarray(history.keys()))
 
-        # return self.history
+        return model
 
 class autoencoder_skeleton(logger):
 
