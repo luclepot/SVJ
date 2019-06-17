@@ -55,24 +55,26 @@ class Converter:
             'j1Phi',
             'j1Pt',
             'j1M',
-            'j1E', # REMOVE
-            'j1mult',
+            'j2NChargedOverNNeutrals',
+            # 'j1E', # REMOVE/
+            # 'j1mult',
             'j1ptd',
             'j1axis2',
             # DELTAPHI BETWEEN MET/JET # ADD
             # MET FOR EVENT # ADD
 
-            # 'j2Eta', # ADD
-            # 'j2Phi', # ADD
+            'j2Eta', # ADD
+            'j2Phi', # ADD
             'j2Pt',
             'j2M',
-            'j2E', # REMOVE
-            'j2mult',
+            'j2NChargedOverNNeutrals',
+            # 'j2E', # REMOVE
+            # 'j2mult',
             'j2ptd',
             'j2axis2',
 
-            'DeltaEtaJJ', # REMOVE
-            'DeltaPhiJJ', # REMOVE
+            # 'DeltaEtaJJ', # REMOVE
+            # 'DeltaPhiJJ', # REMOVE
         ]
 
         self.jet_constituent_names = ['pEta', 'pPhi', 'pPt']
@@ -221,16 +223,21 @@ class Converter:
         yield j1.Phi()
         yield j1.Pt()
         yield j1.M()
-        yield j1.E()
+        yield float(j1.NCharged) / float(j1.NNeutrals) 
+        # yield j1.E()
         for value in self.jets_axis2_pt2(j1, tree, track_index[0]):
             yield value
+
+        yield j2.Eta()
+        yield j2.Phi() 
         yield j2.Pt()
         yield j2.M()
-        yield j2.E()
+        yield float(j2.NCharged) / float(j2.NNeutrals) 
+        # yield j2.E()
         for value in self.jets_axis2_pt2(j2, tree, track_index[1]):
             yield value
-        yield j1.Eta() - j2.Eta()       # deltaeta
-        yield j1.DeltaPhi(j2)           # deltaphi
+        # yield j1.Eta() - j2.Eta()       # deltaeta
+        # yield j1.DeltaPhi(j2)           # deltaphi
 
     def jets_axis2_pt2(
         self,
@@ -239,7 +246,7 @@ class Converter:
         track_index
     ):
         ret = np.empty((self.n_jets,3))
-        mult = 0
+        # mult = 0
         sum_weight = 0
         sum_pt = 0
         sum_deta = 0
@@ -252,9 +259,9 @@ class Converter:
             if i < 0:
                 break
             c = getattr(tree, core.EFlow_types[eft][0])[i].P4()
-            if eft == 0 and c.Pt() > 1.0:
-                # means that the particle has charge, increase jet multiplicity
-                mult += 1
+            # if eft == 0 and c.Pt() > 1.0:
+            #     # means that the particle has charge, increase jet multiplicity
+            #     mult += 1
 
             deta = c.Eta() - jet.Eta()
             dphi = c.DeltaPhi(jet)
@@ -283,7 +290,7 @@ class Converter:
         delta = np.sqrt(np.abs((a - b)*(a - b) + 4*c*c))
         axis2 = np.sqrt(0.5*(a+b-delta)) if a + b - delta > 0 else 0
         ptD = np.sqrt(sum_weight)/sum_pt if sum_weight > 0 else 0
-        return mult, ptD, axis2
+        return ptD, axis2
         
     def get_jet_constituents(
         self,
