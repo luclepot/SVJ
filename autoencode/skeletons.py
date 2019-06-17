@@ -129,11 +129,7 @@ class training_skeleton(logger):
             file_attrs = {
                 "params": (["training", "config"], dict),
                 "data": ([
-                    "x_train", "x_test",
-                    "y_train", "y_test", 
-                    "pred_train", "pred_test",
-                    "reps_train", "reps_test",
-                    "metrics", "metric_names"
+                    "metric_names"
                     ], None)
             }
             
@@ -141,20 +137,36 @@ class training_skeleton(logger):
                 for subattr in file_attrs[attr][0]:
                     setattr(self, subattr, h5_element_wrapper(self.file, attr, subattr, file_attrs[attr][1], overwrite=overwrite))
                 setattr(self, attr, self.file[attr])
+
+            for subattr in self.metric_names:
+                setattr(self, subattr, h5_element_wrapper(self.file, "metric_names", subattr, None, overwrite=overwrite))
                         
         except Exception as e:
             self.error(traceback.format_exc())
             self._throw(e, unlock=True)
 
         cdict = self.config.copy()
+        tdict = self.training.copy()
         
         if not preexisting:
             cdict = odict()
             cdict['name'] = name
             cdict['trained'] = ''
             cdict['model_file'] = ''
-        
+            tdict['epoch_splits'] = '[]'
+
+        self.metrics = odict()
+        self.training.update(tdict)
         self.config.update(cdict)
+        self._update_metrics_dict(self.metrics)
+
+    def _update_metrics_dict(
+        self, 
+        mdict_to_fill
+    ):  
+        for metric in self.metric_names:
+            if hasattr(self, metric):
+                mdict_to_fill[metric] = getattr(self, metric).rep
 
     def _throw(
         self,
@@ -228,19 +240,21 @@ class training_skeleton(logger):
         model=None,
         epochs=10,
         batch_size=32,
-        force=False
+        force=False,
+        metrics=[],
+        loss=None,
+        optimizer=None,
     ):
 
         # if already trained
         if self.config['trained']:
             if os.path.exists(self.config['model_file']):
-                new_model = load_model(self.config['model_file'])
                 if model is None:
-                    model = new_model
+                    model = load_model(self.config['model_file'])
                     self.log("using saved model at file '{}'".format(self.config['model_file']))
                 else:
                     if not force:
-                        model = new_model
+                        model = load_model(self.config['model_file'])
                         self.error("IGNORING PASSED PARAMETER 'model'")
                         self.log("using saved model at file '{}'".format(self.config['model_file']))
                     else:
@@ -256,7 +270,15 @@ class training_skeleton(logger):
         
         if model is None:
             self._throw("no model passed and no saved model found!!")
-    
+
+        if optimizer is None:
+            optimizer = model.optimizer
+        if loss is None:
+            loss = model.loss
+        if metrics is None:
+            metrics = model.metrics
+
+        model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
         model.summary()
 
         start = datetime.now()
@@ -270,42 +292,76 @@ class training_skeleton(logger):
         if y_test is None:
             y_test = x_test.copy()
 
-
-        print x_train.shape, y_train.shape
-        print x_test.shape, y_test.shape
-
         assert x_test.shape[0] == y_test.shape[0]
         assert x_train.shape[0] == y_train.shape[0]
         assert x_test.shape[1] == x_train.shape[1]
         assert y_test.shape[1] == y_train.shape[1]
 
+
+        previous_epochs = eval(self.training['epoch_splits'])
+        master_epoch_n = sum(previous_epochs)
+
+        finished_epoch_n = master_epoch_n + epochs
+        
+
+        # last_full_epoch = len(self.metrics[-1][(self.metrics[-1] != -1)])
+        # self.metrics = self.metrics[:,:start_epoch]
+        # for metric,name in zip(self.metrics, self.metric_names):
+        #     history[name] = self.metric
+
         history = odict()
-        trained = False
 
         try:
             for epoch in range(epochs):
+                self.log("TRAINING EPOCH {}/{}".format(master_epoch_n, finished_epoch_n))
                 nhistory = model.fit(
                     x=x_train,
                     y=y_train,
                     steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
                     validation_steps=int(np.ceil(len(x_test)/batch_size)),
                     validation_data=[x_test, y_test],
-                    initial_epoch=epoch,
-                    epochs=epoch + 1,
+                    initial_epoch=master_epoch_n,
+                    epochs=master_epoch_n + 1,
                     verbose=1,
                 ).history
 
                 if epoch == 0:
                     for metric in nhistory:
-                        history[metric] = -1.*np.ones(epochs)
+                        history[metric] = []
 
                 for metric in nhistory:
-                    history[metric][epoch] = nhistory[metric][0]
+                    history[metric].append([master_epoch_n, nhistory[metric][0]])
+
+                master_epoch_n += 1
 
         except:
             self.error(traceback.format_exc())
+            print history
             if all([len(v) == 0 for v in history]):
                 self._throw("quitting")
+
+        n_epochs_finished = min(map(len, history.values()))
+        self.log("")
+        self.log("trained {} epochs!".format(n_epochs_finished))
+        self.log("")
+
+        hvalues = [hv[:n_epochs_finished] for hv in history.values()]
+        hkeys = history.keys()
+
+        for key,value in zip(hkeys, hvalues):
+            if hasattr(self, key):
+                print key, value
+                getattr(self, key).update(np.concatenate([getattr(self, key), value]))
+            else:
+                setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
+                # setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
+                getattr(self, key).update(np.asarray(value))
+
+        self.metric_names.update(np.asarray(list(set(self.metric_names).union(hkeys))))
+        self._update_metrics_dict(self.metrics)
+
+        previous_epochs.append(n_epochs_finished)
+        finished_epoch_n = sum(previous_epochs)
 
         end = datetime.now()
 
@@ -322,15 +378,37 @@ class training_skeleton(logger):
         tdict['time'] = str(end - start)
         tdict['epochs'] = epochs
         tdict['batch_size'] = batch_size
-
+        tdict['epoch_splits'] = str(previous_epochs)
         self.training.update(tdict)
 
-        self.x_train.update(x_train)
-        self.y_train.update(y_train)
-        self.x_test.update(x_test)
-        self.y_test.update(y_test)
-        self.metrics.update(np.asarray(history.values()))
-        self.metric_names.update(np.asarray(history.keys()))
+        # return odel 
+        # hkeys = history.keys()
+        # self.metric_names.update(hkeys)
+
+        # self.x_train.update(x_train)
+        # self.y_train.update(y_train)
+        # self.x_test.update(x_test)
+        # self.y_test.update(y_test)
+        
+
+        # maxlen = min(map(len, history.values()))
+
+        # hvalues = np.asarray([a[:maxlen] for a in history.values()]))
+        # hkeys = history.keys()
+
+        # new_metrics = self.metrics.copy()
+        # new_keys = self.metric_names.copy()
+
+        # existing = [(i,new_keys.index(hkeys[i])) for i in range(len(hkeys)) if hkeys[i] in new_keys]
+        # to_add = [(i,-1) for i in range(len(hkeys)) if hkeys[i] not in new_keys]
+        # unused = [(-1,i) for i in range(len(new_keys)) if new_keys[i] not in hkeys]
+        
+
+
+        # for i,key in enumerate(to_add):
+            
+        #     new_metrics = np.vstack([new_metrics, ])
+        # self.metrics.update(hvalues)
 
         return model
 
