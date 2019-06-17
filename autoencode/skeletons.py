@@ -1,6 +1,6 @@
 import numpy as np 
 from keras.layers import Input, Dense
-from keras.models import Model, load_model
+from keras.models import Model, model_from_json
 from collections import OrderedDict as odict
 import os
 import traceback
@@ -152,7 +152,8 @@ class training_skeleton(logger):
             cdict = odict()
             cdict['name'] = name
             cdict['trained'] = ''
-            cdict['model_file'] = ''
+            cdict['model_json'] = ''
+            # cdict['model_weights'] = ''
             tdict['epoch_splits'] = '[]'
 
         self.metrics = odict()
@@ -245,25 +246,27 @@ class training_skeleton(logger):
         loss=None,
         optimizer=None,
     ):
-
+        w_path = self.config_file.replace(".h5", "_weights.h5")
         # if already trained
         if self.config['trained']:
-            if os.path.exists(self.config['model_file']):
+            if self.config['model_json']:
                 if model is None:
-                    model = load_model(self.config['model_file'])
-                    self.log("using saved model at file '{}'".format(self.config['model_file']))
+                    model = model_from_json(self.config['model_json'])
+                    model.load_weights(w_path)
+                    self.log("using saved model")
                 else:
                     if not force:
-                        model = load_model(self.config['model_file'])
+                        model = model_from_json(self.config['model_json'])
+                        model.load_weights(w_path)
                         self.error("IGNORING PASSED PARAMETER 'model'")
-                        self.log("using saved model at file '{}'".format(self.config['model_file']))
+                        self.log("using saved model")
                     else:
                         if isinstance(model, str):
                             model = load_model(model)
                         self.log("using model passed as function argument")
             else:
                 if model is None:
-                    self._throw("no model passed, and saved model at file '{}' not found!".format(self.config['model_file']))
+                    self._throw("no model passed, and saved model not found!")
                 if isinstance(model, str):
                     model = load_model(model)
                 self.log("using model passed as function argument")
@@ -272,11 +275,21 @@ class training_skeleton(logger):
             self._throw("no model passed and no saved model found!!")
 
         if optimizer is None:
-            optimizer = model.optimizer
+            if hasattr(model, "optimizer"):
+                optimizer = model.optimizer
+            else:
+                optimizer = "adam"
         if loss is None:
-            loss = model.loss
+            if hasattr(model, "loss"):
+                loss = model.loss
+            else:
+                loss = "mse"
+
         if metrics is None:
-            metrics = model.metrics
+            if hasattr(model, "metrics"):
+                metrics = model.metrics
+            else:
+                metrics = []
 
         model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
         model.summary()
@@ -365,14 +378,14 @@ class training_skeleton(logger):
 
         end = datetime.now()
 
-        model_file = self.config_file.replace(".h5", "_model.h5")
-        model.save(model_file)
-        self.log("model saved to file '{}'".format(model_file))
+        model.save_weights(w_path)
 
         cdict = self.config.copy()
-        cdict['model_file'] = model_file
+        cdict['model_json'] = model.to_json()
+        # cdict['model_weights'] = w_path
         cdict['trained'] = str(start) + " ::: " + str(end)
         self.config.update(cdict)
+        self.log("model saved")
 
         tdict = self.training.copy()
         tdict['time'] = str(end - start)
