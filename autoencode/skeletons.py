@@ -7,6 +7,11 @@ import traceback
 from datetime import datetime
 from utils import logger, smartpath
 import h5py
+import matplotlib.pyplot as plt
+import glob
+
+plt.rcParams.update({'font.size': 18})
+plt.rcParams['figure.figsize'] = (10,10)
 
 class h5_element_wrapper(logger):
     def __init__(
@@ -245,6 +250,7 @@ class training_skeleton(logger):
         metrics=[],
         loss=None,
         optimizer=None,
+        verbose=1,
     ):
         w_path = self.config_file.replace(".h5", "_weights.h5")
         # if already trained
@@ -292,7 +298,6 @@ class training_skeleton(logger):
                 metrics = []
 
         model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
-        model.summary()
 
         start = datetime.now()
 
@@ -335,7 +340,7 @@ class training_skeleton(logger):
                     validation_data=[x_test, y_test],
                     initial_epoch=master_epoch_n,
                     epochs=master_epoch_n + 1,
-                    verbose=1,
+                    verbose=verbose,
                 ).history
 
                 if epoch == 0:
@@ -349,11 +354,13 @@ class training_skeleton(logger):
 
         except:
             self.error(traceback.format_exc())
-            print history
             if all([len(v) == 0 for v in history]):
                 self._throw("quitting")
 
-        n_epochs_finished = min(map(len, history.values()))
+        if len(history.values()) == 0:
+            n_epochs_finished = 0
+        else:
+            n_epochs_finished = min(map(len, history.values()))
         self.log("")
         self.log("trained {} epochs!".format(n_epochs_finished))
         self.log("")
@@ -363,7 +370,6 @@ class training_skeleton(logger):
 
         for key,value in zip(hkeys, hvalues):
             if hasattr(self, key):
-                print key, value
                 getattr(self, key).update(np.concatenate([getattr(self, key), value]))
             else:
                 setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
@@ -424,6 +430,45 @@ class training_skeleton(logger):
         # self.metrics.update(hvalues)
 
         return model
+
+    def plot_metrics(
+        self,
+        fnmatch_criteria="*loss*",
+        yscale=None
+    ):
+        names = []
+        metrics = []
+        for mname in self.metrics:
+            if glob.fnmatch.fnmatch(mname, fnmatch_criteria):
+                names.append(mname)
+                metrics.append(self.metrics[mname])
+                
+        # break concatenated plot arrays into individual components
+        plots = []
+        for mn,metric in enumerate(metrics):
+            splits = [0,] + list(np.where(np.diff(metric[:,0].astype(int)) > 1)[0]) + [len(metric[:,0]),]
+            plots.append([])
+            for i in range(len(splits[:-1])):
+                plots[mn].append(metric[splits[i] + 1:splits[i+1] + 1,:])
+
+        # plot em'
+        plt.rcParams.update({'font.size': 18})
+        if yscale is not None:
+            plt.yscale(yscale)
+        plt.xlabel("epoch number")
+        plt.ylabel("metric value" + (" ({}-scaled)".format(yscale) if yscale else ""))
+        
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+        for color,plot,name in zip(colors, plots, names):
+            for subplot in plot:
+                plt.plot(subplot[:,0], subplot[:,1], c=color, label=name)
+
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = odict(zip(map(str, labels), handles))
+        plt.legend(by_label.values(), by_label.keys())
+        plt.tight_layout()
+        plt.show()
 
 class autoencoder_skeleton(logger):
 
@@ -506,7 +551,7 @@ class autoencoder_skeleton(logger):
 
         autoencoder.compile(optimizer, loss, metrics=metrics)
 
-        return encoder, decoder, autoencoder
+        return autoencoder
 
     # def fit(
     #     self,
