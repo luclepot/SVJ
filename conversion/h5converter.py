@@ -94,15 +94,16 @@ class Converter:
         self.event_features = None
         self.jet_constituents = None
 
-        spathout = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
-        spathin = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
-        spath = None
-        if os.path.exists(spathout):
-            spath = spathout
-        elif os.path.exists(spathin):
-            spath = spathin            
-        else:
-            raise AttributeError("Selection file does not exist in either input/output dirs!!")
+        
+        # spathout = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
+        # spathin = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
+        # spath = None
+        # if os.path.exists(spathout):
+        #     spath = spathout
+        # elif os.path.exists(spathin):
+        #     spath = spathin            
+        # else:
+        #     raise AttributeError("Selection file does not exist in either input/output dirs!!")
 
         with open(spath) as f:
             self.selections = np.asarray(map(lambda x: map(long, x.split(',')), f.read().strip().split()))
@@ -199,11 +200,16 @@ class Converter:
         self,
         outputfile=None,
     ):
+        if not os.path.exists(self.outputdir):
+            os.mkdir(self.outputdir)
         outputfile = outputfile or os.path.join(self.outputdir, "{}_data.h5".format(self.name))
 
         if not outputfile.endswith(".h5"):
             outputfile += ".h5"
         
+        # self.log(os.path.exists(outputfile))
+        # self.log(os.path.exists(os.path.dirname(outputfile)))
+        # self.log(outputfile)
         f = h5py.File(outputfile, "w")
         f.create_dataset('event_feature_data', data=self.event_features)
         f.create_dataset('event_feature_names', data=self.event_feature_names)
@@ -223,7 +229,7 @@ class Converter:
         yield j1.Phi()
         yield j1.Pt()
         yield j1.M()
-        yield float(j1.NCharged) / float(j1.NNeutrals) 
+        yield float(tree.Jet[0].NCharged) / float(tree.Jet[0].NNeutrals) 
         # yield j1.E()
         for value in self.jets_axis2_pt2(j1, tree, track_index[0]):
             yield value
@@ -232,7 +238,7 @@ class Converter:
         yield j2.Phi() 
         yield j2.Pt()
         yield j2.M()
-        yield float(j2.NCharged) / float(j2.NNeutrals) 
+        yield float(tree.Jet[1].NCharged) / float(tree.Jet[0].NNeutrals) 
         # yield j2.E()
         for value in self.jets_axis2_pt2(j2, tree, track_index[1]):
             yield value
@@ -322,6 +328,9 @@ class Converter:
 if __name__ == "__main__":
     if len(sys.argv) == 10:
         (_, outputdir, filespec, pathspec, name, dr, nc, rmin, rmax, constituents) = sys.argv
+        print outputdir
+        print pathspec
+        print filespec
         core = Converter(outputdir, filespec, pathspec, name, float(dr), int(nc), bool(int(constituents)))
         ret = core.convert((int(rmin), int(rmax)))
         core.save()
