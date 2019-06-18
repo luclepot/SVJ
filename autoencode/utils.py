@@ -124,6 +124,8 @@ class data_table(logger):
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
         assert len(self.data) > 0, "n samples must be greater than zero"
         self.df = pd.DataFrame(self.data, columns=self.headers)
+        for c in self.df.columns:
+            self.df = self.df[~np.isclose(self.df[c], 0)]
         self.scaler = MinMaxScaler((0,1))
         self.scaler.fit(self.df)
 
