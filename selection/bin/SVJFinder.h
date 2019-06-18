@@ -11,8 +11,8 @@
 #include <string>
 #include "THashList.h"
 #include "TBenchmark.h"
-#include <sstream> 
-#include <fstream> 
+#include <sstream>
+#include <fstream>
 #include <utility>
 #include <map>
 #include <cassert>
@@ -60,11 +60,11 @@ namespace Cuts {
         {jetCounts, "n Jets > 1"},
         {jetEtas, "jet Eta veto"},
         {jetDeltaEtas, "DeltaEta veto"},
-        {metRatio,"MET/M_T > 0.15"},
+        {metRatio,"MET/M_T > 0.025"},
         {jetPt, "Jet PT veto"},
         {jetDiJet, "Dijet veto"},
         {metValue, "loose MET cut"},
-        {metRatioTight, "MET/M_T > 0.25"},
+        {metRatioTight, "MET/M_T > 0.05"},
         {selection, "final selection"}
     };
 };
@@ -80,7 +80,6 @@ namespace Hists {
         COUNT
     };
 }; 
-
 
 // import for backportability (;-<)
 using namespace vectorTypes; 
@@ -395,6 +394,25 @@ public:
                 i++;
             }
             CutFlowHist->Write(); 
+
+            std::ofstream f(outputdir + "/" + sample + "_cutflow.txt");
+            if (f.is_open()) {
+                vector<string> cutNames;
+                for (auto elt : Cuts::CutName) {
+                    cutNames.push_back(elt.second);
+                }
+                WriteVector(f, CutFlow);
+                WriteVector(f, cutNames);
+                f.close(); 
+            }
+        }
+
+        template<typename t>
+        void WriteVector(std::ostream & out, vector<t> & vec, string delimiter=", ") {
+            for (size_t i = 0; i < vec.size() - 1; ++i) {
+                out << vec[i] << delimiter;
+            }
+            out << vec.back() << endl;
         }
 
         // void PrintAllCuts() {
