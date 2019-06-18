@@ -13,25 +13,36 @@ def grab_data(filename, split):
 
     return train_norm, test_norm, data
 
-def shallow(bn, n_features):
+def shallow(bn, n_features, central_activation='relu'):
 
     model = autoencoder_skeleton()
     model.add(n_features, 'relu')
-    model.add(bn, 'relu')
+    model.add(bn, central_activation)
     model.add(n_features, 'linear')
     
     return model.build(optimizer='adam', loss='mse')
 
-def medium(bn, n_features):
+def medium(bn, n_features, central_activation='relu'):
     model = autoencoder_skeleton()
     model.add(n_features, 'relu')
     model.add((n_features - bn)/2 + bn)
-    model.add(bn, 'relu')
+    model.add(bn, central_activation)
     model.add((n_features - bn)/2 + bn)
     model.add(n_features, 'linear')    
     
     return model.build(optimizer='adam', loss='mse')
 
+def deep(bn, n_features, central_activation='relu', depth=100, intermediate_layers=2):
+    model = autoencoder_skeleton()
+    model.add(n_features, 'relu')
+    for i in range(intermediate_layers):
+        model.add(depth, 'relu')
+    model.add(bn, central_activation)
+    for i in range(intermediate_layers):
+        model.add(depth, 'relu')
+    model.add(n_features, 'linear')
+
+    return model.build(optimizer='adam', loss='mse')
 
 # def rand_search(n):
 #     def r(l):
