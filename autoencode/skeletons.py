@@ -159,6 +159,7 @@ class training_skeleton(logger):
             cdict['trained'] = ''
             cdict['model_json'] = ''
             # cdict['model_weights'] = ''
+            tdict['batch_size'] = '[]'
             tdict['epoch_splits'] = '[]'
 
         self.metrics = odict()
@@ -237,20 +238,10 @@ class training_skeleton(logger):
 
     ### ACTUAL WRAPPERS
 
-    def train(
+    def load_model(
         self,
-        x_train,
-        y_train=None,
-        x_test=None,
-        y_test=None,
         model=None,
-        epochs=10,
-        batch_size=32,
         force=False,
-        metrics=[],
-        loss=None,
-        optimizer=None,
-        verbose=1,
     ):
         w_path = self.config_file.replace(".h5", "_weights.h5")
         # if already trained
@@ -279,6 +270,27 @@ class training_skeleton(logger):
         
         if model is None:
             self._throw("no model passed and no saved model found!!")
+            
+        return model
+
+    def train(
+        self,
+        x_train,
+        y_train=None,
+        x_test=None,
+        y_test=None,
+        model=None,
+        epochs=10,
+        batch_size=32,
+        force=False,
+        metrics=[],
+        loss=None,
+        optimizer=None,
+        verbose=1,
+    ):
+        w_path = self.config_file.replace(".h5", "_weights.h5")
+
+        model = self.load_model(model, force)
 
         if optimizer is None:
             if hasattr(model, "optimizer"):
@@ -396,8 +408,8 @@ class training_skeleton(logger):
         tdict = self.training.copy()
         tdict['time'] = str(end - start)
         tdict['epochs'] = epochs
-        tdict['batch_size'] = batch_size
-        tdict['epoch_splits'] = str(previous_epochs)
+        tdict['batch_size'] = str(eval(tdict['batch_size']) + [batch_size,]*n_epochs_finished)
+        tdict['epoch_splits'] = str(eval(tdict['epoch_splits']) + previous_epochs)
         self.training.update(tdict)
 
         # return odel 
@@ -434,7 +446,8 @@ class training_skeleton(logger):
     def plot_metrics(
         self,
         fnmatch_criteria="*loss*",
-        yscale=None
+        yscale=None,
+        figsize=(7,5)
     ):
         names = []
         metrics = []
@@ -452,6 +465,8 @@ class training_skeleton(logger):
                 plots[mn].append(metric[splits[i] + 1:splits[i+1] + 1,:])
 
         # plot em'
+
+        plt.rcParams['figure.figsize'] = figsize
         plt.rcParams.update({'font.size': 18})
         if yscale is not None:
             plt.yscale(yscale)
@@ -459,7 +474,6 @@ class training_skeleton(logger):
         plt.ylabel("metric value" + (" ({}-scaled)".format(yscale) if yscale else ""))
         
         colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-
         for color,plot,name in zip(colors, plots, names):
             for subplot in plot:
                 plt.plot(subplot[:,0], subplot[:,1], c=color, label=name)

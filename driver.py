@@ -192,6 +192,8 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun):
     log("running command 'convert'")
     if inputdir is None:
         inputdir = outputdir
+    if not os.path.exists(outputdir):
+        os.mkdir(outputdir)
     filespec = _check_for_default_file([inputdir], name, 'filelist')
     spath = _check_for_default_file([inputdir], name, 'selection')
     

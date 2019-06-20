@@ -9,6 +9,10 @@ import pandas as pd
 import os
 import traceback
 import matplotlib.pyplot as plt
+import glob
+import pandas as pd
+import prettytable
+from StringIO import StringIO
 
 plt.rcParams['figure.figsize'] = (10,10)
 plt.rcParams.update({'font.size': 18})
@@ -182,6 +186,25 @@ class data_table(logger):
     ):
         return self.df.__repr__()
 
+    def split_by_column_names(
+        self,
+        column_list_or_criteria,
+    ):
+        match_list = None
+        if isinstance(column_list_or_criteria, str):
+            match_list = [c for c in self.headers if glob.fnmatch.fnmatch(c, column_list_or_criteria)]
+        else:
+            match_list = list(column_list_or_criteria)
+
+        other = [c for c in self.headers if c not in match_list]
+
+        t1,t2 = self.df.drop(other,axis=1),self.df.drop(match_list,axis=1)
+
+        
+        return data_table(t1, headers=match_list, name=self.name), data_table(t2, headers=other, name=self.name)
+        
+
+
     def train_test_split(
         self,
         test_fraction=0.25,
@@ -204,6 +227,8 @@ class data_table(logger):
         figloc="upper right",
         figsize=(10,10),
         alpha=0.7,
+        xscale="linear",
+        yscale="linear"
     ):
         if isinstance(values, str):
             values = [key for key in self.headers if glob.fnmatch.fnmatch(key, values)]
@@ -231,7 +256,9 @@ class data_table(logger):
         plot_others = [[other[v] for v in values] for other in others]
 
         if rng is None:
-            rng = [(p.min(), p.max()) for p in plot_data]
+            rmax = np.max([d.max().values for d in ([self] + others)], axis=0)
+            rmin = np.min([d.min().values for d in ([self] + others)], axis=0)
+            rng =  np.array([rmin, rmax]).T
         elif len(rng) == 2 and all([not hasattr(r, "__iter__") for r in rng]):
             rng = [rng for i in range(len(plot_data))]
 
@@ -248,9 +275,15 @@ class data_table(logger):
                 # weights = np.ones_like(plot_others[j][i])/float(len(plot_others[j][i]))
                 ax.hist(plot_others[j][i], bins=bins, range=rng[i], histtype='step', label=others[j].name, normed=normed, weights=weights, alpha=alpha)
 
-            plt.xlabel(plot_data[i].name, fontsize=fontsize)
+            plt.xlabel(plot_data[i].name + " {}-scaled".format(xscale), fontsize=fontsize)
+            plt.ylabel("{}-scaled".format(yscale), fontsize=fontsize)
             plt.xticks(size=ticksize)
             plt.yticks(size=ticksize)
+            plt.yscale(yscale)
+            plt.xscale(xscale)
+            plt.gca().spines['left']._adjust_location()
+            plt.gca().spines['bottom']._adjust_location()
+
 
         handles,labels = ax.get_legend_handles_labels()
         plt.figlegend(handles, labels, loc=figloc)
@@ -465,3 +498,16 @@ def smartpath(path):
     if path.startswith("~/"):
         return path
     return os.path.abspath(path)
+
+def get_cutflow_table(paths):
+    if isinstance(paths, str):
+        paths = [paths]
+        
+    assert len(paths) > 0, "must have SOME paths"
+    
+    values = []
+    keys = []
+    for path in paths:
+        with open(path) as f:
+            values_comp, keys_comp = map(lambda x: x.strip('\n').split(','), f.readlines())
+            values_comp = map(int, values_comp)

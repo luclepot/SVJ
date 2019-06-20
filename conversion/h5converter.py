@@ -52,39 +52,23 @@ class Converter:
 
         self.jetDR = jetDR
 
-        ## ADD MET
-        self.event_feature_names =  [
-
-            'j1Eta',
-            'j1Phi',
-            'j1Pt',
-            'j1M',
-            'j1ChargedFraction',
-            'j1NeutralsFraction',
-            'j1NChargedOverNNeutrals',
-
-            # 'j1E', # REMOVE/
-            # 'j1mult',
-            'j1ptd',
-            'j1axis2',
-            # DELTAPHI BETWEEN MET/JET # ADD
-            # MET FOR EVENT # ADD
-
-            'j2Eta', # ADD
-            'j2Phi', # ADD
-            'j2Pt',
-            'j2M',
-            'j2ChargedFraction',
-            'j2NeutralsFraction',
-            'j2NChargedOverNNeutrals',
-            # 'j2E', # REMOVE
-            # 'j2mult',
-            'j2ptd',
-            'j2axis2',
-
-            # 'DeltaEtaJJ', # REMOVE
-            # 'DeltaPhiJJ', # REMOVE
+        self.n_jets = 2
+        self.jet_base_names = [
+            'Eta',
+            'Phi',
+            'Pt',
+            'M',
+            'ChargedFraction',
+            'PTD',
+            'Axis2',
         ]
+
+        ## ADD MET
+        self.event_feature_names =  []
+
+        for i in range(self.n_jets):
+            self.event_feature_names += ['j{}'.format(i) + j for j in self.jet_base_names]
+        
 
         self.jet_constituent_names = ['pEta', 'pPhi', 'pPt']
 
@@ -99,7 +83,6 @@ class Converter:
             self.EFlow_dict[eft[0]] = i
 
         self.n_constituent_particles=n_constituent_particles
-        self.n_jets = 2
         self.event_features = None
         self.jet_constituents = None
 
@@ -235,37 +218,21 @@ class Converter:
         track_index,
     ):
         j1,j2 = tree.Jet[0].P4(), tree.Jet[1].P4()
-        # yield (j1 + j2).M()       # Mjj
-        yield j1.Eta()
-        yield j1.Phi()
-        yield j1.Pt()
-        yield j1.M()
+        
+        ## leading 2 jets
+        for i in range(self.n_jets):
+            j = tree.Jet[i].P4()
+            yield j.Eta()
+            yield j.Phi()
+            yield j.Pt()
+            yield j.M()
 
-        nc, nn = map(float, [tree.Jet[0].NCharged, tree.Jet[0].NNeutrals])
-        n_total = nc + nn
-        yield nc / n_total if n_total > 0 else np.inf
-        yield nn / n_total if n_total > 0 else np.inf
-        yield nc / nn if nn > 0 else np.inf
-        # yield j1.E()
-        for value in self.jets_axis2_pt2(j1, tree, track_index[0]):
-            yield value
-
-        yield j2.Eta()
-        yield j2.Phi() 
-        yield j2.Pt()
-        yield j2.M()
-
-        nc, nn = map(float, [tree.Jet[1].NCharged, tree.Jet[1].NNeutrals])
-        n_total = nc + nn
-        yield nc / n_total if n_total > 0 else np.inf
-        yield nn / n_total if n_total > 0 else np.inf
-        yield nc / nn if nn > 0 else np.inf
-
-        # yield j2.E()
-        for value in self.jets_axis2_pt2(j2, tree, track_index[1]):
-            yield value
-        # yield j1.Eta() - j2.Eta()       # deltaeta
-        # yield j1.DeltaPhi(j2)           # deltaphi
+            nc, nn = map(float, [tree.Jet[i].NCharged, tree.Jet[i].NNeutrals])
+            n_total = nc + nn
+            yield nc / n_total if n_total > 0 else -1
+        
+            for value in self.jets_axis2_pt2(j, tree, track_index[i]):
+                yield value
 
     def jets_axis2_pt2(
         self,
