@@ -107,8 +107,8 @@ class base_autoencoder(logger):
         outputs = self._add_layer(output_layer, self._add_layers(outer_interms, encoded_input))
 
         # make keras models for encoder, decoder, and autoencoder
-        # encoder = keras.models.Model(inputs, encoded, name='encoder')
-        # decoder = keras.models.Model(encoded_input, outputs, name='decoder')
+        encoder = keras.models.Model(inputs, encoded, name='encoder')
+        decoder = keras.models.Model(encoded_input, outputs, name='decoder')
         autoencoder = keras.models.Model(inputs, decoder(encoder(inputs)), name='autoencoder')
 
         autoencoder.compile(optimizer, loss, metrics=metrics)

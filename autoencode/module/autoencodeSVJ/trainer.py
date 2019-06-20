@@ -8,6 +8,7 @@ from utils import logger, smartpath
 import h5py
 import matplotlib.pyplot as plt
 import glob
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau, TerminateOnNaN
 
 plt.rcParams.update({'font.size': 18})
 plt.rcParams['figure.figsize'] = (10,10)
@@ -285,8 +286,16 @@ class trainer(logger):
         loss=None,
         optimizer=None,
         verbose=1,
-        callbacks=None,
+        use_callbacks=False,
     ):
+        callbacks = None
+        if use_callbacks:
+            callbacks = [
+                EarlyStopping(monitor='val_loss', patience=10, verbose=0),
+                ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=0),
+                TerminateOnNaN()
+            ]
+        
         w_path = self.config_file.replace(".h5", "_weights.h5")
 
         model = self.load_model(model, force)
@@ -340,38 +349,59 @@ class trainer(logger):
 
         history = odict()
 
-        try:
-            for epoch in range(epochs):
-                self.log("TRAINING EPOCH {}/{}".format(master_epoch_n, finished_epoch_n))
-                nhistory = model.fit(
-                    x=x_train,
-                    y=y_train,
-                    steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
-                    validation_steps=int(np.ceil(len(x_test)/batch_size)),
-                    validation_data=[x_test, y_test],
-                    initial_epoch=master_epoch_n,
-                    epochs=master_epoch_n + 1,
-                    verbose=verbose,
-                    callbacks=callbacks
-                ).history
+        if not use_callbacks:
+            try:
+                for epoch in range(epochs):
+                    self.log("TRAINING EPOCH {}/{}".format(master_epoch_n, finished_epoch_n))
+                    nhistory = model.fit(
+                        x=x_train,
+                        y=y_train,
+                        steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
+                        validation_steps=int(np.ceil(len(x_test)/batch_size)),
+                        validation_data=[x_test, y_test],
+                        initial_epoch=master_epoch_n,
+                        epochs=master_epoch_n + 1,
+                        verbose=verbose,
+                        callbacks=callbacks
+                    ).history
 
-                if epoch == 0:
+                    if epoch == 0:
+                        for metric in nhistory:
+                            history[metric] = []
+
                     for metric in nhistory:
-                        history[metric] = []
+                        history[metric].append([master_epoch_n, nhistory[metric][0]])
 
-                for metric in nhistory:
-                    history[metric].append([master_epoch_n, nhistory[metric][0]])
+                    master_epoch_n += 1
 
-                master_epoch_n += 1
+            except:
+                self.error(traceback.format_exc())
+                if all([len(v) == 0 for v in history]):
+                    self._throw("quitting")
 
-        except:
-            self.error(traceback.format_exc())
-            if all([len(v) == 0 for v in history]):
-                self._throw("quitting")
+            if len(history.values()) == 0:
+                n_epochs_finished = 0
+            else:
+                n_epochs_finished = min(map(len, history.values()))
 
-        if len(history.values()) == 0:
-            n_epochs_finished = 0
         else:
+            nhistory = model.fit(
+                x=x_train,
+                y=y_train,
+                steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
+                validation_steps=int(np.ceil(len(x_test)/batch_size)),
+                validation_data=[x_test, y_test],
+                initial_epoch=master_epoch_n,
+                epochs=master_epoch_n + epochs,
+                verbose=verbose,
+                callbacks=callbacks
+            ).history
+
+            for metric in nhistory:
+                history[metric] = []
+                for i,value in enumerate(nhistory[metric]):
+                    history[metric].append([master_epoch_n + i, value])
+
             n_epochs_finished = min(map(len, history.values()))
 
         self.log("")

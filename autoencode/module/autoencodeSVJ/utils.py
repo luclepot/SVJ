@@ -129,6 +129,7 @@ class data_table(logger):
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
         assert len(self.data) > 0, "n samples must be greater than zero"
         self.df = pd.DataFrame(self.data, columns=self.headers)
+        self.std = std
         if self.data.shape[1] == 0:
             self.scaler = None
         else:
@@ -152,7 +153,7 @@ class data_table(logger):
         
         assert isinstance(data, data_table), "data must be data_table type"
 
-        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name="'{}' normed to '{}' on range '{}'".format(data.name,self.name,self.scaler.feature_range))
+        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name="'{}' normed to '{}'".format(data.name,self.name), std=self.std)
         ret.scaler = self.scaler
         return ret
 
@@ -170,7 +171,7 @@ class data_table(logger):
 
         assert isinstance(data, data_table), "data must be data_table type"
 
-        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name="'{}' inv_normed to '{}' on range '{}'".format(data.name,self.name,self.scaler.feature_range))
+        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name="'{}' inv_normed to '{}'".format(data.name,self.name), std=self.std)
         ret.scaler = self.scaler
         return ret
         
@@ -214,10 +215,11 @@ class data_table(logger):
         self,
         test_fraction=0.25,
         random_state=None,
+        shuffle=True
     ):
         dtrain, dtest = train_test_split(self, test_size=test_fraction, random_state=random_state)
-        return (data_table(np.asarray(dtrain), np.asarray(dtrain.columns), "train"),
-            data_table(np.asarray(dtest), np.asarray(dtest.columns), "test"))
+        return (data_table(np.asarray(dtrain), np.asarray(dtrain.columns), "train", std=self.std),
+            data_table(np.asarray(dtest), np.asarray(dtest.columns), "test", std=self.std))
     
     def plot(
         self,
@@ -305,7 +307,7 @@ class data_table(logger):
     def split_to_jets(
         self,
     ):
-        return split_to_jets(self)
+        return split_to_jets(self, std=self.std)
 
 class data_loader(logger):
     """
@@ -431,6 +433,7 @@ class data_loader(logger):
         name=None,
         value_keys="*data",
         header_keys="*names",
+        std=False,
     ):
         values, vdict = self.get_dataset(value_keys)
         headers, hdict = None if header_keys is None else self.get_dataset(header_keys) 
@@ -439,7 +442,7 @@ class data_loader(logger):
         assert len(values.shape) == 2, "data must be 2-dimensional and numeric!"
         assert values.shape[1] == headers.shape[0], "data must have the same number of columns as there are headers!!"
 
-        return data_table(values, headers, name)
+        return data_table(values, headers, name, std=False)
 
     # def norm_min_max(
     #     self,
@@ -521,15 +524,15 @@ def get_cutflow_table(glob_path):
             values_comp, keys_comp = map(lambda x: x.strip('\n').split(','), f.readlines())
             values_comp = map(int, values_comp)
 
-def get_training_data(glob_path):
+def get_training_data(glob_path, std=False):
     paths = glob.glob(glob_path)
     d = data_loader("main sample")
     for p in paths:
         d.add_sample(p)
-    return d.make_table()
+    return d.make_table(std=std)
 
-def get_training_data_jets(glob_path):
-    return split_to_jets(get_training_data(glob_path))
+def get_training_data_jets(glob_path, std=False):
+    return split_to_jets(get_training_data(glob_path, std=std), std=std)
 
 def get_subheaders(data):
     classes = {}
@@ -551,7 +554,7 @@ def get_subheaders(data):
         i += 1
     return classes
 
-def split_to_jets(data):
+def split_to_jets(data, std=False):
     """
     given a data table with values for the n leading jets, split into one data 
     table for all jets.
@@ -568,13 +571,15 @@ def split_to_jets(data):
             data_table(
                 data=np.asarray(to_add),
                 headers=headers[h],
-                name="jet {}".format(h)
+                name="jet {}".format(h),
+                std=std,
             )
         )
 
     full = data_table(
         data=np.vstack([jt.df for jt in jets]),
         headers=jets[0].headers,
-        name="all jet data"
+        name="all jet data",
+        std=std,
     )
     return full, jets
