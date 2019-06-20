@@ -373,6 +373,7 @@ class training_skeleton(logger):
             n_epochs_finished = 0
         else:
             n_epochs_finished = min(map(len, history.values()))
+
         self.log("")
         self.log("trained {} epochs!".format(n_epochs_finished))
         self.log("")
@@ -382,8 +383,12 @@ class training_skeleton(logger):
 
         for key,value in zip(hkeys, hvalues):
             if hasattr(self, key):
-                getattr(self, key).update(np.concatenate([getattr(self, key), value]))
+                # print(getattr(self, key))
+                # print(np.concatenate([getattr(self, key), value]))
+                getattr(self, key).update(np.concatenate([getattr(self, key).rep, value]))
             else:
+                # print(getattr(self, key))
+                # print(np.concatenate([getattr(self, key), value]))
                 setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
                 # setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
                 getattr(self, key).update(np.asarray(value))
