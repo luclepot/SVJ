@@ -4,7 +4,7 @@ from operator import mul
 import h5py
 import glob
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import pandas as pd
 import os
 import traceback
@@ -117,7 +117,8 @@ class data_table(logger):
         data,
         headers=None,
         name=None,
-        verbose=1
+        verbose=1,
+        std=False
     ):
         logger.__init__(self, "data_table :: ", verbose)
         self.name = name or "untitled {}".format(data_table.TABLE_COUNT)    
@@ -128,8 +129,14 @@ class data_table(logger):
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
         assert len(self.data) > 0, "n samples must be greater than zero"
         self.df = pd.DataFrame(self.data, columns=self.headers)
-        self.scaler = MinMaxScaler((0,1))
-        self.scaler.fit(self.df)
+        if self.data.shape[1] == 0:
+            self.scaler = None
+        else:
+            if std:
+                self.scaler = StandardScaler((0,1))
+            else:
+                self.scaler = MinMaxScaler((0,1))
+            self.scaler.fit(self.df)
 
     def norm(
         self,
@@ -203,8 +210,6 @@ class data_table(logger):
         
         return data_table(t1, headers=match_list, name=self.name), data_table(t2, headers=other, name=self.name)
         
-
-
     def train_test_split(
         self,
         test_fraction=0.25,
@@ -296,6 +301,11 @@ class data_table(logger):
         n
     ):
         return n/cols + bool(n%cols)
+
+    def split_to_jets(
+        self,
+    ):
+        return split_to_jets(self)
 
 class data_loader(logger):
     """
@@ -499,10 +509,9 @@ def smartpath(path):
         return path
     return os.path.abspath(path)
 
-def get_cutflow_table(paths):
-    if isinstance(paths, str):
-        paths = [paths]
+def get_cutflow_table(glob_path):
         
+    paths = glob.glob(glob_path)
     assert len(paths) > 0, "must have SOME paths"
     
     values = []
@@ -511,3 +520,61 @@ def get_cutflow_table(paths):
         with open(path) as f:
             values_comp, keys_comp = map(lambda x: x.strip('\n').split(','), f.readlines())
             values_comp = map(int, values_comp)
+
+def get_training_data(glob_path):
+    paths = glob.glob(glob_path)
+    d = data_loader("main sample")
+    for p in paths:
+        d.add_sample(p)
+    return d.make_table()
+
+def get_training_data_jets(glob_path):
+    return split_to_jets(get_training_data(glob_path))
+
+def get_subheaders(data):
+    classes = {}
+    i = 0
+    n = 0
+    h = data.headers
+    while i < len(h):
+        if str(n) not in h[i]:
+            n += 1
+            continue
+        rep = h[i]
+        if "j{}".format(n) in rep:
+            rep = rep.replace("j{}".format(n), "jet")
+        elif "jet{}".format(n) in rep:
+            rep = rep.replace("jet{}".format(n), "jet")
+        if n not in classes:
+            classes[n] = []
+        classes[n].append(rep)
+        i += 1
+    return classes
+
+def split_to_jets(data):
+    """
+    given a data table with values for the n leading jets, split into one data 
+    table for all jets.
+    """
+    headers = get_subheaders(data)
+    assert len(set().union(*headers.values())) == len(headers.values()[0])
+    jets = []
+    next = data
+    for h in headers:
+        to_add, next = next.split_by_column_names("jet{}*".format(h))
+        if to_add.shape[1] == 0:
+            to_add, next = next.split_by_column_names("j{}*".format(h))
+        jets.append(
+            data_table(
+                data=np.asarray(to_add),
+                headers=headers[h],
+                name="jet {}".format(h)
+            )
+        )
+
+    full = data_table(
+        data=np.vstack([jt.df for jt in jets]),
+        headers=jets[0].headers,
+        name="all jet data"
+    )
+    return full, jets

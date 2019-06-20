@@ -6,7 +6,8 @@ setup(
     author='Luc Le Pottier',
     author_email='luc.lepottier@cern.ch',
     packages=[
-        'source',
+        # 'source',
+        'autoencodeSVJ',
     #     # 'autoencode.models',
     #     # 'autoencode.utils',
     #     # 'autoencode.skeletons',
