@@ -16,7 +16,7 @@ def grab_data(filename, split):
 def shallow(bn, n_features, central_activation='relu'):
 
     model = autoencoder_skeleton()
-    model.add(n_features, 'relu')
+    model.add(n_features, 'relu', )
     model.add(bn, central_activation)
     model.add(n_features, 'linear')
     
