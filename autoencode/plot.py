@@ -7,7 +7,9 @@ def get_args():
 
     def figsize(s):
         try:
-            return list(map(int, s.split(",")))
+            slist = list(map(int, s.split(",")))
+            assert len(slist) == 2
+            return tuple(slist)
         except:
             raise argparse.ArgumentTypeError("input '{}' is not of the required format <int>,<int>".format(s))
 
@@ -45,5 +47,6 @@ def get_args():
     return parser.parse_args(sys.argv[1:])
 
 if __name__ == "__main__":
+    raise NotImplementedError, "yEAh nO don't use this yet please"
     args = get_args()
     print args
