@@ -1,4 +1,5 @@
 import keras 
+from utils import logger
 
 def shallow(bn, n_features, central_activation='relu'):
 

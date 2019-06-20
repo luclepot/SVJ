@@ -94,7 +94,7 @@ class h5_element_wrapper(logger):
     ):
         return getattr(self.rep, attr)
 
-class training_skeleton(logger):
+class trainer(logger):
     """
     Wraps training/testing/evaluation activity for a model in an h5 file saver, which keeps all
     training inputs/outputs, model performance stats, model weights, etc.
@@ -500,3 +500,32 @@ class training_skeleton(logger):
                 if os.path.exists(f):
                     os.remove(f)
             self.log("removed associated data files for self!")
+
+def train_unique_instance(
+    name,
+    model,
+    x_train,
+    x_test,
+    show_plots=True,
+    **kwargs
+):
+    if name.endswith(".h5"):
+        name = name.replace(".h5", "")
+    npath = lambda p : p + ".h5"
+    if os.path.exists(npath(name)):
+        i = 0
+        while os.path.exists(npath(name + "_copy{}".format(i))):
+            i += 1
+        name = npath(name + "_copy{}".format(i))
+
+    print "using name {}".format(name)
+    t = trainer(name)
+    t.train(
+        model=model,
+        **kwargs
+    )
+
+    if show_plots:
+        t.plot_metrics("*")
+
+    return t
