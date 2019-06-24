@@ -18,7 +18,6 @@ from enum import Enum
 plt.rcParams['figure.figsize'] = (10,10)
 plt.rcParams.update({'font.size': 18})
 
-
 class logger:
     """
     good logging parent class.
@@ -103,7 +102,6 @@ class logger:
         else:
             out += prefix + str(line) + '\n'
         return out
-
 
 class data_table(logger):
     
@@ -601,3 +599,6 @@ def split_to_jets(data):
         name="all jet data"
     )
     return full, jets
+
+def log_uniform(low, high, size=None, base=10.):
+    return float(base)**(np.random.uniform(np.log(low)/np.log(base), np.log(high)/np.log(base), size))
