@@ -95,6 +95,8 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--learning-rate", dest="lr", type=float, default=0.01)
     parser.add_argument("-t", "--norm-type", dest="ntype", type=str, default="RobustScaler")
     parser.add_argument("-l", "--loss", dest="loss", type=str, default="mse")
+    parser.add_argument("-p", "--path", dest="path", type=str, default="CWD")
+
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -105,6 +107,10 @@ if __name__ == "__main__":
     lr = args.lr
     ntype = args.ntype
     loss = args.loss
+    path = args.path
+
+    if path == "CWD":
+        path = os.path
 
     import autoencodeSVJ.utils as utils
     import autoencodeSVJ.models as models
@@ -128,7 +134,7 @@ if __name__ == "__main__":
     encoder, decoder = autoencoder.layers[1:]
 
     name = name + "_" + str(bn)
-    path = os.path.join("../data/training_runs/7jf/", name)
+    path = os.path.join(path, name)
     if os.path.exists(path):
         raise AttributeError("Data at '' already exists!".format(path))
 
