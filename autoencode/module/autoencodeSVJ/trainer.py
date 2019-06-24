@@ -9,6 +9,7 @@ import h5py
 import matplotlib.pyplot as plt
 import glob
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau, TerminateOnNaN
+import keras.optimizers
 
 plt.rcParams.update({'font.size': 18})
 plt.rcParams['figure.figsize'] = (10,10)
@@ -287,6 +288,7 @@ class trainer(logger):
         optimizer=None,
         verbose=1,
         use_callbacks=False,
+        learning_rate=0.01,
     ):
         callbacks = None
         if use_callbacks:
@@ -317,7 +319,7 @@ class trainer(logger):
             else:
                 metrics = []
 
-        model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+        model.compile(optimizer=getattr(keras.optimizers, optimizer)(lr=learning_rate), loss=loss, metrics=metrics)
 
         start = datetime.now()
 
@@ -401,9 +403,9 @@ class trainer(logger):
                 history[metric] = []
                 for i,value in enumerate(nhistory[metric]):
                     history[metric].append([master_epoch_n + i, value])
-
+            master_epoch_n += epochs
             n_epochs_finished = min(map(len, history.values()))
-
+        print "EPOCH N:", master_epoch_n, epochs
         self.log("")
         self.log("trained {} epochs!".format(n_epochs_finished))
         self.log("")
@@ -413,12 +415,12 @@ class trainer(logger):
 
         for key,value in zip(hkeys, hvalues):
             if hasattr(self, key):
-                # print(getattr(self, key))
-                # print(np.concatenate([getattr(self, key), value]))
+                #print(getattr(self, key))
+                #print(np.concatenate([getattr(self, key).rep, value]))
                 getattr(self, key).update(np.concatenate([getattr(self, key).rep, value]))
             else:
-                # print(getattr(self, key))
-                # print(np.concatenate([getattr(self, key), value]))
+                #print(getattr(self, key))
+                # print(np.concatenate([getattr(self, key).rep, value]))
                 setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
                 # setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
                 getattr(self, key).update(np.asarray(value))
@@ -430,6 +432,9 @@ class trainer(logger):
         finished_epoch_n = sum(previous_epochs)
 
         end = datetime.now()
+
+        print "finished epoch N", finished_epoch_n
+        print "prev", previous_epochs
 
         model.save_weights(w_path)
 
@@ -444,7 +449,7 @@ class trainer(logger):
         tdict['time'] = str(end - start)
         tdict['epochs'] = epochs
         tdict['batch_size'] = str(eval(tdict['batch_size']) + [batch_size,]*n_epochs_finished)
-        tdict['epoch_splits'] = str(eval(tdict['epoch_splits']) + previous_epochs)
+        tdict['epoch_splits'] = str(previous_epochs)
         self.training.update(tdict)
 
         # return odel 
@@ -497,7 +502,7 @@ class trainer(logger):
             splits = [0,] + list(np.where(np.diff(metric[:,0].astype(int)) > 1)[0]) + [len(metric[:,0]),]
             plots.append([])
             for i in range(len(splits[:-1])):
-                plots[mn].append(metric[splits[i] + 1:splits[i+1] + 1,:])
+                plots[mn].append(metric[splits[i] + 1 : splits[i+1] + 1 , :])
 
         # plot em'
 
@@ -515,6 +520,7 @@ class trainer(logger):
 
         handles, labels = plt.gca().get_legend_handles_labels()
         by_label = odict(zip(map(str, labels), handles))
+        plt.xticks()
         plt.legend(by_label.values(), by_label.keys())
         plt.tight_layout()
         plt.show()
