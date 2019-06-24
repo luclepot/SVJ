@@ -85,6 +85,103 @@ def make_parser():
     plot_types = plot.add_subparsers()
 
 if __name__ == "__main__":
-    args = get_args()
-    print args
+    import argparse
+    import sys
+    parser = argparse.ArgumentParser()
+    parser.add_argument("name", type=str)
+    parser.add_argument("-n", "--neck-nodes", dest="bn", required=True, type=int)
+    parser.add_argument("-e", "--epochs", dest="epochs", type=int, default=10)
+    parser.add_argument("-b", "--batch-size", dest="batch_size", type=int, default=32)
+    parser.add_argument("-r", "--learning-rate", dest="lr", type=float, default=0.01)
+    parser.add_argument("-t", "--norm-type", dest="ntype", type=str, default="RobustScaler")
+    parser.add_argument("-l", "--loss", dest="loss", type=str, default="mse")
+
+    args = parser.parse_args(sys.argv[1:])
+
+    name = args.name
+    bn = args.bn
+    epochs = args.epochs
+    batch = args.batch_size
+    lr = args.lr
+    ntype = args.ntype
+    loss = args.loss
+
+    import autoencodeSVJ.utils as utils
+    import autoencodeSVJ.models as models
+    import autoencodeSVJ.trainer as trainer
+    import glob
+    import os
+    import numpy as np
+
+    data,jet_tables = utils.get_training_data_jets("../../data/dijet_tight/*data.h5")
+    train, test = data.train_test_split(0.3)
+
+    train_norm, test_norm = data.norm(train, norm_type=ntype), data.norm(test, norm_type=ntype)
+
+    ae_skeleton = models.base_autoencoder()
+    ae_skeleton.add(7)
+    ae_skeleton.add(30)
+    ae_skeleton.add(bn, 'relu')
+    ae_skeleton.add(30)
+    ae_skeleton.add(7, "linear")
+    autoencoder = ae_skeleton.build()
+    encoder, decoder = autoencoder.layers[1:]
+
+    name = name + "_" + str(bn)
+    path = os.path.join("../data/training_runs/7jf/", name)
+    if os.path.exists(path):
+        raise AttributeError("Data at '' already exists!".format(path))
+
+    instance = trainer.trainer(path)
+
+    from keras import backend as K
+
+    def r_square(y_true, y_pred):
+        SS_res =  K.sum(K.square(y_true - y_pred)) 
+        SS_tot = K.sum(K.square(y_true - K.mean(y_true)))
+        return ( 1 - SS_res/(SS_tot + K.epsilon()))
+
+    # train, test = data.train_test_split(0.25)
+    # ntype="RobustScaler"
+    # train_norm, test_norm = data.norm(train, norm_type=ntype), data.norm(test, norm_type=ntype)
+
+    autoencoder = instance.train(
+        x_train=train_norm.data,
+        x_test=test_norm.data,
+        y_train=train_norm.data,
+        y_test=test_norm.data,
+        optimizer="adam",
+        loss=loss,
+        epochs=epochs,
+        model=autoencoder,
+        metrics=[r_square, "mae", "mse"],
+        force=False,
+        batch_size=batch,
+        use_callbacks=True,
+        learning_rate=lr,
+    )
+
+    instance.plot_metrics(fnmatch_criteria="*loss*", yscale="linear")
+    # instance.plot_metrics(fnmatch_criteria="*absolute*", yscale="linear")
+    # instance.plot_metrics(fnmatch_criteria="*r_square*", yscale="linear")
+
+    data_recon_norm = utils.data_table(autoencoder.predict(data.norm(norm_type=ntype).df.values), headers=train_norm.headers)
+    data_recon = data.inorm(data_recon_norm, norm_type=ntype)
+    data_recon.name = "all jet data (pred)"
+
+    data.plot(
+        data_recon,
+        normed=0, bins=35, alpha=1.0, figloc="upper right",
+        figsize=(25,15), fontsize=22, rng=[(-2,2), (-4,4), (0,2000), (0,210), (0,1), (0,0.8), (0, .10)]
+    )
+
+    encoder, decoder = autoencoder.layers[1:]
+    train_reps, test_reps = (
+        utils.data_table(encoder.predict(train_norm.data), name="train_reps"),
+        utils.data_table(encoder.predict(test_norm.data), name="test_reps")
+    )
+    train_reps.plot([test_reps], cols=5, figsize=(25,5), fontsize=22, normed=1, bins=40)
+    # data.head()
+    # args = get_args()
+    # print args
 
