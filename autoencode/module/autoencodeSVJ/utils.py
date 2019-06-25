@@ -4,7 +4,7 @@ from operator import mul
 import h5py
 import glob
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
+import sklearn.preprocessing as prep
 import pandas as pd
 import os
 import traceback
@@ -13,10 +13,10 @@ import glob
 import pandas as pd
 import prettytable
 from StringIO import StringIO
+from enum import Enum
 
 plt.rcParams['figure.figsize'] = (10,10)
 plt.rcParams.update({'font.size': 18})
-
 
 class logger:
     """
@@ -105,6 +105,13 @@ class logger:
 
 class data_table(logger):
     
+    class NORM_TYPES(Enum):
+        MinMaxScaler = 0
+        StandardScaler = 1
+        RobustScaler = 2
+
+    _RDICT_NORM_TYPES = dict(map(lambda x: (x.value, x.name), NORM_TYPES))
+
     TABLE_COUNT = 0
 
     """
@@ -117,7 +124,7 @@ class data_table(logger):
         data,
         headers=None,
         name=None,
-        verbose=1
+        verbose=1,
     ):
         logger.__init__(self, "data_table :: ", verbose)
         self.name = name or "untitled {}".format(data_table.TABLE_COUNT)    
@@ -128,43 +135,59 @@ class data_table(logger):
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
         assert len(self.data) > 0, "n samples must be greater than zero"
         self.df = pd.DataFrame(self.data, columns=self.headers)
-        self.scaler = MinMaxScaler((0,1))
-        self.scaler.fit(self.df)
+        self.scaler = None
 
     def norm(
         self,
         data=None,
-        rng=None,
+        norm_type=0,
+        **scaler_args
     ):
-        if rng is not None:
-            self.scaler = MinMaxScaler(rng)
-            self.scaler.fit(self.df)
+        if isinstance(norm_type, str):
+            norm_type = getattr(self.NORM_TYPES, norm_type)
+        elif isinstance(norm_type, int):
+            norm_type = getattr(self.NORM_TYPES, self._RDICT_NORM_TYPES[norm_type])
+        
+        assert isinstance(norm_type, self.NORM_TYPES)
+
+        self.scaler = getattr(prep, norm_type.name)(**scaler_args)
+        self.scaler.fit(self.df)
         
         if data is None:
             data = self
         
         assert isinstance(data, data_table), "data must be data_table type"
 
-        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name="'{}' normed to '{}' on range '{}'".format(data.name,self.name,self.scaler.feature_range))
-        ret.scaler = self.scaler
+        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name="'{}' normed to '{}'".format(data.name,self.name))
         return ret
 
     def inorm(
         self,
         data=None, 
         rng=None,
+        norm_type=0,
+        **scaler_args
     ):
-        if rng is not None:
-            self.scaler = MinMaxScaler(rng)
-            self.scaler.fit(self.df)
 
+        if rng is None:
+            rng = (0,1)
+
+        if isinstance(norm_type, str):
+            norm_type = getattr(self.NORM_TYPES, norm_type)
+        elif isinstance(norm_type, int):
+            norm_type = getattr(self.NORM_TYPES, self._RDICT_NORM_TYPES[norm_type])
+        
+        assert isinstance(norm_type, self.NORM_TYPES)
+
+        self.scaler = getattr(prep, norm_type.name)(rng, **scaler_args)
+        self.scaler.fit(self.df)
+        
         if data is None:
             data = self
-
+        
         assert isinstance(data, data_table), "data must be data_table type"
 
-        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name="'{}' inv_normed to '{}' on range '{}'".format(data.name,self.name,self.scaler.feature_range))
-        ret.scaler = self.scaler
+        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name="'{}' inv_normed to '{}'".format(data.name,self.name))
         return ret
         
     def __getattr__(
@@ -203,12 +226,11 @@ class data_table(logger):
         
         return data_table(t1, headers=match_list, name=self.name), data_table(t2, headers=other, name=self.name)
         
-
-
     def train_test_split(
         self,
         test_fraction=0.25,
         random_state=None,
+        shuffle=True
     ):
         dtrain, dtest = train_test_split(self, test_size=test_fraction, random_state=random_state)
         return (data_table(np.asarray(dtrain), np.asarray(dtrain.columns), "train"),
@@ -296,6 +318,11 @@ class data_table(logger):
         n
     ):
         return n/cols + bool(n%cols)
+
+    def split_to_jets(
+        self,
+    ):
+        return split_to_jets(self)
 
 class data_loader(logger):
     """
@@ -420,7 +447,7 @@ class data_loader(logger):
         self,
         name=None,
         value_keys="*data",
-        header_keys="*names",
+        header_keys="*names"
     ):
         values, vdict = self.get_dataset(value_keys)
         headers, hdict = None if header_keys is None else self.get_dataset(header_keys) 
@@ -499,10 +526,9 @@ def smartpath(path):
         return path
     return os.path.abspath(path)
 
-def get_cutflow_table(paths):
-    if isinstance(paths, str):
-        paths = [paths]
+def get_cutflow_table(glob_path):
         
+    paths = glob.glob(glob_path)
     assert len(paths) > 0, "must have SOME paths"
     
     values = []
@@ -511,3 +537,64 @@ def get_cutflow_table(paths):
         with open(path) as f:
             values_comp, keys_comp = map(lambda x: x.strip('\n').split(','), f.readlines())
             values_comp = map(int, values_comp)
+
+def get_training_data(glob_path):
+    paths = glob.glob(glob_path)
+    d = data_loader("main sample")
+    for p in paths:
+        d.add_sample(p)
+    return d.make_table()
+
+def get_training_data_jets(glob_path):
+    return split_to_jets(get_training_data(glob_path))
+
+def get_subheaders(data):
+    classes = {}
+    i = 0
+    n = 0
+    h = data.headers
+    while i < len(h):
+        if str(n) not in h[i]:
+            n += 1
+            continue
+        rep = h[i]
+        if "j{}".format(n) in rep:
+            rep = rep.replace("j{}".format(n), "jet")
+        elif "jet{}".format(n) in rep:
+            rep = rep.replace("jet{}".format(n), "jet")
+        if n not in classes:
+            classes[n] = []
+        classes[n].append(rep)
+        i += 1
+    return classes
+
+def split_to_jets(data):
+    """
+    given a data table with values for the n leading jets, split into one data 
+    table for all jets.
+    """
+    headers = get_subheaders(data)
+    assert len(set().union(*headers.values())) == len(headers.values()[0])
+    jets = []
+    next = data
+    for h in headers:
+        to_add, next = next.split_by_column_names("jet{}*".format(h))
+        if to_add.shape[1] == 0:
+            to_add, next = next.split_by_column_names("j{}*".format(h))
+        jets.append(
+            data_table(
+                data=np.asarray(to_add),
+                headers=headers[h],
+                name="jet {}".format(h)
+            )
+        )
+
+    full = data_table(
+        data=np.vstack([jt.df for jt in jets]),
+        headers=jets[0].headers,
+        name="all jet data"
+    )
+    return full, jets
+
+def log_uniform(low, high, size=None, base=10.):    
+    return float(base)**(np.random.uniform(np.log(low)/np.log(base), np.log(high)/np.log(base), size))

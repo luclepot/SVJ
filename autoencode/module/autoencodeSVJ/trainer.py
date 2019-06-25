@@ -1,5 +1,4 @@
-import numpy as np 
-from keras.layers import Input, Dense
+import numpy as np
 from keras.models import Model, model_from_json
 from collections import OrderedDict as odict
 import os
@@ -9,6 +8,8 @@ from utils import logger, smartpath
 import h5py
 import matplotlib.pyplot as plt
 import glob
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau, TerminateOnNaN
+import keras.optimizers
 
 plt.rcParams.update({'font.size': 18})
 plt.rcParams['figure.figsize'] = (10,10)
@@ -95,7 +96,7 @@ class h5_element_wrapper(logger):
     ):
         return getattr(self.rep, attr)
 
-class training_skeleton(logger):
+class trainer(logger):
     """
     Wraps training/testing/evaluation activity for a model in an h5 file saver, which keeps all
     training inputs/outputs, model performance stats, model weights, etc.
@@ -128,7 +129,7 @@ class training_skeleton(logger):
 
         self.file = h5py.File(self.config_file)
 
-        self._lock_file(self.config_file)
+        # self._lock_file(self.config_file)
 
         try:
             file_attrs = {
@@ -148,7 +149,7 @@ class training_skeleton(logger):
                         
         except Exception as e:
             self.error(traceback.format_exc())
-            self._throw(e, unlock=True)
+            self._throw(e, unlock=False)
 
         cdict = self.config.copy()
         tdict = self.training.copy()
@@ -188,7 +189,6 @@ class training_skeleton(logger):
 
     def close(
         self,
-        unlock=False,
     ):
         try:
             if self.file is not None:
@@ -204,7 +204,7 @@ class training_skeleton(logger):
     def __del__(
         self,
     ):
-        self.close(unlock=True)
+        self.close()
 
     ### LOCKING
 
@@ -287,7 +287,17 @@ class training_skeleton(logger):
         loss=None,
         optimizer=None,
         verbose=1,
+        use_callbacks=False,
+        learning_rate=0.01,
     ):
+        callbacks = None
+        if use_callbacks:
+            callbacks = [
+                EarlyStopping(monitor='val_loss', patience=10, verbose=0),
+                ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=0),
+                TerminateOnNaN()
+            ]
+        
         w_path = self.config_file.replace(".h5", "_weights.h5")
 
         model = self.load_model(model, force)
@@ -309,7 +319,7 @@ class training_skeleton(logger):
             else:
                 metrics = []
 
-        model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+        model.compile(optimizer=getattr(keras.optimizers, optimizer)(lr=learning_rate), loss=loss, metrics=metrics)
 
         start = datetime.now()
 
@@ -341,39 +351,61 @@ class training_skeleton(logger):
 
         history = odict()
 
-        try:
-            for epoch in range(epochs):
-                self.log("TRAINING EPOCH {}/{}".format(master_epoch_n, finished_epoch_n))
-                nhistory = model.fit(
-                    x=x_train,
-                    y=y_train,
-                    steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
-                    validation_steps=int(np.ceil(len(x_test)/batch_size)),
-                    validation_data=[x_test, y_test],
-                    initial_epoch=master_epoch_n,
-                    epochs=master_epoch_n + 1,
-                    verbose=verbose,
-                ).history
+        if not use_callbacks:
+            try:
+                for epoch in range(epochs):
+                    self.log("TRAINING EPOCH {}/{}".format(master_epoch_n, finished_epoch_n))
+                    nhistory = model.fit(
+                        x=x_train,
+                        y=y_train,
+                        steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
+                        validation_steps=int(np.ceil(len(x_test)/batch_size)),
+                        validation_data=[x_test, y_test],
+                        initial_epoch=master_epoch_n,
+                        epochs=master_epoch_n + 1,
+                        verbose=verbose,
+                        callbacks=callbacks
+                    ).history
 
-                if epoch == 0:
+                    if epoch == 0:
+                        for metric in nhistory:
+                            history[metric] = []
+
                     for metric in nhistory:
-                        history[metric] = []
+                        history[metric].append([master_epoch_n, nhistory[metric][0]])
 
-                for metric in nhistory:
-                    history[metric].append([master_epoch_n, nhistory[metric][0]])
+                    master_epoch_n += 1
 
-                master_epoch_n += 1
+            except:
+                self.error(traceback.format_exc())
+                if all([len(v) == 0 for v in history]):
+                    self._throw("quitting")
 
-        except:
-            self.error(traceback.format_exc())
-            if all([len(v) == 0 for v in history]):
-                self._throw("quitting")
+            if len(history.values()) == 0:
+                n_epochs_finished = 0
+            else:
+                n_epochs_finished = min(map(len, history.values()))
 
-        if len(history.values()) == 0:
-            n_epochs_finished = 0
         else:
-            n_epochs_finished = min(map(len, history.values()))
+            nhistory = model.fit(
+                x=x_train,
+                y=y_train,
+                steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
+                validation_steps=int(np.ceil(len(x_test)/batch_size)),
+                validation_data=[x_test, y_test],
+                initial_epoch=master_epoch_n,
+                epochs=master_epoch_n + epochs,
+                verbose=verbose,
+                callbacks=callbacks
+            ).history
 
+            for metric in nhistory:
+                history[metric] = []
+                for i,value in enumerate(nhistory[metric]):
+                    history[metric].append([master_epoch_n + i, value])
+            master_epoch_n += epochs
+            n_epochs_finished = min(map(len, history.values()))
+        print "EPOCH N:", master_epoch_n, epochs
         self.log("")
         self.log("trained {} epochs!".format(n_epochs_finished))
         self.log("")
@@ -383,12 +415,12 @@ class training_skeleton(logger):
 
         for key,value in zip(hkeys, hvalues):
             if hasattr(self, key):
-                # print(getattr(self, key))
-                # print(np.concatenate([getattr(self, key), value]))
+                #print(getattr(self, key))
+                #print(np.concatenate([getattr(self, key).rep, value]))
                 getattr(self, key).update(np.concatenate([getattr(self, key).rep, value]))
             else:
-                # print(getattr(self, key))
-                # print(np.concatenate([getattr(self, key), value]))
+                #print(getattr(self, key))
+                # print(np.concatenate([getattr(self, key).rep, value]))
                 setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
                 # setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
                 getattr(self, key).update(np.asarray(value))
@@ -400,6 +432,9 @@ class training_skeleton(logger):
         finished_epoch_n = sum(previous_epochs)
 
         end = datetime.now()
+
+        print "finished epoch N", finished_epoch_n
+        print "prev", previous_epochs
 
         model.save_weights(w_path)
 
@@ -414,7 +449,7 @@ class training_skeleton(logger):
         tdict['time'] = str(end - start)
         tdict['epochs'] = epochs
         tdict['batch_size'] = str(eval(tdict['batch_size']) + [batch_size,]*n_epochs_finished)
-        tdict['epoch_splits'] = str(eval(tdict['epoch_splits']) + previous_epochs)
+        tdict['epoch_splits'] = str(previous_epochs)
         self.training.update(tdict)
 
         # return odel 
@@ -467,7 +502,7 @@ class training_skeleton(logger):
             splits = [0,] + list(np.where(np.diff(metric[:,0].astype(int)) > 1)[0]) + [len(metric[:,0]),]
             plots.append([])
             for i in range(len(splits[:-1])):
-                plots[mn].append(metric[splits[i] + 1:splits[i+1] + 1,:])
+                plots[mn].append(metric[splits[i] + 1 : splits[i+1] + 1 , :])
 
         # plot em'
 
@@ -485,182 +520,48 @@ class training_skeleton(logger):
 
         handles, labels = plt.gca().get_legend_handles_labels()
         by_label = odict(zip(map(str, labels), handles))
+        plt.xticks()
         plt.legend(by_label.values(), by_label.keys())
         plt.tight_layout()
         plt.show()
 
-class autoencoder_skeleton(logger):
-
-    def __init__(
-        self,
-        name="autoencoder",
-        verbose=True,
-    ):
-        logger.__init__(self)
-        self._LOG_PREFIX = "autoencoder_skeleton :: "
-        self.VERBOSE = verbose
-        self.name = name
-        self.layers = []
-
-    def __str__(
-        self,
-    ):
-        s = self.log('Current Structure:', True)
-        for layer in self.layers:
-            s += self.log("{0}: {1} nodes {2}".format(layer[0], layer[1], layer[2:]), True)
-        return s
-
-    def __repr__(
-        self,
-    ):
-        return str(self)
-
     def remove(
         self,
-        index=None,
+        sure=False,
     ):
-        if index is None:
-            index = -1
-        self.layers.pop(index)
+        if not sure:
+            self.error("NOT DELETING: run again with keyword 'sure=True' to remove!")
+        else:
+            for f in [self.config_file, self.config_file.replace(".h5", "_weights.h5")]:
+                if os.path.exists(f):
+                    os.remove(f)
+            self.log("removed associated data files for self!")
 
-    def add(
-        self,
-        nodes,
-        activation='relu',
-        reg=None,
-        name=None,
-        bias_init='zeros',
-        kernel_init='glorot_uniform'
-    ):
-        if name is None:
-            name = "layer_{0}".format(len(self.layers) + 1)
-        
-        self.layers.append([name, nodes, activation, reg, bias_init, kernel_init])
+def train_unique_instance(
+    name,
+    model,
+    x_train,
+    x_test,
+    show_plots=True,
+    **kwargs
+):
+    if name.endswith(".h5"):
+        name = name.replace(".h5", "")
+    npath = lambda p : p + ".h5"
+    if os.path.exists(npath(name)):
+        i = 0
+        while os.path.exists(npath(name + "_copy{}".format(i))):
+            i += 1
+        name = npath(name + "_copy{}".format(i))
 
-    def build(
-        self,
-        encoding_index=None,
-        optimizer='adam',
-        loss='mse',
-        metrics=['accuracy']
-    ):
+    print "using name {}".format(name)
+    t = trainer(name)
+    t.train(
+        model=model,
+        **kwargs
+    )
 
-        assert len(self.layers) >= 3, "need to have input, bottleneck, output!"
+    if show_plots:
+        t.plot_metrics("*")
 
-        if encoding_index is None:
-            encoding_index = self._find_bottleneck(self.layers[1:-1]) + 1
-
-        # grab individual layers
-        input_layer = self.layers[0]
-        inner_interms = self.layers[1:encoding_index]
-        encoded_layer = self.layers[encoding_index]
-        outer_interms = self.layers[encoding_index + 1:-1]
-        output_layer = self.layers[-1]
-
-        # get necessary keras layers
-        inputs = self._input(input_layer)
-        encoded = self._add_layer(encoded_layer, self._add_layers(inner_interms, inputs))
-        encoded_input = self._input(encoded_layer)
-        outputs = self._add_layer(output_layer, self._add_layers(outer_interms, encoded_input))
-
-        # make keras models for encoder, decoder, and autoencoder
-        encoder = Model(inputs, encoded, name='encoder')
-        decoder = Model(encoded_input, outputs, name='decoder')
-        autoencoder = Model(inputs, decoder(encoder(inputs)), name='autoencoder')
-
-        autoencoder.compile(optimizer, loss, metrics=metrics)
-
-        return autoencoder
-
-    # def fit(
-    #     self,
-    #     x,
-    #     y,
-    #     validation_data,
-    #     batch_size=10,
-    #     *args,
-    #     **kwargs
-    # ):
-
-    #     if self.autoencoder is None: 
-    #         raise AttributeError, "Model not yet built!"
-
-    #     try:
-    #         self.history = self.autoencoder.fit(
-    #             x=x,
-    #             y=y,
-    #             steps_per_epoch=int(np.ceil(len(x)/batch_size)),
-    #             validation_steps=int(np.ceil(len(validation_data[0])/batch_size)),
-    #             validation_data=validation_data,
-    #             *args,
-    #             **kwargs
-    #         )
-
-    #     except KeyboardInterrupt:
-    #         return None
-
-    #     return self.history
-
-    # def save(
-    #     self,
-    #     path,
-    # ):
-    #     path = smartpath(path)
-    #     path = smartpath(path)
-    #     if not os.path.exists(path):
-    #         os.mkdirs(path)
-    #     to_save = ['autoencoder', 'encoder', 'decoder']
-    #     filenames = [os.path.join(path, model + '.h5') for model in to_save]
-    #     for filename,typename in zip(filenames, to_save):
-    #         if os.path.exists(smartpath(filename)):
-    #             raise AttributeError, "Model already exists at file '{}'!!".format(filename)
-    #         getattr(self, typename).save(filename)
-
-    # def load(
-    #     self,
-    #     path,
-    # ):
-    #     to_load = ['autoencoder', 'encoder', 'decoder']
-    #     filenames = [os.path.join(path, model + '.h5') for model in to_load]
-    #     for filename,typename in zip(filenames, to_load):
-    #         if not os.path.exists(smartpath(filename)):
-    #             raise AttributeError, "Model does not exist at file '{}'!!".format(filename)
-    #         setattr(self, typename, keras.models.load_model(filename))
-
-    def _find_bottleneck(
-        self,
-        layers,
-    ):
-        imin = 0
-        lmin = layers[0][1]
-        for i,layer in enumerate(layers):
-            if layer[1] < lmin:
-                imin = i
-                lmin = layer[1]
-        return imin
-
-    def _add_layers(
-        self,
-        layers,
-        base_layer,
-    ):
-        lnext = base_layer
-        for layer in layers:
-            temp = lnext
-            lnext = Dense(layer[1], activation=layer[2], activity_regularizer=layer[3], name=layer[0], bias_initializer=layer[4], kernel_initializer=layer[5])(temp)
-        return lnext
-
-    def _add_layer(
-        self,
-        layer,
-        base_layer,
-    ):
-        return Dense(layer[1], activation=layer[2], activity_regularizer=layer[3], name=layer[0], bias_initializer=layer[4], kernel_initializer=layer[5])(base_layer)
-
-    def _input(
-        self,
-        layer,
-    ):
-        return Input(shape=(layer[1],), name=layer[0])
-
-    # return locals()
+    return t
