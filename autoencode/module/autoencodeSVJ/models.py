@@ -74,6 +74,8 @@ class robust_deep(logger):
         if self.S is None:
             self.S = np.zeros(x.shape)
 
+        self.log("{:.2f} % OUTLIERS".format(100.*float(len(np.where(np.linalg.norm(self.S, axis=1) > 0)[0]))/float(len(self.S))))
+
         self.L = x - self.S
 
         history = self.AE.fit(
@@ -82,7 +84,7 @@ class robust_deep(logger):
             **kwargs
         )
 
-        self.L = self.predict(self.L)
+        self.L = self.AE.predict(self.L)
         self.S = robust_deep.l21shrink(self.lambda_, (x - self.L).T).T
 
         return history
@@ -90,7 +92,7 @@ class robust_deep(logger):
     def predict(
         self,
         x
-    ):
+    ):  
         return self.AE.predict(x)
 
     def to_json(

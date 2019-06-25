@@ -140,13 +140,9 @@ class data_table(logger):
     def norm(
         self,
         data=None,
-        rng=None,
         norm_type=0,
         **scaler_args
     ):
-        if rng is None:
-            rng = (0,1)
-
         if isinstance(norm_type, str):
             norm_type = getattr(self.NORM_TYPES, norm_type)
         elif isinstance(norm_type, int):
@@ -154,7 +150,7 @@ class data_table(logger):
         
         assert isinstance(norm_type, self.NORM_TYPES)
 
-        self.scaler = getattr(prep, norm_type.name)(rng, **scaler_args)
+        self.scaler = getattr(prep, norm_type.name)(**scaler_args)
         self.scaler.fit(self.df)
         
         if data is None:
@@ -600,5 +596,5 @@ def split_to_jets(data):
     )
     return full, jets
 
-def log_uniform(low, high, size=None, base=10.):
+def log_uniform(low, high, size=None, base=10.):    
     return float(base)**(np.random.uniform(np.log(low)/np.log(base), np.log(high)/np.log(base), size))
