@@ -601,4 +601,3 @@ def split_to_jets(data):
     return full, jets
 
 def log_uniform(low, high, size=None, base=10.):
-    return float(base)**(np.random.uniform(np.log(low)/np.log(base), np.log(high)/np.log(base), size))

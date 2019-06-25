@@ -1,5 +1,6 @@
 import keras 
 from utils import logger
+import numpy as np
 
 def shallow(bn, n_features, central_activation='relu'):
 
@@ -31,6 +32,119 @@ def deep(bn, n_features, central_activation='relu', depth=100, intermediate_laye
     model.add(n_features, 'linear')
 
     return model.build(optimizer='adam', loss='mse')
+
+class robust_deep(logger):
+    """
+    quick keras implementation of robust deep autoencoder, found at
+    https://dl.acm.org/citation.cfm?id=3098052
+    """
+
+    def __init__(
+        self,
+        base_ae,
+        lambda_,
+        name="robust deep autoencoder",
+        verbose=True,
+    ):
+        if isinstance(base_ae, base_autoencoder):
+            self.AE = base_ae.build()
+        elif hasattr(base_ae, "compile"):
+            self.AE = base_ae
+        else:
+            raise AttributeError, "'base_ae' parameter must be keras model or base_autoencoder instance!"
+        logger.__init__(self, VERBOSE=verbose, LOG_PREFIX="robust_deep_ae :: ")
+        self.L, self.S = None, None
+        self.lambda_ = lambda_
+
+    def compile(
+        self,
+        *args,
+        **kwargs
+    ):
+        return self.AE.compile(*args, **kwargs)
+
+    def fit(
+        self,
+        x,
+        *args,
+        **kwargs
+    ):
+        if self.L is None:
+            self.L = np.zeros(x.shape)
+        if self.S is None:
+            self.S = np.zeros(x.shape)
+
+        self.L = x - self.S
+
+        history = self.AE.fit(
+            self.L,
+            *args,
+            **kwargs
+        )
+
+        self.L = self.predict(self.L)
+        self.S = robust_deep.l21shrink(self.lambda_, (x - self.L).T).T
+
+        return history
+
+    def predict(
+        self,
+        x
+    ):
+        return self.AE.predict(x)
+
+    def to_json(
+        self,
+    ):
+        return self.AE.to_json()
+
+    def save_weights(
+        self,
+        *args,
+        **kwargs
+    ):
+        return self.AE.save_weights(*args, **kwargs)
+    
+    def load_weights(
+        self,
+        *args,
+        **kwargs
+    ):
+        return self.AE.load_weights(*args, **kwargs)
+
+    @staticmethod
+    def l21shrink(
+        eps,
+        x,
+    ):
+        ret = x.copy()
+        normed = np.linalg.norm(x, ord=2, axis=0)
+        # loop over features
+        for i in range(x.shape[1]):
+            # if norm for this feature is greater than eps...
+            if normed[i] > eps:
+                # loop across samples
+                for j in range(x.shape[0]):
+                    ret[j,i] = x[j,i] - eps*x[j,i]/normed[i]
+            else:
+                ret[:,i] = 0.
+        return ret
+
+    @staticmethod
+    def l1shrink(
+        eps,
+        x
+    ):
+
+        ret = np.zeros(x.shape)
+        for i,elt in enumerate(x):
+            if elt > eps:
+                ret[i] = elt - eps
+            elif elt < -eps:
+                ret[i] = elt + eps
+            else:
+                ret[i] = 0
+        return ret
 
 class base_autoencoder(logger):
 
