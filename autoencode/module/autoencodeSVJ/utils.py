@@ -129,8 +129,16 @@ class data_table(logger):
         logger.__init__(self, "data_table :: ", verbose)
         self.name = name or "untitled {}".format(data_table.TABLE_COUNT)    
         data_table.TABLE_COUNT += 1
-        self.data = data
-        self.headers = headers if headers is not None else ["dist " + str(i + 1) for i in range(self.data.shape[1])]
+        if headers is not None:
+            self.headers = headers
+        elif isinstance(data, pd.DataFrame):
+            self.headers = data.columns 
+        elif isinstance(data, data_table):
+            data = data.data
+            self.headers = data.headers
+        else:
+            self.headers = ["dist " + str(i + 1) for i in range(self.data.shape[1])]
+        self.data = data        
         assert len(self.data.shape) == 2, "data must be matrix!"
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
         assert len(self.data) > 0, "n samples must be greater than zero"
@@ -240,14 +248,14 @@ class data_table(logger):
         self,
         others=[],
         values="*",
-        bins=15,
+        bins=32,
         rng=None,
         cols=4,
         ticksize=8,
-        fontsize=10,
+        fontsize=25,
         normed=0,
         figloc="upper right",
-        figsize=(10,10),
+        figsize=(30,15),
         alpha=0.7,
         xscale="linear",
         yscale="linear"
