@@ -137,7 +137,7 @@ class data_table(logger):
             data = data.data
             self.headers = data.headers
         else:
-            self.headers = ["dist " + str(i + 1) for i in range(self.data.shape[1])]
+            self.headers = ["dist " + str(i + 1) for i in range(data.shape[1])]
         self.data = data        
         assert len(self.data.shape) == 2, "data must be matrix!"
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
