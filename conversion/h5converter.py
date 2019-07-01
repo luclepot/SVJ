@@ -61,6 +61,13 @@ class Converter:
             'ChargedFraction',
             'PTD',
             'Axis2',
+            'Flavor',
+            'Energy',
+            'DeltaEta',
+            'DeltaPhi',
+            'MET',
+            'METEta',
+            'METPhi',
         ]
 
         ## ADD MET
@@ -217,7 +224,7 @@ class Converter:
         tree,
         track_index,
     ):
-        j1,j2 = tree.Jet[0].P4(), tree.Jet[1].P4()
+        # j1,j2 = tree.Jet[0].P4(), tree.Jet[1].P4()
         
         ## leading 2 jets
         for i in range(self.n_jets):
@@ -233,6 +240,14 @@ class Converter:
         
             for value in self.jets_axis2_pt2(j, tree, track_index[i]):
                 yield value
+
+            yield tree.Jet[i].Flavor
+            yield j.E()
+            yield tree.Jet[i].DeltaEta
+            yield tree.Jet[i].DeltaPhi
+            yield tree.MissingET[0].MET
+            yield tree.MissingET[0].Eta
+            yield tree.MissingET[0].Phi
 
     def jets_axis2_pt2(
         self,
@@ -331,5 +346,5 @@ if __name__ == "__main__":
             print track_index.shape
         except:
             print "dang"
-            core = Converter("../data/hlfSVJ", "../data/hlfSVJ/0.0_filelist.txt", "../data/hlfSVJ/0.0_selection.txt","0.0")
+            core = Converter("../data/", "../data/tightSVJ/0.0_filelist.txt", "../data/tightSVJ/0.0_selection.txt","0.0")
             ret = core.convert((0, 2000))
