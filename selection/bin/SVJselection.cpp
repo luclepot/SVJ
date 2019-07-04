@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
             double Mjj2 = Mjj*Mjj;
             double ptjj = Vjj.Pt();
             double ptjj2 = ptjj*ptjj;
-            double ptMet = Vjj.Px()*(metFull_Px + Vjj.Py()*metFull_Py);
+            double ptMet = Vjj.Px()*metFull_Px + Vjj.Py()*metFull_Py;
             double MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*(*metFull_Pt) - ptMet)); // SAVE
 
             // leading jet etas both meet eta veto
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
 
             // ratio between calculated mt2 of dijet system and missing momentum is not negligible
             core.Cut(
-                (*metFull_Pt) / MT2 > 0.025, //0.15,
+                (*metFull_Pt) / MT2 > 0.15,
                 Cuts::metRatio
                 );
 
@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
 
             // tighter MET ratio
             core.Cut(
-                (*metFull_Pt) / MT2 > 0.05, //0.25,
+                (*metFull_Pt) / MT2 > 0.25,
                 Cuts::metRatioTight
                 );
                  
