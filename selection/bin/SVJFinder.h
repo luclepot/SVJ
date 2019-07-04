@@ -56,14 +56,14 @@ namespace Cuts {
     };
 
     std::map<CutType, string> CutName {
-        {leptonCounts, "Lepton Veto"},
+        {leptonCounts, "0 Passing Leptons"},
         {jetCounts, "n Jets > 1"},
-        {jetEtas, "jet Eta veto"},
-        {jetDeltaEtas, "DeltaEta veto"},
+        {jetEtas, "abs jet Etas < 2.4"},
+        {jetDeltaEtas, "abs DeltaEta < 1.5"},
         {metRatio,"MET/M_T > 0.15"},
-        {jetPt, "Jet PT veto"},
+        {jetPt, "Jet PT > 200"},
         {jetDiJet, "Dijet veto"},
-        {metValue, "loose MET cut"},
+        {metValue, "M_T > 1500"},
         {metRatioTight, "MET/M_T > 0.25"},
         {selection, "final selection"}
     };
@@ -366,7 +366,7 @@ public:
         }
 
         void PrintCutFlow() {
-            int fn = 15;
+            int fn = 20;
             int ns = 6 + int(log10(CutFlow[0]));
             int n = 10;
 
