@@ -131,14 +131,18 @@ class data_table(logger):
         data_table.TABLE_COUNT += 1
         if headers is not None:
             self.headers = headers
+            self.data = data
         elif isinstance(data, pd.DataFrame):
             self.headers = data.columns 
+            self.data = data.values
         elif isinstance(data, data_table):
-            data = data.data
             self.headers = data.headers
+            self.data = data.df.values
+            self.name = data.name
         else:
             self.headers = ["dist " + str(i + 1) for i in range(data.shape[1])]
-        self.data = data        
+            self.data = data
+
         assert len(self.data.shape) == 2, "data must be matrix!"
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
         assert len(self.data) > 0, "n samples must be greater than zero"
@@ -252,13 +256,14 @@ class data_table(logger):
         rng=None,
         cols=4,
         ticksize=8,
-        fontsize=25,
+        fontsize=10,
         normed=0,
-        figloc="upper right",
-        figsize=(30,15),
+        figloc="bottom right",
+        figsize=(16,7),
         alpha=0.7,
         xscale="linear",
-        yscale="linear"
+        yscale="linear",
+        histtype='step'
     ):
         if isinstance(values, str):
             values = [key for key in self.headers if glob.fnmatch.fnmatch(key, values)]
@@ -300,10 +305,10 @@ class data_table(logger):
         for i in range(n):
             ax = plt.subplot(rows, cols, i + 1)
             # weights = np.ones_like(plot_data[i])/float(len(plot_data[i]))
-            ax.hist(plot_data[i], bins=bins, range=rng[i], histtype='step', normed=normed, label=self.name, weights=weights, alpha=alpha)
+            ax.hist(plot_data[i], bins=bins, range=rng[i], histtype=histtype, normed=normed, label=self.name, weights=weights, alpha=alpha)
             for j in range(len(others)):
                 # weights = np.ones_like(plot_others[j][i])/float(len(plot_others[j][i]))
-                ax.hist(plot_others[j][i], bins=bins, range=rng[i], histtype='step', label=others[j].name, normed=normed, weights=weights, alpha=alpha)
+                ax.hist(plot_others[j][i], bins=bins, range=rng[i], histtype=histtype, label=others[j].name, normed=normed, weights=weights, alpha=alpha)
 
             plt.xlabel(plot_data[i].name + " {}-scaled".format(xscale), fontsize=fontsize)
             plt.ylabel("{}-scaled".format(yscale), fontsize=fontsize)
@@ -320,6 +325,42 @@ class data_table(logger):
         plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01)
         plt.show()
     
+    def cdrop(
+        self,
+        globstr,
+        inplace=False,
+    ):
+        to_drop = list(parse_globlist(globstr, list(self.df.columns)))
+        modify = None
+        if inplace:
+            modify = self
+        else:
+            ret = data_table(self)
+            modify = ret
+        for d in to_drop:
+            modify.df.drop(d, axis=1, inplace=True)
+        modify.headers = list(modify.df.columns)
+        return modify
+
+    def cfilter(
+        self, 
+        globstr,
+        inplace=False,
+    ):
+        to_keep = parse_globlist(globstr, list(self.df.columns))
+        to_drop = set(self.headers).difference(to_keep)
+        
+        modify = None
+        if inplace:
+            modify = self
+        else:
+            ret = data_table(self)
+            modify = ret
+        for d in to_drop:
+            modify.df.drop(d, axis=1, inplace=True)
+        modify.headers = list(modify.df.columns)
+        return modify
+
     def _rows(
         self,
         cols,
@@ -528,7 +569,44 @@ class data_loader(logger):
             else:
                 assert d[key].shape[1:] == sfile[key].shape[1:]
                 d[key] = np.concatenate([d[key], sfile[key]])
+
+def parse_globlist(glob_list, match_list):
+    if not hasattr(glob_list, "__iter__") or isinstance(glob_list, str):
+        glob_list = [glob_list]
     
+    for i,x in enumerate(glob_list):
+        if isinstance(x, int):
+            glob_list[i] = match_list[x]
+        
+    assert all([isinstance(c, str) for c in glob_list])
+
+    match = set()
+    for g in glob_list:
+        match.update(glob.fnmatch.filter(match_list, g))
+
+    return match
+
+delphes_jet_tags_dict = {
+    1: "down",
+    2: "up",
+    3: "strange",
+    4: "charm",
+    5: "bottom",
+    6: "top",
+    21: "gluon",
+    9: "gluon"
+}
+
+def split_table_by_column(column_name, df, tag_names=None):
+    tagged = []
+    unique = set(df.loc[:,column_name].values)
+    if tag_names is None:
+        tag_names = dict([(u, str(u)) for u in unique])
+    gb = df.groupby(column_name)
+    for region, df_region in gb:
+        tagged.append(data_table(df_region.drop(column_name, axis=1), name=tag_names[region]))
+    return tagged
+
 def smartpath(path):
     if path.startswith("~/"):
         return path
@@ -604,5 +682,5 @@ def split_to_jets(data):
     )
     return full, jets
 
-def log_uniform(low, high, size=None, base=10.):    
+def log_uniform(low, high, size=None, base=10.):
     return float(base)**(np.random.uniform(np.log(low)/np.log(base), np.log(high)/np.log(base), size))
