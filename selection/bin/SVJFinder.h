@@ -60,11 +60,11 @@ namespace Cuts {
         {jetCounts, "n Jets > 1"},
         {jetEtas, "jet Eta veto"},
         {jetDeltaEtas, "DeltaEta veto"},
-        {metRatio,"MET/M_T > 0.025"},
+        {metRatio,"MET/M_T > 0.15"},
         {jetPt, "Jet PT veto"},
         {jetDiJet, "Dijet veto"},
         {metValue, "loose MET cut"},
-        {metRatioTight, "MET/M_T > 0.05"},
+        {metRatioTight, "MET/M_T > 0.25"},
         {selection, "final selection"}
     };
 };
