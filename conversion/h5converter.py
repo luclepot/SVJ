@@ -16,6 +16,7 @@ rt.gInterpreter.Declare('#include "{}/include/classes/DelphesClasses.h"'.format(
 rt.gInterpreter.Declare('#include "{}/include/classes/DelphesFactory.h"'.format(DELPHES_DIR))
 rt.gInterpreter.Declare('#include "{}/include/ExRootAnalysis/ExRootTreeReader.h"'.format(DELPHES_DIR))
 
+
 class Converter:
 
     LOGMSG = "Converter :: "
@@ -68,6 +69,7 @@ class Converter:
             'MET',
             'METEta',
             'METPhi',
+            # 'MT',
         ]
 
         ## ADD MET
@@ -126,7 +128,8 @@ class Converter:
 
     def convert(
         self,
-        rng=(-1,-1)
+        rng=(-1,-1),
+        return_debug_tree=False,
     ):
         rng = list(rng)
 
@@ -192,6 +195,9 @@ class Converter:
 
             self.event_features[count] = np.fromiter(self.get_jet_features(tree, track_index), float, count=len(self.event_feature_names))
             
+            if return_debug_tree:
+                return tree, self.event_features[count]
+
         if self.save_constituents:
             return self.jet_constituents, self.event_features
 
@@ -347,4 +353,4 @@ if __name__ == "__main__":
         except:
             print "dang"
             core = Converter("../data/", "../data/tightSVJ/0.0_filelist.txt", "../data/tightSVJ/0.0_selection.txt","0.0")
-            ret = core.convert((0, 2000))
+            ret = core.convert((0, 2000), return_debug_tree=True)
