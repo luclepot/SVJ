@@ -14,6 +14,7 @@ import pandas as pd
 import prettytable
 from StringIO import StringIO
 from enum import Enum
+import subprocess
 
 plt.rcParams['figure.figsize'] = (10,10)
 plt.rcParams.update({'font.size': 18})
@@ -258,7 +259,7 @@ class data_table(logger):
         ticksize=8,
         fontsize=10,
         normed=0,
-        figloc="bottom right",
+        figloc="lower right",
         figsize=(16,7),
         alpha=0.7,
         xscale="linear",
@@ -349,7 +350,7 @@ class data_table(logger):
     ):
         to_keep = parse_globlist(globstr, list(self.df.columns))
         to_drop = set(self.headers).difference(to_keep)
-        
+
         modify = None
         if inplace:
             modify = self
@@ -597,15 +598,24 @@ delphes_jet_tags_dict = {
     9: "gluon"
 }
 
-def split_table_by_column(column_name, df, tag_names=None):
+def split_table_by_column(column_name, df, tag_names=None, keep_split_column=False, df_to_write=None):
+    if df_to_write is None:
+        df_to_write = df
     tagged = []
     unique = set(df.loc[:,column_name].values)
     if tag_names is None:
         tag_names = dict([(u, str(u)) for u in unique])
+
+    assert df.shape[0] == df_to_write.shape[0], 'writing and splitting dataframes must have the same size!'
+
     gb = df.groupby(column_name)
-    for region, df_region in gb:
-        tagged.append(data_table(df_region.drop(column_name, axis=1), name=tag_names[region]))
-    return tagged
+    index = gb.groups
+    for region, idx in index.items():
+        if keep_split_column or column_name not in df_to_write:
+            tagged.append(data_table(df_to_write.iloc[idx], name=tag_names[region]))
+        else:
+            tagged.append(data_table(df_to_write.iloc[idx].drop(column_name, axis=1), name=tag_names[region]))
+    return tagged, dict([(tag_names[k], v) for k,v in index.items()])
 
 def smartpath(path):
     if path.startswith("~/"):
@@ -653,6 +663,12 @@ def get_subheaders(data):
         classes[n].append(rep)
         i += 1
     return classes
+
+def get_repo_info():
+    info = {}
+    info['head'] = subprocess.Popen("git rev-parse --show-toplevel".split(), stdout=subprocess.PIPE).communicate()[0].strip('\n')
+    info['name'] = subprocess.Popen("git config --get remote.origin.url".split(), stdout=subprocess.PIPE).communicate()[0].strip('\n')
+    return info
 
 def split_to_jets(data):
     """
