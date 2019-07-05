@@ -253,37 +253,53 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
         sname = "{0}_{1}-{2}".format(name, i*split, i*split + len(filespecs_sub))
         
         spec_path_to_write = os.path.join(outputdir, "{0}_combined_filelist.txt".format(sname))
+        spath_path_to_write = os.path.join(outputdir, "{0}_combined_selection.txt".format(sname))
+
         log("> writing combined specfile at path {0}".format(spec_path_to_write))
+        log("> writing combined selection file at path {0}".format(spath_path_to_write))
         
-        spec_sizes = []
-        written_specs = []
-        with open(spec_path_to_write, "w+") as spec_to_write:
-            for j,filespec in enumerate(filespecs_sub):
+        events_parsed = 0
+        trees_parsed = 0 
+
+        with open(spec_path_to_write, "w+") as spec_to_write, \
+            open(spath_path_to_write, "w+") as spath_to_write:
+
+            for j,(filespec,spath) in enumerate(zip(filespecs_sub, spaths_sub)):
                 with open(filespec) as spec_to_read:
                     read_lines = spec_to_read.readlines()
-                    # log(" - adding {0} rootfiles to comb. spec, from spec {1}/{2}".format(len(read_lines), j, len(filespecs_sub)))
-                    written_specs += read_lines
-                    spec_to_write.writelines(read_lines)
-                    spec_sizes.append(len(read_lines))
-        log("  wrote {0} lines to combined specfile, from {1} specfiles".format(len(spec_sizes), len(filespecs_sub)))
-
-        spath_path_to_write = os.path.join(outputdir, "{0}_combined_selection.txt".format(sname))
-        log("> writing combined selection file at path {0}".format(spath_path_to_write))
-        written =0 
-        with open(spath_path_to_write, "w+") as spath_to_write:
-            for j,spath in enumerate(spaths_sub):
-                alldata = ''
+                
                 with open(spath) as spath_to_read:
                     read_events = np.asarray(map(lambda x: map(long, x.split(',')), spath_to_read.read().strip().split()))
-                    if read_events.shape[0] > 0:
-                        read_events[:,0] += j*spec_sizes[j]
-                        spath_to_write.write(" ".join([",".join(d.astype(str)) for d in read_events]) + " ")
-                        written += read_events.shape[0]
-                        # spath_to_write.write(read_events)
-                    # log(" - adding {0} rootfiles to comb. spec, from spec {1}/{2}".format(len(read_lines), j, len(filespecs_sub)))
-                    # spec_to_write.writelines(read_lines)
-                    # written += len(read_lines)
-        log("  wrote {0} events to combined selection file, from {1} selection files".format(written, len(spaths_sub)))
+
+                # add specfiles to new spec
+                spec_to_write.writelines(read_lines)                
+
+                if read_events.shape[0] > 0:
+                    read_events[:,0] += trees_parsed
+                    spath_to_write.write(" ".join([",".join(d.astype(str)) for d in read_events]) + " ")
+                    events_parsed += read_events.shape[0]
+
+                trees_parsed += len(read_lines)
+
+        log("  wrote {0} trees to combined specfile, from {1} specfiles".format(trees_parsed, len(filespecs_sub)))
+        log("  wrote {0} events to combined selection file, from {1} selection files".format(events_parsed, len(spaths_sub)))
+
+    # sys.exit(0)
+
+    #     events_parsed = 0
+    #     trees_parsed = 0 
+
+    #     with open(spath_path_to_write, "w+") as spath_to_write:
+    #         for j,(filespec,spath) in enumerate(zip(filespecs_sub, spaths_sub)):
+    #             alldata = ''
+    #             with open(spath) as spath_to_read:
+    #                 read_events = np.asarray(map(lambda x: map(long, x.split(',')), spath_to_read.read().strip().split()))
+    #                                         # spath_to_write.write(read_events)
+    #                 # log(" - adding {0} rootfiles to comb. spec, from spec {1}/{2}".format(len(read_lines), j, len(filespecs_sub)))
+    #                 # spec_to_write.writelines(read_lines)
+    #                 # written += len(read_lines)
+                
+    #     log("  wrote {0} events to combined selection file, from {1} selection files".format(written, len(spaths_sub)))
 
 
     sys.exit(0)
