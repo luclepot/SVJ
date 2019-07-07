@@ -181,7 +181,10 @@ public:
             start();
             log("Creating file chain with tree type 'Delphes'...");
             chain = new ParallelTreeChain();
-            chain->GetTrees(inputspec); 
+            outputTrees = chain->GetTrees(inputspec, "Delphes");
+
+            selectionIndex.resize(outputTrees.size());
+
             file = new TFile((outputdir + "/" + sample + "_output.root").c_str(), "RECREATE");
             nEvents = (Int_t)chain->GetEntries();
 
@@ -442,16 +445,23 @@ public:
         }
 
         void UpdateSelectionIndex(size_t entry) {
-            chain->GetN(entry); 
-            selectionIndex.push_back(chain->currentEntry);
-            selectionTree.push_back(chain->currentTree); 
+            chain->GetN(entry);
+            selectionIndex[chain->currentTree].push_back(chain->currentEntry);
         }
 
         void WriteSelectionIndex() {
             std::ofstream f(outputdir + "/" + sample + "_selection.txt");
+            log(selectionIndex.size());
+            for (auto elt : selectionIndex) {
+                log(elt.size()); 
+            }
             if (f.is_open()) {
                 for (size_t i = 0; i < selectionIndex.size(); i++){
-                    f << selectionTree[i] << "," << selectionIndex[i] << " ";
+                    f << outputTrees[i] << ": ";
+                    for (size_t j = 0; j < selectionIndex[i].size(); j++) {
+                        f << selectionIndex[i][j] << " ";
+                    }
+                    f << endl;
                 }
                 f.close();
             }
@@ -831,6 +841,7 @@ private:
         // file data
         ParallelTreeChain *chain=nullptr;
         TFile *file=nullptr; 
+        vector<string> outputTrees;
 
         // logging data
         const string LOG_PREFIX = "SVJselection :: ";
@@ -864,6 +875,5 @@ private:
 
         // cut variables
         vector<int> cutValues = vector<int>(Cuts::COUNT, -1); 
-        vector<size_t> selectionIndex;
-        vector<size_t> selectionTree; 
+        vector<vector<size_t>> selectionIndex;
 };

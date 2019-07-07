@@ -68,9 +68,9 @@ def condor_submit(
         f.write("\n")
         # f.write(cmd + "\n")
         for line in cmd.split("; "):
-            f.write("{}\n".format(line))
+            f.write("{0}\n".format(line))
     with open(run_submit, 'w+') as f:
-        f.write("executable = {}\n\n".format(run_script))
+        f.write("executable = {0}\n\n".format(run_script))
         f.write("universe = vanilla\n")
         f.write("getenv = True\n")
         f.write("log = {0}\n".format(os.path.join(outputdir, "{0}.log".format(name))))
@@ -85,8 +85,8 @@ def condor_submit(
         # f.write("request_memory = 5MB\n\n")
         f.write("+JobFlavour = \"workday\"\n")
         f.write("queue\n")
-    os.system("chmod +rwx {}".format(run_script))
-    condor_cmd = "condor_submit {}; condor_q".format(run_submit)
+    os.system("chmod +rwx {0}".format(run_script))
+    condor_cmd = "condor_submit {0}; condor_q".format(run_submit)
     if setup_cmd is not None:
         condor_cmd = "{0}; ".format(setup_cmd) + condor_cmd
     os.system(condor_cmd)
@@ -167,7 +167,7 @@ def select_main(inputdir, outputdir, name, batch, filter, range, debug, timing, 
 
 
     log("running {0} jobs with {1} rootfiles each".format(len(split_samplenames), split))
-    log("splits: {}".format(map(len, split_samplenames)))
+    log("splits: {0}".format(map(len, split_samplenames)))
 
     if not os.path.exists(outputdir):
         log("making ouput directory '{0}'".format(outputdir))
@@ -261,25 +261,24 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
         events_parsed = 0
         trees_parsed = 0 
 
-        with open(spec_path_to_write, "w+") as spec_to_write, \
-            open(spath_path_to_write, "w+") as spath_to_write:
+        with open(spec_path_to_write, "w+") as spec_to_write:
+            with open(spath_path_to_write, "w+") as spath_to_write:
+                for j,(filespec,spath) in enumerate(zip(filespecs_sub, spaths_sub)):
+                    with open(filespec) as spec_to_read:
+                        read_lines = spec_to_read.readlines()
+                    
+                    with open(spath) as spath_to_read:
+                        read_events = np.asarray(map(lambda x: map(long, x.split(',')), spath_to_read.read().strip().split()))
 
-            for j,(filespec,spath) in enumerate(zip(filespecs_sub, spaths_sub)):
-                with open(filespec) as spec_to_read:
-                    read_lines = spec_to_read.readlines()
-                
-                with open(spath) as spath_to_read:
-                    read_events = np.asarray(map(lambda x: map(long, x.split(',')), spath_to_read.read().strip().split()))
+                    # add specfiles to new spec
+                    spec_to_write.writelines(read_lines)                
 
-                # add specfiles to new spec
-                spec_to_write.writelines(read_lines)                
+                    if read_events.shape[0] > 0:
+                        read_events[:,0] += trees_parsed
+                        spath_to_write.write(" ".join([",".join(d.astype(str)) for d in read_events]) + " ")
+                        events_parsed += read_events.shape[0]
 
-                if read_events.shape[0] > 0:
-                    read_events[:,0] += trees_parsed
-                    spath_to_write.write(" ".join([",".join(d.astype(str)) for d in read_events]) + " ")
-                    events_parsed += read_events.shape[0]
-
-                trees_parsed += len(read_lines)
+                    trees_parsed += len(read_lines)
 
         log("  wrote {0} trees to combined specfile, from {1} specfiles".format(trees_parsed, len(filespecs_sub)))
         log("  wrote {0} events to combined selection file, from {1} selection files".format(events_parsed, len(spaths_sub)))
