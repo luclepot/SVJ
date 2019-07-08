@@ -49,7 +49,7 @@ def _check_for_default_file(pathoptions, name, ftype, suffix="txt"):
         if len(match) > 0:
             return match
 
-    error("files wih pattern '{0}' does not exist in any of: \n\t{1}".format(fname, "\n\t".join(pathoptions)))
+    error("files wih pattern '{0}' does not exist in any of: \n\t{1}".format(name, "\n\t".join(pathoptions)))
     error("quiting")
     sys.exit(1)
 
@@ -238,10 +238,25 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
         n_constituents = 100
         save_constituents = 0
 
-    if split < 0:
-        split = len(spaths)
+    all_data = get_data_dict(spaths)
 
-    spaths_split = list(split_to_chunks(spaths, split))
+    if split < 0:
+        split = int(len(all_data)/len(spaths))
+
+    split_keys = split_to_chunks(all_data.keys(), split)
+
+    for i,keys in enumerate(split_keys):
+        process_name = "{0}_combined.txt".format("{0}_merge_{1}.txt".format(name, i))
+        process_path = os.path.join(outputdir, process_name)
+        with open(process_path, 'w+') as f:
+            for k in keys:
+                s = k + ': '
+                s += ' '.join(map(str, all_data[k]))
+                s += '\n'
+                f.write(s)
+        
+            
+    sys.exit(0)
 
     import numpy as np
     
@@ -284,6 +299,18 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
         log("  wrote {0} trees to combined specfile, from {1} specfiles".format(trees_parsed, len(filespecs_sub)))
         log("  wrote {0} events to combined selection file, from {1} selection files".format(events_parsed, len(spaths_sub)))
 
+    sys.exit(0)
+
+def get_data_dict(list_of_selections):
+    ret = {}
+    for sel in list_of_selections:
+        with open(sel, 'r') as f:
+            data = map(lambda x: x.strip('\n'), f.readlines())
+        for elt in data:
+            key, raw = elt.split(': ')
+            ret[key] = map(int, raw.split())
+    return ret
+
     # sys.exit(0)
 
     #     events_parsed = 0
@@ -301,40 +328,33 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
                 
     #     log("  wrote {0} events to combined selection file, from {1} selection files".format(written, len(spaths_sub)))
 
+    # for i, (filespec, spath) in enumerate(zip(filespecs, spaths)):
+    #     log("------------------------------------------")
+    #     log("  PERFORMING CONVERSION ON SAMPLE {0}/{1}".format(i, len(filespecs)))
+    #     log("------------------------------------------")
 
-    sys.exit(0)
+    #     sname = name + "_" + str(i)
+    #     setup_command = "source " + os.path.abspath("conversion/setup.sh")
+    #     python_command = "python " + os.path.abspath("conversion/h5converter.py")
+    #     python_command += " " + " ".join(map(str, [outputdir, filespec, spath, sname, DR, n_constituents, range[0], range[1], save_constituents]))
 
-    for i, (filespec, spath) in enumerate(zip(filespecs, spaths)):
-        log("------------------------------------------")
-        log("  PERFORMING CONVERSION ON SAMPLE {0}/{1}".format(i, len(filespecs)))
-        log("------------------------------------------")
+    #     master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
 
-        sname = name + "_" + str(i)
-        setup_command = "source " + os.path.abspath("conversion/setup.sh")
-        python_command = "python " + os.path.abspath("conversion/h5converter.py")
-        python_command += " " + " ".join(map(str, [outputdir, filespec, spath, sname, DR, n_constituents, range[0], range[1], save_constituents]))
+    #     if dryrun:
+    #         log("DRYRUN: command is:")
+    #         log(master_command)
 
-        master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
-
-        if dryrun:
-            log("DRYRUN: command is:")
-            log(master_command)
-
-        elif batch is not None:
-            if batch == "condor":
-                condor_setup = ""
-                condor_submit(condor_setup + master_command, outputdir, name, setup_command)
-            else:
-                raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
+    #     elif batch is not None:
+    #         if batch == "condor":
+    #             condor_setup = ""
+    #             condor_submit(condor_setup + master_command, outputdir, name, setup_command)
+    #         else:
+    #             raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
         
-        else:
-            os.system(master_command)
+    #     else:
+    #         os.system(master_command)
 
-    sys.exit(0)
-
-def merge_selections(selections_list):
-    for path in selections_list:
-        
+    # sys.exit(0)
 
 def train_main(outputdir, name, batch, filter):
     log("running command 'train'")
