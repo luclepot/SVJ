@@ -225,10 +225,11 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
     if not os.path.exists(outputdir):
         os.mkdir(outputdir)
 
-    filespecs = _check_for_default_file([inputdir], name, "filelist")
+    # filespecs = _check_for_default_file([inputdir], name, "filelist")
     spaths = _check_for_default_file([inputdir], name, "selection")
+    # errors = _check_for_default_file([inputdir], name, "")
     
-    assert len(filespecs) == len(spaths), "must have equal amounts of filespecs and paths"
+    # assert len(filespecs) == len(spaths), "must have equal amounts of filespecs and paths"
 
     save_constituents = 1
     n_constituents = NC
@@ -238,13 +239,13 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
         save_constituents = 0
 
     if split < 0:
-        split = len(filespecs)
+        split = len(spaths)
 
-    filespecs_split, spaths_split = map(lambda x: list(split_to_chunks(x, split)), [filespecs, spaths])
+    spaths_split = list(split_to_chunks(spaths, split))
 
     import numpy as np
     
-    for i,(filespecs_sub,spaths_sub) in enumerate(zip(filespecs_split, spaths_split)):
+    for i,data_paths in enumerate(zip(filespecs_split, spaths_split)):
         log("------------------------------------------")
         log("  PERFORMING CONVERSION ON SAMPLE {0}/{1}".format(i + 1, len(filespecs_split)))
         log("------------------------------------------")
@@ -330,6 +331,10 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
             os.system(master_command)
 
     sys.exit(0)
+
+def merge_selections(selections_list):
+    for path in selections_list:
+        
 
 def train_main(outputdir, name, batch, filter):
     log("running command 'train'")
