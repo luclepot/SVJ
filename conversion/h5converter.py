@@ -43,8 +43,6 @@ class Converter:
 
         self.name = name
 
-        self.spath = spath
-
         self.selections = get_data_dict([spath])
         self.inputfiles = list(self.selections.keys())
 
@@ -225,16 +223,17 @@ class Converter:
 
         if not outputfile.endswith(".h5"):
             outputfile += ".h5"
-        
-        # self.log(os.path.exists(outputfile))
-        # self.log(os.path.exists(os.path.dirname(outputfile)))
-        # self.log(outputfile)
+
+        self.log("saving h5 data to file {0}".format(outputfile))
+
         f = h5py.File(outputfile, "w")
         f.create_dataset('event_feature_data', data=self.event_features)
         f.create_dataset('event_feature_names', data=self.event_feature_names)
         if self.save_constituents:
             f.create_dataset('jet_constituent_data', data=self.jet_constituents)
             f.create_dataset('jet_constituent_names', data=self.jet_constituent_names)
+
+        self.log("Successfully saved!")
         f.close()
 
     def get_jet_features(

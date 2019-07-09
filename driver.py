@@ -51,7 +51,7 @@ def _check_for_default_file(pathoptions, name, ftype, suffix="txt"):
 
     error("files wih pattern '{0}' does not exist in any of: \n\t{1}".format(name, "\n\t".join(pathoptions)))
     error("quiting")
-    sys.exit(1)
+    raise AttributeError("No files found")
 
 def condor_submit(
     cmd,
@@ -100,6 +100,61 @@ def split_to_chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i+n]
 
+def get_data_dict(list_of_selections):
+    ret = {}
+    for sel in list_of_selections:
+        with open(sel, 'r') as f:
+            data = map(lambda x: x.strip('\n'), f.readlines())
+        for elt in data:
+            key, raw = elt.split(': ')
+            ret[key] = map(int, raw.split())
+    return ret
+
+    # sys.exit(0)
+
+    #     events_parsed = 0
+    #     trees_parsed = 0 
+
+    #     with open(spath_path_to_write, "w+") as spath_to_write:
+    #         for j,(filespec,spath) in enumerate(zip(filespecs_sub, spaths_sub)):
+    #             alldata = ''
+    #             with open(spath) as spath_to_read:
+    #                 read_events = np.asarray(map(lambda x: map(long, x.split(',')), spath_to_read.read().strip().split()))
+    #                                         # spath_to_write.write(read_events)
+    #                 # log(" - adding {0} rootfiles to comb. spec, from spec {1}/{2}".format(len(read_lines), j, len(filespecs_sub)))
+    #                 # spec_to_write.writelines(read_lines)
+    #                 # written += len(read_lines)
+                
+    #     log("  wrote {0} events to combined selection file, from {1} selection files".format(written, len(spaths_sub)))
+
+    # for i, (filespec, spath) in enumerate(zip(filespecs, spaths)):
+    #     log("------------------------------------------")
+    #     log("  PERFORMING CONVERSION ON SAMPLE {0}/{1}".format(i, len(filespecs)))
+    #     log("------------------------------------------")
+
+    #     sname = name + "_" + str(i)
+    #     setup_command = "source " + os.path.abspath("conversion/setup.sh")
+    #     python_command = "python " + os.path.abspath("conversion/h5converter.py")
+    #     python_command += " " + " ".join(map(str, [outputdir, filespec, spath, sname, DR, n_constituents, range[0], range[1], save_constituents]))
+
+    #     master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
+
+    #     if dryrun:
+    #         log("DRYRUN: command is:")
+    #         log(master_command)
+
+    #     elif batch is not None:
+    #         if batch == "condor":
+    #             condor_setup = ""
+    #             condor_submit(condor_setup + master_command, outputdir, name, setup_command)
+    #         else:
+    #             raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
+        
+    #     else:
+    #         os.system(master_command)
+
+    # sys.exit(0)
+
 ### parser setup
 
 def setup_parser():
@@ -107,21 +162,23 @@ def setup_parser():
 
     # add subparsers
     subparsers = parser.add_subparsers(dest='COMMAND')
+
     select = subparsers.add_parser("select", help="base selection of events")
     convert = subparsers.add_parser("convert", help="convert raw root data to h5 files based on selection output")
     train = subparsers.add_parser("train", help="training command for module")
     signal = subparsers.add_parser("signal", help="select/convert all rootfile events to h5 files")
 
-    # general criteria
+    # shared args
     for subparser in [select, convert, train, signal]:
         subparser.add_argument('-o', '--output', dest="outputdir", action="store", type=_smartpath, help="output dir path", required=True)
-        subparser.add_argument('-n', '--name', dest='name', action='store', default='sample', help='sample save name')
+        subparser.add_argument('-n', '--name', dest='name', action='store', default='data', help='sample save name')
         subparser.add_argument('-j', '--batch-job', dest='batch', action='store', default=None, help='attempt to run as a batch job on the indicated service')
         subparser.add_argument('-z', '--dry',  dest='dryrun', action='store_true', default=False, help='don\'t run analysis code')
     
     # signal args
-    signal.add_argument('-i', '--input', dest="inputdir", action='store', type=_smartpath, help='input')
+    signal.add_argument('-i', '--input', dest="inputdir", action='store', type=_smartpath, help='input', required=True)
     signal.add_argument('-f', '--filter', dest='filter', action='store', default='*', help='glob-style filter for root files in inputfile')
+    signal.add_argument('-r', '--range', dest='range', action='store', type=_range_input, default=(-1,-1), help='range of data to parse')
 
     # selection args
     select.add_argument('-s', '--split-trees',  dest='split', action='store', type=int, default=-1, help='split trees into chunks of N')
@@ -141,15 +198,15 @@ def setup_parser():
     convert.add_argument('-c', '--constituents', dest='NC', action='store', type=int, default=-1, help='number of jet constituents to save')
     convert.add_argument('-r', '--range', dest='range', action='store', type=_range_input, default=(-1,-1), help='range of data to parse')
     convert.add_argument('-s', '--split-samples',  dest='split', action='store', type=int, default=-1, help='split samplelist processing into chunks of N')
-    # training arg
+    
+    # training args
 
     return parser
 
+# MAIN functions:
+
 def select_main(inputdir, outputdir, name, batch, filter, range, debug, timing, cuts, build, dryrun, gdb, split):
     log("running command 'select'")
-    
-    inputdir = _smartpath(inputdir)
-    outputdir = _smartpath(outputdir)
     
     ffilter = str(filter)
     rng = range
@@ -268,7 +325,7 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
 
         setup_command = "source " + os.path.abspath("conversion/setup.sh")
         python_command = "python " + os.path.abspath("conversion/h5converter.py")
-        python_command += " " + " ".join(map(str, [outputdir, process_path, name, DR, n_constituents, range[0], range[1], save_constituents]))
+        python_command += " " + " ".join(map(str, [outputdir, process_path, sname, DR, n_constituents, range[0], range[1], save_constituents]))
 
         master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
 
@@ -287,104 +344,66 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
             os.system(master_command)
 
     sys.exit(0)
-        
-    # for i,data_paths in enumerate(zip(filespecs_split, spaths_split)):
-    #     log("------------------------------------------")
-    #     log("  PERFORMING CONVERSION ON SAMPLE {0}/{1}".format(i + 1, len(filespecs_split)))
-    #     log("------------------------------------------")
-        
-    #     # make master path and filespec
-    #     sname = "{0}_{1}-{2}".format(name, i*split, i*split + len(filespecs_sub))
-        
-    #     spec_path_to_write = os.path.join(outputdir, "{0}_combined_filelist.txt".format(sname))
-    #     spath_path_to_write = os.path.join(outputdir, "{0}_combined_selection.txt".format(sname))
-
-    #     log("> writing combined specfile at path {0}".format(spec_path_to_write))
-    #     log("> writing combined selection file at path {0}".format(spath_path_to_write))
-        
-    #     events_parsed = 0
-    #     trees_parsed = 0 
-
-    #     with open(spec_path_to_write, "w+") as spec_to_write:
-    #         with open(spath_path_to_write, "w+") as spath_to_write:
-    #             for j,(filespec,spath) in enumerate(zip(filespecs_sub, spaths_sub)):
-    #                 with open(filespec) as spec_to_read:
-    #                     read_lines = spec_to_read.readlines()
-                    
-    #                 with open(spath) as spath_to_read:
-    #                     read_events = np.asarray(map(lambda x: map(long, x.split(',')), spath_to_read.read().strip().split()))
-
-    #                 # add specfiles to new spec
-    #                 spec_to_write.writelines(read_lines)                
-
-    #                 if read_events.shape[0] > 0:
-    #                     read_events[:,0] += trees_parsed
-    #                     spath_to_write.write(" ".join([",".join(d.astype(str)) for d in read_events]) + " ")
-    #                     events_parsed += read_events.shape[0]
-
-    #                 trees_parsed += len(read_lines)
-
-    #     log("  wrote {0} trees to combined specfile, from {1} specfiles".format(trees_parsed, len(filespecs_sub)))
-    #     log("  wrote {0} events to combined selection file, from {1} selection files".format(events_parsed, len(spaths_sub)))
-
-def get_data_dict(list_of_selections):
-    ret = {}
-    for sel in list_of_selections:
-        with open(sel, 'r') as f:
-            data = map(lambda x: x.strip('\n'), f.readlines())
-        for elt in data:
-            key, raw = elt.split(': ')
-            ret[key] = map(int, raw.split())
-    return ret
-
-    # sys.exit(0)
-
-    #     events_parsed = 0
-    #     trees_parsed = 0 
-
-    #     with open(spath_path_to_write, "w+") as spath_to_write:
-    #         for j,(filespec,spath) in enumerate(zip(filespecs_sub, spaths_sub)):
-    #             alldata = ''
-    #             with open(spath) as spath_to_read:
-    #                 read_events = np.asarray(map(lambda x: map(long, x.split(',')), spath_to_read.read().strip().split()))
-    #                                         # spath_to_write.write(read_events)
-    #                 # log(" - adding {0} rootfiles to comb. spec, from spec {1}/{2}".format(len(read_lines), j, len(filespecs_sub)))
-    #                 # spec_to_write.writelines(read_lines)
-    #                 # written += len(read_lines)
-                
-    #     log("  wrote {0} events to combined selection file, from {1} selection files".format(written, len(spaths_sub)))
-
-    # for i, (filespec, spath) in enumerate(zip(filespecs, spaths)):
-    #     log("------------------------------------------")
-    #     log("  PERFORMING CONVERSION ON SAMPLE {0}/{1}".format(i, len(filespecs)))
-    #     log("------------------------------------------")
-
-    #     sname = name + "_" + str(i)
-    #     setup_command = "source " + os.path.abspath("conversion/setup.sh")
-    #     python_command = "python " + os.path.abspath("conversion/h5converter.py")
-    #     python_command += " " + " ".join(map(str, [outputdir, filespec, spath, sname, DR, n_constituents, range[0], range[1], save_constituents]))
-
-    #     master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
-
-    #     if dryrun:
-    #         log("DRYRUN: command is:")
-    #         log(master_command)
-
-    #     elif batch is not None:
-    #         if batch == "condor":
-    #             condor_setup = ""
-    #             condor_submit(condor_setup + master_command, outputdir, name, setup_command)
-    #         else:
-    #             raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
-        
-    #     else:
-    #         os.system(master_command)
-
-    # sys.exit(0)
-
+     
 def train_main(outputdir, name, batch, filter):
     log("running command 'train'")
     sys.exit(0)
+
+def signal_main(inputdir, outputdir, name, batch, range, dryrun, filter):
+    log("running command 'signal'")
+
+    ffilter = str(filter)
+    rng = range
+    
+    if not ffilter.endswith(".root"):
+        ffilter += ".root"
+
+    criteria = os.path.join(inputdir, ffilter)
+    all_samplenames = glob(criteria)
+
+    if len(all_samplenames) == 0:
+        error("No samples found matching glob crieria '{0}'".format(criteria))
+        sys.exit(1)
+
+    sname = '{0}_{1}'.format(name, 0)
+    base_filepath = os.path.join(outputdir, sname)
+
+    filelist_path = base_filepath + '_filelist.txt'
+    selection_path = base_filepath + '_selection.txt'
+
+    if not dryrun:
+        if not os.path.exists(outputdir):
+            os.mkdir(outputdir)
+        with open(filelist_path, 'w+') as f:
+            for line in all_samplenames:
+                f.write('{0}\n'.format(line))
+
+    setup_command = "source " + os.path.abspath("conversion/setup.sh")
+    python_command = "python " + os.path.abspath("selection/signal_selection.py")
+
+    args_to_pass = [selection_path, filelist_path, name, rng[0], rng[1]]
+    python_command += " " + " ".join(map(str, args_to_pass))
+
+    master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
+
+    if dryrun:
+        log("DRYRUN: command is:")
+        log(master_command)
+
+    elif batch is not None:
+        if batch == "condor":
+            condor_setup = ""
+            condor_submit(condor_setup + master_command, outputdir, sname, setup_command)
+        else:
+            raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
+    
+    else:
+        os.system(master_command)
+        # subprocess.Popen(master_command).wait()
+    # with open(filepath, 'w+') as f:
+    #     for i,samplename in enumerate(all_samplenames):
+    #         f.write(samplename)
+
 
 if __name__=="__main__":
     log("setting up driver")
@@ -408,3 +427,5 @@ if __name__=="__main__":
         convert_main(**args_dict)
     if cmd == "train":
         train_main(**args_dict) 
+    if cmd == "signal":
+        signal_main(**args_dict)
