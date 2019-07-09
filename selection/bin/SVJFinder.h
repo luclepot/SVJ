@@ -56,15 +56,15 @@ namespace Cuts {
     };
 
     std::map<CutType, string> CutName {
-        {leptonCounts, "Lepton Veto"},
+        {leptonCounts, "0 Passing Leptons"},
         {jetCounts, "n Jets > 1"},
-        {jetEtas, "jet Eta veto"},
-        {jetDeltaEtas, "DeltaEta veto"},
-        {metRatio,"MET/M_T > 0.025"},
-        {jetPt, "Jet PT veto"},
+        {jetEtas, "abs jet Etas < 2.4"},
+        {jetDeltaEtas, "abs DeltaEta < 1.5"},
+        {metRatio,"MET/M_T > 0.15"},
+        {jetPt, "Jet PT > 200"},
         {jetDiJet, "Dijet veto"},
-        {metValue, "loose MET cut"},
-        {metRatioTight, "MET/M_T > 0.05"},
+        {metValue, "M_T > 1500"},
+        {metRatioTight, "MET/M_T > 0.25"},
         {selection, "final selection"}
     };
 };
@@ -181,7 +181,10 @@ public:
             start();
             log("Creating file chain with tree type 'Delphes'...");
             chain = new ParallelTreeChain();
-            chain->GetTrees(inputspec); 
+            outputTrees = chain->GetTrees(inputspec, "Delphes");
+
+            selectionIndex.resize(outputTrees.size());
+
             file = new TFile((outputdir + "/" + sample + "_output.root").c_str(), "RECREATE");
             nEvents = (Int_t)chain->GetEntries();
 
@@ -366,7 +369,7 @@ public:
         }
 
         void PrintCutFlow() {
-            int fn = 15;
+            int fn = 20;
             int ns = 6 + int(log10(CutFlow[0]));
             int n = 10;
 
@@ -442,16 +445,23 @@ public:
         }
 
         void UpdateSelectionIndex(size_t entry) {
-            chain->GetN(entry); 
-            selectionIndex.push_back(chain->currentEntry);
-            selectionTree.push_back(chain->currentTree); 
+            chain->GetN(entry);
+            selectionIndex[chain->currentTree].push_back(chain->currentEntry);
         }
 
         void WriteSelectionIndex() {
             std::ofstream f(outputdir + "/" + sample + "_selection.txt");
+            log(selectionIndex.size());
+            for (auto elt : selectionIndex) {
+                log(elt.size()); 
+            }
             if (f.is_open()) {
                 for (size_t i = 0; i < selectionIndex.size(); i++){
-                    f << selectionTree[i] << "," << selectionIndex[i] << " ";
+                    f << outputTrees[i] << ": ";
+                    for (size_t j = 0; j < selectionIndex[i].size(); j++) {
+                        f << selectionIndex[i][j] << " ";
+                    }
+                    f << endl;
                 }
                 f.close();
             }
@@ -831,6 +841,7 @@ private:
         // file data
         ParallelTreeChain *chain=nullptr;
         TFile *file=nullptr; 
+        vector<string> outputTrees;
 
         // logging data
         const string LOG_PREFIX = "SVJselection :: ";
@@ -864,6 +875,5 @@ private:
 
         // cut variables
         vector<int> cutValues = vector<int>(Cuts::COUNT, -1); 
-        vector<size_t> selectionIndex;
-        vector<size_t> selectionTree; 
+        vector<vector<size_t>> selectionIndex;
 };

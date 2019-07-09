@@ -14,6 +14,7 @@ import pandas as pd
 import prettytable
 from StringIO import StringIO
 from enum import Enum
+import subprocess
 
 plt.rcParams['figure.figsize'] = (10,10)
 plt.rcParams.update({'font.size': 18})
@@ -129,8 +130,20 @@ class data_table(logger):
         logger.__init__(self, "data_table :: ", verbose)
         self.name = name or "untitled {}".format(data_table.TABLE_COUNT)    
         data_table.TABLE_COUNT += 1
-        self.data = data
-        self.headers = headers if headers is not None else ["dist " + str(i + 1) for i in range(self.data.shape[1])]
+        if headers is not None:
+            self.headers = headers
+            self.data = data
+        elif isinstance(data, pd.DataFrame):
+            self.headers = data.columns 
+            self.data = data.values
+        elif isinstance(data, data_table):
+            self.headers = data.headers
+            self.data = data.df.values
+            self.name = data.name
+        else:
+            self.headers = ["dist " + str(i + 1) for i in range(data.shape[1])]
+            self.data = data
+
         assert len(self.data.shape) == 2, "data must be matrix!"
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
         assert len(self.data) > 0, "n samples must be greater than zero"
@@ -240,17 +253,18 @@ class data_table(logger):
         self,
         others=[],
         values="*",
-        bins=15,
+        bins=32,
         rng=None,
         cols=4,
         ticksize=8,
         fontsize=10,
         normed=0,
-        figloc="upper right",
-        figsize=(10,10),
+        figloc="lower right",
+        figsize=(16,7),
         alpha=0.7,
         xscale="linear",
-        yscale="linear"
+        yscale="linear",
+        histtype='step'
     ):
         if isinstance(values, str):
             values = [key for key in self.headers if glob.fnmatch.fnmatch(key, values)]
@@ -292,10 +306,10 @@ class data_table(logger):
         for i in range(n):
             ax = plt.subplot(rows, cols, i + 1)
             # weights = np.ones_like(plot_data[i])/float(len(plot_data[i]))
-            ax.hist(plot_data[i], bins=bins, range=rng[i], histtype='step', normed=normed, label=self.name, weights=weights, alpha=alpha)
+            ax.hist(plot_data[i], bins=bins, range=rng[i], histtype=histtype, normed=normed, label=self.name, weights=weights, alpha=alpha)
             for j in range(len(others)):
                 # weights = np.ones_like(plot_others[j][i])/float(len(plot_others[j][i]))
-                ax.hist(plot_others[j][i], bins=bins, range=rng[i], histtype='step', label=others[j].name, normed=normed, weights=weights, alpha=alpha)
+                ax.hist(plot_others[j][i], bins=bins, range=rng[i], histtype=histtype, label=others[j].name, normed=normed, weights=weights, alpha=alpha)
 
             plt.xlabel(plot_data[i].name + " {}-scaled".format(xscale), fontsize=fontsize)
             plt.ylabel("{}-scaled".format(yscale), fontsize=fontsize)
@@ -312,6 +326,42 @@ class data_table(logger):
         plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01)
         plt.show()
     
+    def cdrop(
+        self,
+        globstr,
+        inplace=False,
+    ):
+        to_drop = list(parse_globlist(globstr, list(self.df.columns)))
+        modify = None
+        if inplace:
+            modify = self
+        else:
+            ret = data_table(self)
+            modify = ret
+        for d in to_drop:
+            modify.df.drop(d, axis=1, inplace=True)
+        modify.headers = list(modify.df.columns)
+        return modify
+
+    def cfilter(
+        self, 
+        globstr,
+        inplace=False,
+    ):
+        to_keep = parse_globlist(globstr, list(self.df.columns))
+        to_drop = set(self.headers).difference(to_keep)
+
+        modify = None
+        if inplace:
+            modify = self
+        else:
+            ret = data_table(self)
+            modify = ret
+        for d in to_drop:
+            modify.df.drop(d, axis=1, inplace=True)
+        modify.headers = list(modify.df.columns)
+        return modify
+
     def _rows(
         self,
         cols,
@@ -520,23 +570,77 @@ class data_loader(logger):
             else:
                 assert d[key].shape[1:] == sfile[key].shape[1:]
                 d[key] = np.concatenate([d[key], sfile[key]])
+
+def parse_globlist(glob_list, match_list):
+    if not hasattr(glob_list, "__iter__") or isinstance(glob_list, str):
+        glob_list = [glob_list]
     
+    for i,x in enumerate(glob_list):
+        if isinstance(x, int):
+            glob_list[i] = match_list[x]
+        
+    assert all([isinstance(c, str) for c in glob_list])
+
+    match = set()
+    for g in glob_list:
+        match.update(glob.fnmatch.filter(match_list, g))
+
+    return match
+
+delphes_jet_tags_dict = {
+    1: "down",
+    2: "up",
+    3: "strange",
+    4: "charm",
+    5: "bottom",
+    6: "top",
+    21: "gluon",
+    9: "gluon"
+}
+
+def split_table_by_column(column_name, df, tag_names=None, keep_split_column=False, df_to_write=None):
+    if df_to_write is None:
+        df_to_write = df
+    tagged = []
+    unique = set(df.loc[:,column_name].values)
+    if tag_names is None:
+        tag_names = dict([(u, str(u)) for u in unique])
+
+    assert df.shape[0] == df_to_write.shape[0], 'writing and splitting dataframes must have the same size!'
+
+    gb = df.groupby(column_name)
+    index = gb.groups
+    for region, idx in index.items():
+        if keep_split_column or column_name not in df_to_write:
+            tagged.append(data_table(df_to_write.iloc[idx], name=tag_names[region]))
+        else:
+            tagged.append(data_table(df_to_write.iloc[idx].drop(column_name, axis=1), name=tag_names[region]))
+    return tagged, dict([(tag_names[k], v) for k,v in index.items()])
+
 def smartpath(path):
     if path.startswith("~/"):
         return path
     return os.path.abspath(path)
 
 def get_cutflow_table(glob_path):
-        
     paths = glob.glob(glob_path)
     assert len(paths) > 0, "must have SOME paths"
-    
-    values = []
-    keys = []
+
+    ret = odict()
     for path in paths:
         with open(path) as f:
             values_comp, keys_comp = map(lambda x: x.strip('\n').split(','), f.readlines())
             values_comp = map(int, values_comp)
+            keys_comp = map(str.strip, ['no cut'] + keys_comp)
+            for k,v in zip(keys_comp, values_comp):
+                if k not in ret:
+                    ret[k] = 0
+                ret[k] = ret[k] + v
+    df = pd.DataFrame(ret.items(), columns=['cut_name', 'n_events'])
+    df['abs eff.'] = np.round(100.*(df.n_events / df.n_events[0]), 2)
+    df['rel eff.'] = np.round([100.] + [100.*(float(df.n_events[i + 1]) / float(df.n_events[i])) for i in range(len(df.n_events) - 1)], 2)
+    
+    return df
 
 def get_training_data(glob_path):
     paths = glob.glob(glob_path)
@@ -568,6 +672,22 @@ def get_subheaders(data):
         i += 1
     return classes
 
+def get_selections_dict(list_of_selections):
+    ret = {}
+    for sel in list_of_selections:
+        with open(sel, 'r') as f:
+            data = map(lambda x: x.strip('\n'), f.readlines())
+        for elt in data:
+            key, raw = elt.split(': ')
+            ret[key] = map(int, raw.split())
+    return ret
+
+def get_repo_info():
+    info = {}
+    info['head'] = subprocess.Popen("git rev-parse --show-toplevel".split(), stdout=subprocess.PIPE).communicate()[0].strip('\n')
+    info['name'] = subprocess.Popen("git config --get remote.origin.url".split(), stdout=subprocess.PIPE).communicate()[0].strip('\n')
+    return info
+
 def split_to_jets(data):
     """
     given a data table with values for the n leading jets, split into one data 
@@ -596,5 +716,5 @@ def split_to_jets(data):
     )
     return full, jets
 
-def log_uniform(low, high, size=None, base=10.):    
+def log_uniform(low, high, size=None, base=10.):
     return float(base)**(np.random.uniform(np.log(low)/np.log(base), np.log(high)/np.log(base), size))

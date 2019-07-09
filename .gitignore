@@ -11,6 +11,7 @@
 *_submit.sh
 *_condor.submit
 *.json
+*.__afs*
 #
 # CUSTOM
 

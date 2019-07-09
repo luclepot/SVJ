@@ -16,6 +16,16 @@ rt.gInterpreter.Declare('#include "{}/include/classes/DelphesClasses.h"'.format(
 rt.gInterpreter.Declare('#include "{}/include/classes/DelphesFactory.h"'.format(DELPHES_DIR))
 rt.gInterpreter.Declare('#include "{}/include/ExRootAnalysis/ExRootTreeReader.h"'.format(DELPHES_DIR))
 
+def get_data_dict(list_of_selections):
+    ret = {}
+    for sel in list_of_selections:
+        with open(sel, 'r') as f:
+            data = map(lambda x: x.strip('\n'), f.readlines())
+        for elt in data:
+            key, raw = elt.split(': ')
+            ret[key] = map(int, raw.split())
+    return ret
+
 class Converter:
 
     LOGMSG = "Converter :: "
@@ -23,7 +33,6 @@ class Converter:
     def __init__(
         self,
         outputdir,
-        filespec,
         spath,
         name,
         jetDR=0.8,
@@ -34,15 +43,12 @@ class Converter:
 
         self.name = name
 
-        self.filespec = filespec
-        self.spath = spath
+        self.selections = get_data_dict([spath])
+        self.inputfiles = list(self.selections.keys())
 
-        with open(filespec) as f:
-            self.inputfiles = [line.strip('\n').strip() for line in f.readlines()]
-
-        # core tree, add files
-        self.files = [rt.TFile(f) for f in self.inputfiles]
-        self.trees = [tf.Get("Delphes") for tf in self.files if tf.GetListOfKeys().Contains("Delphes")]
+        # core tree, add files, add all trees
+        self.files = [rf for rf in [rt.TFile(f) for f in self.inputfiles] if rf.GetListOfKeys().Contains("Delphes")]
+        self.trees = [tf.Get("Delphes") for tf in self.files]
         self.sizes = [int(t.GetEntries()) for t in self.trees]
         self.nEvents = sum(self.sizes)
 
@@ -61,6 +67,14 @@ class Converter:
             'ChargedFraction',
             'PTD',
             'Axis2',
+            'Flavor',
+            'Energy',
+            'DeltaEta',
+            'DeltaPhi',
+            'MET',
+            'METEta',
+            'METPhi',
+            # 'MT',
         ]
 
         ## ADD MET
@@ -69,7 +83,6 @@ class Converter:
         for i in range(self.n_jets):
             self.event_feature_names += ['j{}'.format(i) + j for j in self.jet_base_names]
         
-
         self.jet_constituent_names = ['pEta', 'pPhi', 'pPt']
 
         self.EFlow_types = [
@@ -86,7 +99,6 @@ class Converter:
         self.event_features = None
         self.jet_constituents = None
 
-        
         # spathout = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
         # spathin = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
         # spath = None
@@ -97,15 +109,12 @@ class Converter:
         # else:
         #     raise AttributeError("Selection file does not exist in either input/output dirs!!")
 
-        with open(spath) as f:
-            self.selections = np.asarray(map(lambda x: map(long, x.split(',')), f.read().strip().split()))
-        
         hlf_dict = {}
         particle_dict = {}
 
         self.save_constituents = save_constituents
-        self.selections_abs = np.asarray([sum(self.sizes[:s[0]]) + s[1] for s in self.selections])
-        self.log("found {0} selected events".format(len(self.selections_abs)))
+        # self.selections_abs = np.asarray([sum(self.sizes[:s[0]]) + s[1] for s in self.selections])
+        self.log("found {0} selected events, out of a total of {1}".format(sum(map(len, self.selections.values())), self.nEvents))
 
     def log(
         self,
@@ -119,23 +128,32 @@ class Converter:
 
     def convert(
         self,
-        rng=(-1,-1)
+        rng=(-1,-1),
+        return_debug_tree=False
     ):
         rng = list(rng)
 
-        if rng[0] < 0 or rng[0] > self.nEvents:
+        gmin, gmax = min(self.sizes), max(self.sizes)
+
+        if rng[0] < 0 or rng[0] > gmax:
             rng[0] = 0
 
-        if rng[1] > self.nEvents or rng[1] < 0:
-            rng[1] = self.nEvents
+        if rng[1] > gmax or rng[1] < 0:
+            rng[1] = gmax
 
         nmin, nmax = rng
-            
-        selections_iter = self.selections[(self.selections_abs > nmin) & (self.selections_abs < nmax)]
+        selections_iter = self.selections.copy()
+        for k,v in selections_iter.items():
+            v = np.asarray(v).astype(int)
+            selections_iter[k] = v[(v > nmin) & (v < nmax)]
+
+        total_size = sum(map(len, selections_iter.values()))
+        total_count = 0
+
         self.log("selecting on range {0}".format(rng))
-        self.event_features = np.empty((len(selections_iter), len(self.event_feature_names)))
+        self.event_features = np.empty((total_size, len(self.event_feature_names)))
         self.log("event feature shapes: {}".format(self.event_features.shape))
-        self.jet_constituents = np.empty((len(selections_iter), self.n_jets, self.n_constituent_particles, len(self.jet_constituent_names)))
+        self.jet_constituents = np.empty((total_size, self.n_jets, self.n_constituent_particles, len(self.jet_constituent_names)))
         self.log("jet constituent shapes: {}".format(self.jet_constituents.shape))
             
         if not self.save_constituents:
@@ -146,45 +164,50 @@ class Converter:
         ftn = 0
 
         # selection is implicit: looping only through total selectinos
-        for count,(tree_n, i) in enumerate(selections_iter):
-            
-            self.log('tree {}, event {}'.format(tree_n, i))
+        for tree_n,tree_name in enumerate(self.inputfiles):
+            for event_n,event_index in enumerate(selections_iter[tree_name]):
+                self.log('tree {0}, event {1}, index {2}'.format(tree_n, event_n, event_index))
 
-            tree = self.trees[tree_n]
-            tree.GetEntry(i)
+                tree = self.trees[tree_n]
+                tree.GetEntry(event_index)
 
-            jets = [tree.Jet[jetn].P4() for jetn in range(self.n_jets)]
-            
-            track_index = -np.ones((len(jets), self.n_constituent_particles, 2), dtype=int)
-
-            for jetn, jet in enumerate(jets):
-                # grab
-
-                plist = np.empty((0, len(self.jet_constituent_names)))
-                subindex = np.empty((0, 2))
-                for flow_type, pt_min, pt_type in self.EFlow_types:
-                    new, indicies = self.get_jet_constituents(jet, self.jetDR, getattr(tree, flow_type), pt_min, pt_type, flow_type)
-                    plist = np.concatenate([plist, new], axis=0)
-                    subindex = np.concatenate([subindex, indicies], axis=0)
-            
-                # plist = np.concatenate([
-                #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowTrack, 0.1, "PT"),
-                #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowNeutralHadron, 0.5, "ET"),
-                #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowPhoton, 0.2, "ET"),
-                # ], axis=0)
+                jets = [tree.Jet[jetn].P4() for jetn in range(self.n_jets)]
                 
-                # sort
-                sort_index = plist[:,2].argsort()[::-1]
+                track_index = -np.ones((len(jets), self.n_constituent_particles, 2), dtype=int)
 
-                plist = plist[sort_index][0:self.n_constituent_particles,:]
-                subindex = subindex[sort_index][0:self.n_constituent_particles,:]
+                for jetn, jet in enumerate(jets):
+                    # grab
 
-                # pad && add
-                self.jet_constituents[count, jetn] = np.pad(plist, [(0, self.n_constituent_particles - plist.shape[0]),(0,0)], 'constant')
-                track_index[jetn,:len(subindex)] = subindex
+                    plist = np.empty((0, len(self.jet_constituent_names)))
+                    subindex = np.empty((0, 2))
+                    for flow_type, pt_min, pt_type in self.EFlow_types:
+                        new, indicies = self.get_jet_constituents(jet, self.jetDR, getattr(tree, flow_type), pt_min, pt_type, flow_type)
+                        plist = np.concatenate([plist, new], axis=0)
+                        subindex = np.concatenate([subindex, indicies], axis=0)
+                
+                    # plist = np.concatenate([
+                    #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowTrack, 0.1, "PT"),
+                    #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowNeutralHadron, 0.5, "ET"),
+                    #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowPhoton, 0.2, "ET"),
+                    # ], axis=0)
+                    
+                    # sort
+                    sort_index = plist[:,2].argsort()[::-1]
 
-            self.event_features[count] = np.fromiter(self.get_jet_features(tree, track_index), float, count=len(self.event_feature_names))
-            
+                    plist = plist[sort_index][0:self.n_constituent_particles,:]
+                    subindex = subindex[sort_index][0:self.n_constituent_particles,:]
+
+                    # pad && add
+                    self.jet_constituents[total_count, jetn] = np.pad(plist, [(0, self.n_constituent_particles - plist.shape[0]),(0,0)], 'constant')
+                    track_index[jetn,:len(subindex)] = subindex
+
+                self.event_features[total_count] = np.fromiter(self.get_jet_features(tree, track_index), float, count=len(self.event_feature_names))
+                
+                if return_debug_tree:
+                    return tree, self.event_features[total_count]
+                
+                total_count += 1 
+
         if self.save_constituents:
             return self.jet_constituents, self.event_features
 
@@ -200,16 +223,17 @@ class Converter:
 
         if not outputfile.endswith(".h5"):
             outputfile += ".h5"
-        
-        # self.log(os.path.exists(outputfile))
-        # self.log(os.path.exists(os.path.dirname(outputfile)))
-        # self.log(outputfile)
+
+        self.log("saving h5 data to file {0}".format(outputfile))
+
         f = h5py.File(outputfile, "w")
         f.create_dataset('event_feature_data', data=self.event_features)
         f.create_dataset('event_feature_names', data=self.event_feature_names)
         if self.save_constituents:
             f.create_dataset('jet_constituent_data', data=self.jet_constituents)
             f.create_dataset('jet_constituent_names', data=self.jet_constituent_names)
+
+        self.log("Successfully saved!")
         f.close()
 
     def get_jet_features(
@@ -217,7 +241,7 @@ class Converter:
         tree,
         track_index,
     ):
-        j1,j2 = tree.Jet[0].P4(), tree.Jet[1].P4()
+        # j1,j2 = tree.Jet[0].P4(), tree.Jet[1].P4()
         
         ## leading 2 jets
         for i in range(self.n_jets):
@@ -233,6 +257,14 @@ class Converter:
         
             for value in self.jets_axis2_pt2(j, tree, track_index[i]):
                 yield value
+
+            yield tree.Jet[i].Flavor
+            yield j.E()
+            yield tree.Jet[i].DeltaEta
+            yield tree.Jet[i].DeltaPhi
+            yield tree.MissingET[0].MET
+            yield tree.MissingET[0].Eta
+            yield tree.MissingET[0].Phi
 
     def jets_axis2_pt2(
         self,
@@ -315,12 +347,12 @@ class Converter:
         return np.asarray(selected), np.asarray(indicies)
 
 if __name__ == "__main__":
-    if len(sys.argv) == 10:
-        (_, outputdir, filespec, pathspec, name, dr, nc, rmin, rmax, constituents) = sys.argv
+    if len(sys.argv) == 9:
+        (_, outputdir, pathspec, name, dr, nc, rmin, rmax, constituents) = sys.argv
         print outputdir
         print pathspec
-        print filespec
-        core = Converter(outputdir, filespec, pathspec, name, float(dr), int(nc), bool(int(constituents)))
+        # print filespec
+        core = Converter(outputdir, pathspec, name, float(dr), int(nc), bool(int(constituents)))
         ret = core.convert((int(rmin), int(rmax)))
         core.save()
     # elif len(sys.argv) == 0:
@@ -331,5 +363,5 @@ if __name__ == "__main__":
             print track_index.shape
         except:
             print "dang"
-            core = Converter("../data/hlfSVJ", "../data/hlfSVJ/0.0_filelist.txt", "../data/hlfSVJ/0.0_selection.txt","0.0")
-            ret = core.convert((0, 2000))
+            core = Converter(".", "../data/tightSVJ/s10/data_0_selection.txt", "data")
+            ret = core.convert((0, 500), return_debug_tree=True)

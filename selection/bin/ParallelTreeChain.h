@@ -38,14 +38,14 @@ class ParallelTreeChain{
 
         vector<TLeaf*> FindLeaf(const char* spec) {
             vector<TLeaf*> v;
-            for (size_t i = 0; i < ntrees; ++i) 
+            for (size_t i = 0; i < ntrees; ++i)
                 v.push_back(trees[i]->FindLeaf(spec));
             return v;
         }
 
         void GetN(int entry){
             int tn = 0;
-            while (entry >= 0) 
+            while (entry >= 0)
                 entry -= sizes[tn++];
             currentTree = tn - 1;
             currentEntry = entry + sizes[tn - 1]; 
@@ -63,29 +63,32 @@ class ParallelTreeChain{
             return currentTree;
         }
 
-        Int_t GetEntries() { 
+        Int_t GetEntries() {
             return entries; 
         }
 
-        void GetTrees(string filename) {
+        vector<string> GetTrees(string filename, string treetype) {
             GetTreeNames(filename);
             entries = 0;
             int i = 0;
+            vector<string> cleanTreenames; 
             for (size_t tn = 0; tn < treenames.size(); ++tn) {
                 files.push_back(new TFile(treenames[tn].c_str()));
-                bool hasDelphes = files[i]->GetListOfKeys()->Contains("Delphes");
+                bool hasDelphes = files[i]->GetListOfKeys()->Contains(treetype.c_str());
                 if(hasDelphes) {
-                    trees.push_back((TTree*)files[i]->Get("Delphes"));
+                    trees.push_back((TTree*)files[i]->Get(treetype.c_str()));
                     sizes.push_back(trees[i]->GetEntries());
+                    cleanTreenames.push_back(treenames[tn]);
                     trees[i]->GetEntry(0);
                     entries += sizes[i];
-                    i++; 
+                    i++;
                 }
                 else {
-                    files.pop_back(); 
+                    files.pop_back();
                 }
             }   
-            ntrees = trees.size(); 
+            ntrees = trees.size();
+            return cleanTreenames; 
         }
 
         int currentEntry, currentTree;
