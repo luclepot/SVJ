@@ -243,10 +243,16 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
     if split < 0:
         split = int(len(all_data)/len(spaths))
 
-    split_keys = split_to_chunks(all_data.keys(), split)
+    split_keys = list(split_to_chunks(all_data.keys(), split))
 
     for i,keys in enumerate(split_keys):
-        process_name = "{0}_combined.txt".format("{0}_merge_{1}.txt".format(name, i))
+
+        log("------------------------------------------")
+        log("  PERFORMING CONVERSION ON SAMPLE {0}/{1}".format(i + 1, len(split_keys)))
+        log("------------------------------------------")
+
+        sname = "{0}_{1}".format(name, i)
+        process_name = "{0}_combined.txt".format(sname)
         process_path = os.path.join(outputdir, process_name)
         with open(process_path, 'w+') as f:
             for k in keys:
@@ -254,51 +260,67 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
                 s += ' '.join(map(str, all_data[k]))
                 s += '\n'
                 f.write(s)
-            
+
+        setup_command = "source " + os.path.abspath("conversion/setup.sh")
+        python_command = "python " + os.path.abspath("conversion/h5converter.py")
+        python_command += " " + " ".join(map(str, [outputdir, process_path, name, DR, n_constituents, range[0], range[1], save_constituents]))
+
+        master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
+
+        if dryrun:
+            log("DRYRUN: command is:")
+            log(master_command)
+
+        elif batch is not None:
+            if batch == "condor":
+                condor_setup = ""
+                condor_submit(condor_setup + master_command, outputdir, name, setup_command)
+            else:
+                raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
+        
+        else:
+            os.system(master_command)
+
     sys.exit(0)
+        
+    # for i,data_paths in enumerate(zip(filespecs_split, spaths_split)):
+    #     log("------------------------------------------")
+    #     log("  PERFORMING CONVERSION ON SAMPLE {0}/{1}".format(i + 1, len(filespecs_split)))
+    #     log("------------------------------------------")
+        
+    #     # make master path and filespec
+    #     sname = "{0}_{1}-{2}".format(name, i*split, i*split + len(filespecs_sub))
+        
+    #     spec_path_to_write = os.path.join(outputdir, "{0}_combined_filelist.txt".format(sname))
+    #     spath_path_to_write = os.path.join(outputdir, "{0}_combined_selection.txt".format(sname))
 
-    import numpy as np
+    #     log("> writing combined specfile at path {0}".format(spec_path_to_write))
+    #     log("> writing combined selection file at path {0}".format(spath_path_to_write))
         
-    for i,data_paths in enumerate(zip(filespecs_split, spaths_split)):
-        log("------------------------------------------")
-        log("  PERFORMING CONVERSION ON SAMPLE {0}/{1}".format(i + 1, len(filespecs_split)))
-        log("------------------------------------------")
-        
-        # make master path and filespec
-        sname = "{0}_{1}-{2}".format(name, i*split, i*split + len(filespecs_sub))
-        
-        spec_path_to_write = os.path.join(outputdir, "{0}_combined_filelist.txt".format(sname))
-        spath_path_to_write = os.path.join(outputdir, "{0}_combined_selection.txt".format(sname))
+    #     events_parsed = 0
+    #     trees_parsed = 0 
 
-        log("> writing combined specfile at path {0}".format(spec_path_to_write))
-        log("> writing combined selection file at path {0}".format(spath_path_to_write))
-        
-        events_parsed = 0
-        trees_parsed = 0 
-
-        with open(spec_path_to_write, "w+") as spec_to_write:
-            with open(spath_path_to_write, "w+") as spath_to_write:
-                for j,(filespec,spath) in enumerate(zip(filespecs_sub, spaths_sub)):
-                    with open(filespec) as spec_to_read:
-                        read_lines = spec_to_read.readlines()
+    #     with open(spec_path_to_write, "w+") as spec_to_write:
+    #         with open(spath_path_to_write, "w+") as spath_to_write:
+    #             for j,(filespec,spath) in enumerate(zip(filespecs_sub, spaths_sub)):
+    #                 with open(filespec) as spec_to_read:
+    #                     read_lines = spec_to_read.readlines()
                     
-                    with open(spath) as spath_to_read:
-                        read_events = np.asarray(map(lambda x: map(long, x.split(',')), spath_to_read.read().strip().split()))
+    #                 with open(spath) as spath_to_read:
+    #                     read_events = np.asarray(map(lambda x: map(long, x.split(',')), spath_to_read.read().strip().split()))
 
-                    # add specfiles to new spec
-                    spec_to_write.writelines(read_lines)                
+    #                 # add specfiles to new spec
+    #                 spec_to_write.writelines(read_lines)                
 
-                    if read_events.shape[0] > 0:
-                        read_events[:,0] += trees_parsed
-                        spath_to_write.write(" ".join([",".join(d.astype(str)) for d in read_events]) + " ")
-                        events_parsed += read_events.shape[0]
+    #                 if read_events.shape[0] > 0:
+    #                     read_events[:,0] += trees_parsed
+    #                     spath_to_write.write(" ".join([",".join(d.astype(str)) for d in read_events]) + " ")
+    #                     events_parsed += read_events.shape[0]
 
-                    trees_parsed += len(read_lines)
+    #                 trees_parsed += len(read_lines)
 
-        log("  wrote {0} trees to combined specfile, from {1} specfiles".format(trees_parsed, len(filespecs_sub)))
-        log("  wrote {0} events to combined selection file, from {1} selection files".format(events_parsed, len(spaths_sub)))
-
-    sys.exit(0)
+    #     log("  wrote {0} trees to combined specfile, from {1} specfiles".format(trees_parsed, len(filespecs_sub)))
+    #     log("  wrote {0} events to combined selection file, from {1} selection files".format(events_parsed, len(spaths_sub)))
 
 def get_data_dict(list_of_selections):
     ret = {}
