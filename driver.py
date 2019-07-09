@@ -166,20 +166,14 @@ def setup_parser():
     select = subparsers.add_parser("select", help="base selection of events")
     convert = subparsers.add_parser("convert", help="convert raw root data to h5 files based on selection output")
     train = subparsers.add_parser("train", help="training command for module")
-    signal = subparsers.add_parser("signal", help="select/convert all rootfile events to h5 files")
 
     # shared args
-    for subparser in [select, convert, train, signal]:
+    for subparser in [select, convert, train]:
         subparser.add_argument('-o', '--output', dest="outputdir", action="store", type=_smartpath, help="output dir path", required=True)
         subparser.add_argument('-n', '--name', dest='name', action='store', default='data', help='sample save name')
         subparser.add_argument('-j', '--batch-job', dest='batch', action='store', default=None, help='attempt to run as a batch job on the indicated service')
         subparser.add_argument('-z', '--dry',  dest='dryrun', action='store_true', default=False, help='don\'t run analysis code')
     
-    # signal args
-    signal.add_argument('-i', '--input', dest="inputdir", action='store', type=_smartpath, help='input', required=True)
-    signal.add_argument('-f', '--filter', dest='filter', action='store', default='*', help='glob-style filter for root files in inputfile')
-    signal.add_argument('-r', '--range', dest='range', action='store', type=_range_input, default=(-1,-1), help='range of data to parse')
-
     # selection args
     select.add_argument('-s', '--split-trees',  dest='split', action='store', type=int, default=-1, help='split trees into chunks of N')
     select.add_argument('-i', '--input', dest="inputdir", action="store", type=_smartpath, help="input dir path", required=True)
@@ -349,62 +343,6 @@ def train_main(outputdir, name, batch, filter):
     log("running command 'train'")
     sys.exit(0)
 
-def signal_main(inputdir, outputdir, name, batch, range, dryrun, filter):
-    log("running command 'signal'")
-
-    ffilter = str(filter)
-    rng = range
-    
-    if not ffilter.endswith(".root"):
-        ffilter += ".root"
-
-    criteria = os.path.join(inputdir, ffilter)
-    all_samplenames = glob(criteria)
-
-    if len(all_samplenames) == 0:
-        error("No samples found matching glob crieria '{0}'".format(criteria))
-        sys.exit(1)
-
-    sname = '{0}_{1}'.format(name, 0)
-    base_filepath = os.path.join(outputdir, sname)
-
-    filelist_path = base_filepath + '_filelist.txt'
-    selection_path = base_filepath + '_selection.txt'
-
-    if not dryrun:
-        if not os.path.exists(outputdir):
-            os.mkdir(outputdir)
-        with open(filelist_path, 'w+') as f:
-            for line in all_samplenames:
-                f.write('{0}\n'.format(line))
-
-    setup_command = "source " + os.path.abspath("conversion/setup.sh")
-    python_command = "python " + os.path.abspath("selection/signal_selection.py")
-
-    args_to_pass = [selection_path, filelist_path, name, rng[0], rng[1]]
-    python_command += " " + " ".join(map(str, args_to_pass))
-
-    master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
-
-    if dryrun:
-        log("DRYRUN: command is:")
-        log(master_command)
-
-    elif batch is not None:
-        if batch == "condor":
-            condor_setup = ""
-            condor_submit(condor_setup + master_command, outputdir, sname, setup_command)
-        else:
-            raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
-    
-    else:
-        os.system(master_command)
-        # subprocess.Popen(master_command).wait()
-    # with open(filepath, 'w+') as f:
-    #     for i,samplename in enumerate(all_samplenames):
-    #         f.write(samplename)
-
-
 if __name__=="__main__":
     log("setting up driver")
     parser = setup_parser()
@@ -427,5 +365,4 @@ if __name__=="__main__":
         convert_main(**args_dict)
     if cmd == "train":
         train_main(**args_dict) 
-    if cmd == "signal":
-        signal_main(**args_dict)
+    
