@@ -110,14 +110,19 @@ def setup_parser():
     select = subparsers.add_parser("select", help="base selection of events")
     convert = subparsers.add_parser("convert", help="convert raw root data to h5 files based on selection output")
     train = subparsers.add_parser("train", help="training command for module")
-    
+    signal = subparsers.add_parser("signal", help="select/convert all rootfile events to h5 files")
+
     # general criteria
-    for subparser in [select, convert, train]:
+    for subparser in [select, convert, train, signal]:
         subparser.add_argument('-o', '--output', dest="outputdir", action="store", type=_smartpath, help="output dir path", required=True)
         subparser.add_argument('-n', '--name', dest='name', action='store', default='sample', help='sample save name')
         subparser.add_argument('-j', '--batch-job', dest='batch', action='store', default=None, help='attempt to run as a batch job on the indicated service')
         subparser.add_argument('-z', '--dry',  dest='dryrun', action='store_true', default=False, help='don\'t run analysis code')
     
+    # signal args
+    signal.add_argument('-i', '--input', dest="inputdir", action='store', type=_smartpath, help='input')
+    signal.add_argument('-f', '--filter', dest='filter', action='store', default='*', help='glob-style filter for root files in inputfile')
+
     # selection args
     select.add_argument('-s', '--split-trees',  dest='split', action='store', type=int, default=-1, help='split trees into chunks of N')
     select.add_argument('-i', '--input', dest="inputdir", action="store", type=_smartpath, help="input dir path", required=True)
