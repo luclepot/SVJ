@@ -274,7 +274,7 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
         elif batch is not None:
             if batch == "condor":
                 condor_setup = ""
-                condor_submit(condor_setup + master_command, outputdir, name, setup_command)
+                condor_submit(condor_setup + master_command, outputdir, sname, setup_command)
             else:
                 raise ArgumentError("unrecognized batch platform '{0}'".format(batch))
         
