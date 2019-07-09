@@ -623,16 +623,24 @@ def smartpath(path):
     return os.path.abspath(path)
 
 def get_cutflow_table(glob_path):
-        
     paths = glob.glob(glob_path)
     assert len(paths) > 0, "must have SOME paths"
-    
-    values = []
-    keys = []
+
+    ret = odict()
     for path in paths:
         with open(path) as f:
             values_comp, keys_comp = map(lambda x: x.strip('\n').split(','), f.readlines())
             values_comp = map(int, values_comp)
+            keys_comp = map(str.strip, ['no cut'] + keys_comp)
+            for k,v in zip(keys_comp, values_comp):
+                if k not in ret:
+                    ret[k] = 0
+                ret[k] = ret[k] + v
+    df = pd.DataFrame(ret.items(), columns=['cut_name', 'n_events'])
+    df['abs eff.'] = np.round(100.*(df.n_events / df.n_events[0]), 2)
+    df['rel eff.'] = np.round([100.] + [100.*(float(df.n_events[i + 1]) / float(df.n_events[i])) for i in range(len(df.n_events) - 1)], 2)
+    
+    return df
 
 def get_training_data(glob_path):
     paths = glob.glob(glob_path)
@@ -663,6 +671,16 @@ def get_subheaders(data):
         classes[n].append(rep)
         i += 1
     return classes
+
+def get_selections_dict(list_of_selections):
+    ret = {}
+    for sel in list_of_selections:
+        with open(sel, 'r') as f:
+            data = map(lambda x: x.strip('\n'), f.readlines())
+        for elt in data:
+            key, raw = elt.split(': ')
+            ret[key] = map(int, raw.split())
+    return ret
 
 def get_repo_info():
     info = {}
