@@ -16,7 +16,6 @@ def logbase(s, prefix):
     for line in s.split('\n'):
         print prefix + str(line)
 
-
 if __name__=="__main__":
     args = sys.argv
     (_, dummy_filepath, input_filepath, name, rmin, rmax) = args
