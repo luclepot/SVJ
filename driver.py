@@ -254,12 +254,11 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
                 s += ' '.join(map(str, all_data[k]))
                 s += '\n'
                 f.write(s)
-        
             
     sys.exit(0)
 
     import numpy as np
-    
+        
     for i,data_paths in enumerate(zip(filespecs_split, spaths_split)):
         log("------------------------------------------")
         log("  PERFORMING CONVERSION ON SAMPLE {0}/{1}".format(i + 1, len(filespecs_split)))
