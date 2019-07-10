@@ -38,7 +38,7 @@ TCanvas *leptonCount(string filename) {
     return cst;
 }
 
-TCanvas *ptCompare(string filename, float xmax=2500., float ymax=-1) {
+TCanvas *ptCompare(string filename, float xmax=-1., float ymax=-1.) {
     THStack *hs = new THStack("hs","Jet PT;Pt;Count");
     
     TFile *f = new TFile(filename.c_str()); 
@@ -73,13 +73,15 @@ TCanvas *ptCompare(string filename, float xmax=2500., float ymax=-1) {
 
     // cst->SetLogy(); 
     hs->Draw("nostack"); 
-    hs->GetXaxis()->SetLimits(0., xmax);
+    if (xmax > 0)
+        hs->GetXaxis()->SetLimits(0., xmax);
     hs->SetMinimum(0);
     
     if (ymax > 0)
         hs->SetMaximum(ymax);
 
-    hs->Draw("nostack"); 
+    if (xmax > 0)
+        hs->Draw("nostack"); 
 
     auto legend = new TLegend(0.6, 0.7, .95, .92);
     legend->SetHeader("Legend","C"); // option "C" allows to center the header
@@ -94,7 +96,7 @@ TCanvas *ptCompare(string filename, float xmax=2500., float ymax=-1) {
     return cst;
 }
 
-int plot(string filepath, float xmax=2500, float ymax=-1.) {
+int plot(string filepath, string outputpath, float xmax=-1., float ymax=-1.) {
     cout << "plotting!" << endl;
     cout << filepath << endl; 
 
@@ -102,11 +104,15 @@ int plot(string filepath, float xmax=2500, float ymax=-1.) {
     TImage *img2 = TImage::Create();
     
     img1->FromPad(leptonCount(filepath)); 
-    img1->WriteImage("lepton_counts.png");
+    string s1 = outputpath + "lepton_counts.png";
+    cout << "saving image to path '" << s1 << "'" << endl;
+    img1->WriteImage(s1.c_str());
 
 
     img2->FromPad(ptCompare(filepath, xmax, ymax)); 
-    img2->WriteImage("pt_compare.png");
+    string s2 = outputpath + "pt_compare.png"; 
+    cout << "saving image to path '" << s2 << "'" << endl;
+    img2->WriteImage(s2.c_str());
     
     // cout << endl; 
     // string s;
