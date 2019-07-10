@@ -54,6 +54,16 @@ int main(int argc, char **argv) {
     core.AddHist(Hists::mjj, "h_Mjj", "m_{JJ}", 750, 0, 7500);
     core.AddHist(Hists::metPt, "h_METPt", "MET_{p_{T}}", 100, 0, 2000);
     
+    // histograms for pre/post PT wrt PT cut (i.e. after MET, before PT && afer PT)
+    core.AddHist(Hists::pre_1pt, "h_pre_1pt", "pre PT cut leading jet pt", 100, 0, 2500);
+    core.AddHist(Hists::pre_2pt, "h_pre_2pt", "pre PT cut subleading jet pt", 100, 0, 2500);
+    core.AddHist(Hists::post_1pt, "h_post_1pt", "post PT cut leading jet pt", 100, 0, 2500);
+    core.AddHist(Hists::post_2pt, "h_post_2pt", "post PT cut subleading jet pt", 100, 0, 2500);
+
+    // histograms for pre/post lepton count wrt lepton cut
+    core.AddHist(Hists::pre_lep, "h_pre_lep", "lepton count pre-cut", 10, 0, 10);
+    core.AddHist(Hists::post_lep, "h_post_lep", "lepton count post-cut", 10, 0, 10);
+    
     // add componenets for jets (tlorentz)
     vector<TLorentzVector>* Jets = core.AddLorentz("Jet", {"Jet.PT","Jet.Eta","Jet.Phi","Jet.Mass"});
     vector<TLorentzMock>* Electrons = core.AddLorentzMock("Electron", {"Electron.PT","Electron.Eta"});
@@ -77,11 +87,20 @@ int main(int argc, char **argv) {
         core.InitCuts(); 
         core.GetEntry(entry);
 
+        bool last;
+
         // require zero leptons which pass cuts
-        core.Cut(
+        // pre lepton cut
+        core.Fill(Hists::pre_lep, Muons->size() + Electrons->size());
+        last = core.Cut(
             (leptonCount(Muons, MuonIsolation) + leptonCount(Electrons, ElectronIsolation)) < 1,
             Cuts::leptonCounts
             );
+
+        if (!last)
+            continue;
+
+        core.Fill(Hists::post_lep, Muons->size() + Electrons->size());
 
         // require more than 1 jet
         core.Cut(
@@ -121,10 +140,19 @@ int main(int argc, char **argv) {
                 );
 
             // require both leading jets to have transverse momentum greater than 200
-            core.Cut(
+            core.Fill(Hists::pre_1pt, Jets->at(0).Pt()); 
+            core.Fill(Hists::pre_2pt, Jets->at(1).Pt()); 
+
+            last = core.Cut(
                 Vetos::JetPtVeto(Jets->at(0)) && Vetos::JetPtVeto(Jets->at(1)),
                 Cuts::jetPt
                 );
+            if (!last) {
+                continue; 
+            }
+
+            core.Fill(Hists::post_1pt, Jets->at(0).Pt());
+            core.Fill(Hists::post_2pt, Jets->at(1).Pt());
 
             // conglomerate cut, whether jet is a dijet
             core.Cut(
