@@ -1,5 +1,8 @@
 #include <string> 
+#include <iostream>
 
+using std::cout;
+using std::endl; 
 using std::string; 
 
 TCanvas *leptonCount(string filename) {
@@ -10,13 +13,16 @@ TCanvas *leptonCount(string filename) {
     TH1F *post = (TH1F*)f->Get("h_post_lep");
 
     pre->SetMarkerStyle(21);
+    pre->SetLineStyle(1); 
     pre->SetLineColor(kRed);
 
     post->SetMarkerStyle(21);
     post->SetLineColor(kBlue);
+    pre->SetLineStyle(2); 
+
     
-    hs->Add(pre);
     hs->Add(post);
+    hs->Add(pre);
 
     TCanvas *cst = new TCanvas("cst","stacked hists",10,10,700,700);
 
@@ -32,7 +38,7 @@ TCanvas *leptonCount(string filename) {
     return cst;
 }
 
-TCanvas *ptCompare(string filename) {
+TCanvas *ptCompare(string filename, float xmax=2500., float ymax=-1) {
     THStack *hs = new THStack("hs","Jet PT;Pt;Count");
     
     TFile *f = new TFile(filename.c_str()); 
@@ -46,25 +52,22 @@ TCanvas *ptCompare(string filename) {
 
     pre1->SetLineColor(kRed);
     pre1->SetLineStyle(1);
-    pre2->SetLineColor(kRed); 
-    pre2->SetLineStyle(2);
+    pre2->SetLineColor(kOrange); 
+    pre2->SetLineStyle(1);
     
     post1->SetLineColor(kBlue);
-    post1->SetLineStyle(1);
-    post2->SetLineColor(kBlue); 
+    post1->SetLineStyle(2);
+    post2->SetLineColor(kBlack); 
     post2->SetLineStyle(2);
 
-    hs->Add(post1);
-    hs->Add(post2);
+
     hs->Add(pre1);
     hs->Add(pre2);
-
+    hs->Add(post1);
+    hs->Add(post2);
 
     TCanvas *cst = new TCanvas("cst","stacked hists",10,10,700,700);
 
-    float xmax, ymax;
-    xmax = 1000.;
-    ymax = 1500.;
 
     cst->cd();
 
@@ -72,7 +75,10 @@ TCanvas *ptCompare(string filename) {
     hs->Draw("nostack"); 
     hs->GetXaxis()->SetLimits(0., xmax);
     hs->SetMinimum(0);
-    hs->SetMaximum(ymax);
+    
+    if (ymax > 0)
+        hs->SetMaximum(ymax);
+
     hs->Draw("nostack"); 
 
     auto legend = new TLegend(0.6, 0.7, .95, .92);
@@ -86,4 +92,34 @@ TCanvas *ptCompare(string filename) {
     // cst->SetRangeUser(0, 1500); 
 
     return cst;
+}
+
+int plot(string filepath, float xmax=2500, float ymax=-1.) {
+    cout << "plotting!" << endl;
+    cout << filepath << endl; 
+
+    TImage *img1 = TImage::Create();
+    TImage *img2 = TImage::Create();
+    
+    img1->FromPad(leptonCount(filepath)); 
+    img1->WriteImage("lepton_counts.png");
+
+
+    img2->FromPad(ptCompare(filepath, xmax, ymax)); 
+    img2->WriteImage("pt_compare.png");
+    
+    // cout << endl; 
+    // string s;
+    // cout << "press anything to continue...";
+    // cin >> s;
+    // cout << endl;
+    // cout << "press anything to continue...";
+    // cin >> s;
+    // cout << endl;
+    
+    delete img1;
+    delete img2;
+
+    
+    return 0; 
 }
