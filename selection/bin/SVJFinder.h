@@ -77,6 +77,15 @@ namespace Hists {
         met2,
         mjj,
         metPt,
+
+        pre_1pt,
+        pre_2pt,
+        post_1pt,
+        post_2pt,
+
+        pre_lep,
+        post_lep,
+
         COUNT
     };
 }; 
@@ -341,8 +350,9 @@ public:
     /// CUTS
     ///
 
-        void Cut(bool expression, Cuts::CutType cutName) {
+        bool Cut(bool expression, Cuts::CutType cutName) {
             cutValues[cutName] = expression ? 1 : 0;
+            return expression;
         }
 
         bool Cut(Cuts::CutType cutName) {
@@ -406,7 +416,7 @@ public:
                 }
                 WriteVector(f, CutFlow);
                 WriteVector(f, cutNames);
-                f.close(); 
+                f.close();
             }
         }
 
