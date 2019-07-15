@@ -264,7 +264,8 @@ class data_table(logger):
         alpha=0.7,
         xscale="linear",
         yscale="linear",
-        histtype='step'
+        histtype='step',
+        figname="Untitled",
     ):
         if isinstance(values, str):
             values = [key for key in self.headers if glob.fnmatch.fnmatch(key, values)]
@@ -324,6 +325,7 @@ class data_table(logger):
         handles,labels = ax.get_legend_handles_labels()
         plt.figlegend(handles, labels, loc=figloc)
         plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01)
+        plt.title(figname)
         plt.show()
     
     def cdrop(
@@ -597,6 +599,58 @@ delphes_jet_tags_dict = {
     21: "gluon",
     9: "gluon"
 }
+
+def plot_error_ratios(main_error, compare_errors, metric='mse', bins= 40, log=False, rng=None, alpha=0.6):
+    import matplotlib.pyplot as plt
+    raw_counts, binned = np.histogram(main_error[metric], bins=bins, normed=False, range=rng)
+    raw_counts = raw_counts.astype(float)
+    
+    zeros = np.where(raw_counts == 0)[0]
+    if len(zeros) > 0:
+        cutoff_index = zeros[0]
+    else:
+        cutoff_index = len(raw_counts)
+    raw_counts = raw_counts[:cutoff_index]
+    binned = binned[:cutoff_index + 1]
+        
+    ratios = []
+    for e in compare_errors:
+        counts, _ = np.histogram(e[metric], bins=bins, normed=False, range=rng)
+        counts = counts.astype(float)[:cutoff_index]
+        ratio = counts/raw_counts
+        ratio_plot = ratio*(main_error.shape[0]/e.shape[0])
+        ratios.append((ratio, raw_counts, counts))
+        toplot = np.asarray(list(ratio_plot) + [0])
+        err = np.asarray(list(1/counts) + [0])
+        plt.plot(binned, toplot, label=e.name.lstrip("error ") + " ({0})".format(e.shape[0]), marker='o', alpha=alpha)
+        if log:
+            plt.yscale("log")
+    plt.legend()
+    plt.show()
+    return ratios
+
+def get_errors(true, pred, out_name="errors", functions=["mse", "mae"], names=[None, None]):
+    import tensorflow as tf
+    import keras
+    if names is None:
+        names = ['err {}'.format(i) for i in range(len(functions))]
+    
+    functions_keep = []
+    for i,f in enumerate(functions):
+        if isinstance(f, str):
+            fuse = getattr(keras.losses, f)
+            functions_keep.append(fuse)
+            names[i] = f
+        else:
+            functions_keep.append(f)
+    
+    raw = [func(true, pred) for func in functions_keep]
+    raw = np.asarray(map(lambda x: keras.backend.eval(x) if isinstance(x, tf.Tensor) else x, raw)).T
+    return data_table(
+        raw,
+        headers=[str(f) for f in names],
+        name=out_name
+    )
 
 def split_table_by_column(column_name, df, tag_names=None, keep_split_column=False, df_to_write=None):
     if df_to_write is None:
