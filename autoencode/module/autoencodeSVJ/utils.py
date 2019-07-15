@@ -154,6 +154,7 @@ class data_table(logger):
         self,
         data=None,
         norm_type=0,
+        out_name=None,
         **scaler_args
     ):
         if isinstance(norm_type, str):
@@ -171,19 +172,19 @@ class data_table(logger):
         
         assert isinstance(data, data_table), "data must be data_table type"
 
-        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name="'{}' normed to '{}'".format(data.name,self.name))
+        if out_name is None:
+            out_name = "'{}' normed to '{}'".format(data.name,self.name)
+
+        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name=out_name)
         return ret
 
     def inorm(
         self,
-        data=None, 
-        rng=None,
+        data=None,
         norm_type=0,
+        out_name=None,
         **scaler_args
     ):
-
-        if rng is None:
-            rng = (0,1)
 
         if isinstance(norm_type, str):
             norm_type = getattr(self.NORM_TYPES, norm_type)
@@ -192,7 +193,7 @@ class data_table(logger):
         
         assert isinstance(norm_type, self.NORM_TYPES)
 
-        self.scaler = getattr(prep, norm_type.name)(rng, **scaler_args)
+        self.scaler = getattr(prep, norm_type.name)(**scaler_args)
         self.scaler.fit(self.df)
         
         if data is None:
@@ -200,7 +201,10 @@ class data_table(logger):
         
         assert isinstance(data, data_table), "data must be data_table type"
 
-        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name="'{}' inv_normed to '{}'".format(data.name,self.name))
+        if out_name is None:
+            out_name = "'{}' inv_normed to '{}'".format(data.name,self.name)
+
+        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name=out_name)
         return ret
         
     def __getattr__(
@@ -260,12 +264,13 @@ class data_table(logger):
         fontsize=10,
         normed=0,
         figloc="lower right",
-        figsize=(16,7),
+        figsize=16,
         alpha=0.7,
         xscale="linear",
         yscale="linear",
         histtype='step',
         figname="Untitled",
+        savename=None,
     ):
         if isinstance(values, str):
             values = [key for key in self.headers if glob.fnmatch.fnmatch(key, values)]
@@ -301,6 +306,9 @@ class data_table(logger):
 
         weights = None
 
+        if not isinstance(figsize, tuple):
+            figsize = (figsize, rows*float(figsize)/cols)
+
         self.log("plotting distrubution(s) for table(s) {}".format([self.name,] + [o.name for o in others]))
         plt.rcParams['figure.figsize'] = figsize
 
@@ -324,9 +332,12 @@ class data_table(logger):
 
         handles,labels = ax.get_legend_handles_labels()
         plt.figlegend(handles, labels, loc=figloc)
-        plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01)
-        plt.title(figname)
-        plt.show()
+        plt.suptitle(figname)
+        plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01, rect=[0, 0.03, 1, 0.95])
+        if savename is None:
+            plt.show()
+        else:
+            plt.savefig(savename)
     
     def cdrop(
         self,
@@ -696,15 +707,15 @@ def get_cutflow_table(glob_path):
     
     return df
 
-def get_training_data(glob_path):
+def get_training_data(glob_path, verbose=1):
     paths = glob.glob(glob_path)
-    d = data_loader("main sample")
+    d = data_loader("main sample", verbose=verbose)
     for p in paths:
         d.add_sample(p)
     return d.make_table()
 
-def get_training_data_jets(glob_path):
-    return split_to_jets(get_training_data(glob_path))
+def get_training_data_jets(glob_path, verbose=1):
+    return split_to_jets(get_training_data(glob_path, verbose))
 
 def get_subheaders(data):
     classes = {}
@@ -772,3 +783,179 @@ def split_to_jets(data):
 
 def log_uniform(low, high, size=None, base=10.):
     return float(base)**(np.random.uniform(np.log(low)/np.log(base), np.log(high)/np.log(base), size))
+
+def split_by_tag(data, tag_column="jetFlavor", printout=True):
+    tagged, tag_index = split_table_by_column(
+        "jetFlavor",
+        data,
+        delphes_jet_tags_dict,
+        False
+    )
+    if printout:
+        sizes = map(lambda x: x.shape[0], tagged)
+        for t,s in zip(tagged, sizes):
+            print  "{} jet: {}, {}%".format(t.name, s, round(100.*s/sum(sizes), 1))
+        
+    return tagged, tag_index
+    
+def compare_tags(datasets):
+    
+    tags = map(lambda x: dict([(t.name, t) for t in split_by_tag(x, printout=False)[0]]), datasets)
+    tag_ids = set().union(*[set([tn for tn in tlist]) for tlist in tags])
+    
+    for tag_id in tag_ids:
+        print "{}:".format(tag_id)
+        for t,d in zip(tags, datasets):
+            
+            if tag_id in t:
+                tag = t[tag_id]
+                print "\t{:.1f}% ({}) {}".format(100.*tag.shape[0]/d.shape[0], tag.shape[0], d.name)
+            
+def get_recon_errors(data_list, autoencoder, **kwargs):
+
+    if not isinstance(data_list, list):
+        data_list = [data_list]
+    
+    recon = []
+    errors = []
+    
+    for i,d in enumerate(data_list):
+        recon.append(
+            data_table(
+                autoencoder.predict(d.data),        
+                headers=d.headers,
+                name="{0} pred".format(d.name)
+            )
+        )
+        errors.append(
+            get_errors(recon[i].data, d.data, out_name="{0} error".format(d.name), **kwargs)
+        )
+        
+    return errors, recon
+
+def roc_auc_plot(data_err, signal_err):
+    from sklearn.metrics import roc_curve, roc_auc_score
+    pred = np.hstack([signal_err['mae'].values, data_err['mae'].values])
+    true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
+
+    roc = roc_curve(true, pred)
+    auc = roc_auc_score(true, pred)
+    print "auc value:", auc
+    plt.figure(figsize=(10,10))
+    # ax = fig.axes() 
+    plt.plot(roc[0], roc[1])
+    plt.plot((0,1), (0,1))
+    plt.show()
+    
+    return {"roc": roc, "auc": auc}
+
+def load_all_data(data_path, name, cols_to_drop = ["jetM", "*MET*", "*Delta*"]):
+    repo_head = get_repo_info()['head']
+
+    if not os.path.exists(data_path):
+        assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+        data_path = os.path.join(repo_head, data_path)
+    
+    # if not os.path.exists(signal_path):
+    #     assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+    #     signal_path = os.path.join(repo_head, signal_path)
+        
+    # if not os.path.exists(model_path):
+    #     assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+    #     model_path = os.path.join(repo_head, model_path)
+
+    data, data_jets = get_training_data_jets(data_path, 0)
+    # signal, signal_jets = get_training_data_jets(signal_path, 0)
+
+    data.name = name
+
+    data.cdrop(cols_to_drop, inplace=True)
+    # signal.cdrop(cols_to_drop, inplace=True)
+    
+    print "{} tags:".format(name)
+    print "" 
+    tagged_data, tag_index_data = split_by_tag(data)
+    print ""
+    # print "signal tags:"
+    # print ""
+    # tagged_signal, tag_index_signal = split_by_tag(signal)
+    # print ""
+
+    return data, tagged_data, data_jets
+
+def evaluate_model(data_path, signal_path, model_path):
+    # get h5 datasets
+    repo_head = get_repo_info()['head']
+
+    if not os.path.exists(data_path):
+        assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+        data_path = os.path.join(repo_head, data_path)
+    
+    if not os.path.exists(signal_path):
+        assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+        signal_path = os.path.join(repo_head, signal_path)
+        
+    if not os.path.exists(model_path):
+        assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+        model_path = os.path.join(repo_head, model_path)
+
+        
+    data, data_jets = get_training_data_jets(data_path, 0)
+    signal, signal_jets = get_training_data_jets(signal_path, 0)
+
+    signal.name = "signal"
+    data.name = "background"
+
+    # drop some unused columns
+    cols_to_drop = ["jetM", "*MET*", "*Delta*"]
+
+    data.cdrop(cols_to_drop, inplace=True)
+    signal.cdrop(cols_to_drop, inplace=True)
+    
+    print "data tags:"
+    print "" 
+    tagged_data, tag_index_data = split_by_tag(data)
+    print ""
+    print "signal tags:"
+    print ""
+    tagged_signal, tag_index_signal = split_by_tag(signal)
+    print ""
+    
+    data_raw = data.cdrop("*Flavor")
+    signal_raw = signal.cdrop("*Flavor")
+
+    norm_args = {
+        "norm_type": "StandardScaler",
+    #     "feature_range": (0.01, 0.99)
+    }
+
+    data_norm = data_raw.norm(**norm_args)
+    signal_norm = data_raw.norm(signal_raw, **norm_args)
+    
+
+    instance = trainer.trainer(model_path, verbose=False)
+    autoencoder = instance.load_model()
+    encoder, decoder = autoencoder.layers[1:]
+    
+    tagged_norm = [data_raw.norm(t, **norm_args) for t in tagged_data]
+
+    errors, recon = get_recon_errors([data_norm, signal_norm] + tagged_norm, autoencoder)
+    
+    data_recon, signal_recon, tagged_recon = recon[0], recon[1], recon[2:]
+    data_error, signal_error, tagged_error = errors[0], errors[1], errors[2:]
+    
+    roc_auc_plot(data_error, signal_error)
+    
+    data_recon.name = "background pred"
+    signal_recon.name = "signal pred"
+    data_norm.name = "background (norm)"
+    signal_norm.name = "signal (norm)"
+    
+    data_norm.plot(
+        [data_recon, signal_norm, signal_recon],
+        normed=1, bins=70, cols=2, figsize=(10,20),
+#         rng=((0,2), (-3.2, 3.2), (0,2500), (0,1), (0, 0.8),(0,.1), (0,3000)),
+        figname="signal/data comparison"
+    )
+    
+    signal_error.plot(data_error, normed=1, bins=100, figname="signal vs data errors")
