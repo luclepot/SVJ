@@ -833,9 +833,9 @@ def get_recon_errors(data_list, autoencoder, **kwargs):
         
     return errors, recon
 
-def roc_auc_plot(data_err, signal_err):
+def roc_auc_plot(data_err, signal_err, metric='mae'):
     from sklearn.metrics import roc_curve, roc_auc_score
-    pred = np.hstack([signal_err['mae'].values, data_err['mae'].values])
+    pred = np.hstack([signal_err[metric].values, data_err[metric].values])
     true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
 
     roc = roc_curve(true, pred)
