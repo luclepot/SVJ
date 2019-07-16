@@ -358,13 +358,14 @@ class trainer(logger):
                     nhistory = model.fit(
                         x=x_train,
                         y=y_train,
-                        steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
-                        validation_steps=int(np.ceil(len(x_test)/batch_size)),
+                        # steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
+                        # validation_steps=int(np.ceil(len(x_test)/batch_size)),
                         validation_data=[x_test, y_test],
                         initial_epoch=master_epoch_n,
                         epochs=master_epoch_n + 1,
                         verbose=verbose,
-                        callbacks=callbacks
+                        callbacks=callbacks,
+                        batch_size=batch_size,
                     ).history
 
                     if epoch == 0:
@@ -390,13 +391,14 @@ class trainer(logger):
             nhistory = model.fit(
                 x=x_train,
                 y=y_train,
-                steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
-                validation_steps=int(np.ceil(len(x_test)/batch_size)),
+#                steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
+#                validation_steps=int(np.ceil(len(x_test)/batch_size)),
                 validation_data=[x_test, y_test],
                 initial_epoch=master_epoch_n,
                 epochs=master_epoch_n + epochs,
                 verbose=verbose,
-                callbacks=callbacks
+                callbacks=callbacks,
+		batch_size=batch_size,
             ).history
 
             for metric in nhistory:
