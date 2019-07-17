@@ -845,8 +845,10 @@ def roc_auc(data_err, signal_errs):
         ret[signal_err.name] = {'roc': roc, 'auc': auc}
     return ret
 
-def roc_auc_plot(data_errs, signal_errs, metric='loss', *args, **kwargs):
+def roc_auc_plot(data_errs, signal_errs, metrics='loss', *args, **kwargs):
     from sklearn.metrics import roc_curve, roc_auc_score
+    if not isinstance(metrics, list):
+        metrics = [metrics]
 
     if not isinstance(signal_errs, list):
         signal_errs = [signal_errs]
@@ -862,13 +864,15 @@ def roc_auc_plot(data_errs, signal_errs, metric='loss', *args, **kwargs):
 
     for i,(data_err,signal_err) in enumerate(zip(data_errs, signal_errs)):
 
-        pred = np.hstack([signal_err[metric].values, data_err[metric].values])
-        true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
+        styles = ['o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H', 'D', 'd', 'P', 'X']
+        for j,metric in enumerate(metrics):
+            pred = np.hstack([signal_err[metric].values, data_err[metric].values])
+            true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
 
-        roc = roc_curve(true, pred)
-        auc = roc_auc_score(true, pred)
+            roc = roc_curve(true, pred)
+            auc = roc_auc_score(true, pred)
         
-        ax.plot(roc[0], roc[1], c=colors[i], label='{}, AUC {:.4f}'.format(signal_err.name, auc))
+            ax.plot(roc[0], roc[1], styles[j], c=colors[i], label='{} {}, AUC {:.4f}'.format(signal_err.name, metric, auc))
 
     ax.plot(roc[0], roc[0], '--', c='black')
     ax_end("false positive rate", "true positive rate")

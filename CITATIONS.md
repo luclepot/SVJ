@@ -24,3 +24,18 @@
     - gives an overview of sparsity enforcement in DNNs
     - asserts specifically that simple sparsity enforcement works better than more complex techniques 
         - mag pruning, l0 norm, etc. easier to enforce
+
+- Chalapathy, Raghavendra, Aditya Krishna Menon, and Sanjay Chawla. "Anomaly detection using one-class neural networks." arXiv preprint arXiv:1802.06360 (2018).
+    - link: https://arxiv.org/pdf/1802.06360
+    - **One class NN** detects anomalies
+    - OPtimization objective takes **anamoly detection** into account; departure from other approaches
+    - Summary of DL models for anomaly detection:
+        - Autoencoders (using reconstruction error)
+        - Hybrid model (autoencoder as feature extractor, hidden layers used as input to OC-SVM or something similar)
+    - This work: combines OC SVM capability into NN training objective, customizing neural network for anomaly detection
+    - Doesn't really work better for large-scale data sets than robust autoencoder does. 
+     
+- Schölkopf, Bernhard, et al. "Support vector method for novelty detection." Advances in neural information processing systems. 2000.
+    - SVM single-class variant, used in the above paper. 
+    - Might actually work well for estimating background as well
+
