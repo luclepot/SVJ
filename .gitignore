@@ -12,6 +12,7 @@
 *_condor.submit
 *.json
 *.__afs*
+*REF.ipynb
 #
 # CUSTOM
 

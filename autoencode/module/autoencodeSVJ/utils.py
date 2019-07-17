@@ -154,6 +154,7 @@ class data_table(logger):
         self,
         data=None,
         norm_type=0,
+        out_name=None,
         **scaler_args
     ):
         if isinstance(norm_type, str):
@@ -171,19 +172,19 @@ class data_table(logger):
         
         assert isinstance(data, data_table), "data must be data_table type"
 
-        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name="'{}' normed to '{}'".format(data.name,self.name))
+        if out_name is None:
+            out_name = "'{}' normed to '{}'".format(data.name,self.name)
+
+        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name=out_name)
         return ret
 
     def inorm(
         self,
-        data=None, 
-        rng=None,
+        data=None,
         norm_type=0,
+        out_name=None,
         **scaler_args
     ):
-
-        if rng is None:
-            rng = (0,1)
 
         if isinstance(norm_type, str):
             norm_type = getattr(self.NORM_TYPES, norm_type)
@@ -192,7 +193,7 @@ class data_table(logger):
         
         assert isinstance(norm_type, self.NORM_TYPES)
 
-        self.scaler = getattr(prep, norm_type.name)(rng, **scaler_args)
+        self.scaler = getattr(prep, norm_type.name)(**scaler_args)
         self.scaler.fit(self.df)
         
         if data is None:
@@ -200,7 +201,10 @@ class data_table(logger):
         
         assert isinstance(data, data_table), "data must be data_table type"
 
-        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name="'{}' inv_normed to '{}'".format(data.name,self.name))
+        if out_name is None:
+            out_name = "'{}' inv_normed to '{}'".format(data.name,self.name)
+
+        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name=out_name)
         return ret
         
     def __getattr__(
@@ -260,11 +264,13 @@ class data_table(logger):
         fontsize=10,
         normed=0,
         figloc="lower right",
-        figsize=(16,7),
+        figsize=16,
         alpha=0.7,
         xscale="linear",
         yscale="linear",
-        histtype='step'
+        histtype='step',
+        figname="Untitled",
+        savename=None,
     ):
         if isinstance(values, str):
             values = [key for key in self.headers if glob.fnmatch.fnmatch(key, values)]
@@ -300,6 +306,9 @@ class data_table(logger):
 
         weights = None
 
+        if not isinstance(figsize, tuple):
+            figsize = (figsize, rows*float(figsize)/cols)
+
         self.log("plotting distrubution(s) for table(s) {}".format([self.name,] + [o.name for o in others]))
         plt.rcParams['figure.figsize'] = figsize
 
@@ -323,8 +332,12 @@ class data_table(logger):
 
         handles,labels = ax.get_legend_handles_labels()
         plt.figlegend(handles, labels, loc=figloc)
-        plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01)
-        plt.show()
+        plt.suptitle(figname)
+        plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01, rect=[0, 0.03, 1, 0.95])
+        if savename is None:
+            plt.show()
+        else:
+            plt.savefig(savename)
     
     def cdrop(
         self,
@@ -598,6 +611,58 @@ delphes_jet_tags_dict = {
     9: "gluon"
 }
 
+def plot_error_ratios(main_error, compare_errors, metric='mse', bins= 40, log=False, rng=None, alpha=0.6):
+    import matplotlib.pyplot as plt
+    raw_counts, binned = np.histogram(main_error[metric], bins=bins, normed=False, range=rng)
+    raw_counts = raw_counts.astype(float)
+    
+    zeros = np.where(raw_counts == 0)[0]
+    if len(zeros) > 0:
+        cutoff_index = zeros[0]
+    else:
+        cutoff_index = len(raw_counts)
+    raw_counts = raw_counts[:cutoff_index]
+    binned = binned[:cutoff_index + 1]
+        
+    ratios = []
+    for e in compare_errors:
+        counts, _ = np.histogram(e[metric], bins=bins, normed=False, range=rng)
+        counts = counts.astype(float)[:cutoff_index]
+        ratio = counts/raw_counts
+        ratio_plot = ratio*(main_error.shape[0]/e.shape[0])
+        ratios.append((ratio, raw_counts, counts))
+        toplot = np.asarray(list(ratio_plot) + [0])
+        err = np.asarray(list(1/counts) + [0])
+        plt.plot(binned, toplot, label=e.name.lstrip("error ") + " ({0})".format(e.shape[0]), marker='o', alpha=alpha)
+        if log:
+            plt.yscale("log")
+    plt.legend()
+    plt.show()
+    return ratios
+
+def get_errors(true, pred, out_name="errors", functions=["mse", "mae"], names=[None, None]):
+    import tensorflow as tf
+    import keras
+    if names is None:
+        names = ['err {}'.format(i) for i in range(len(functions))]
+    
+    functions_keep = []
+    for i,f in enumerate(functions):
+        if isinstance(f, str):
+            fuse = getattr(keras.losses, f)
+            functions_keep.append(fuse)
+            names[i] = f
+        else:
+            functions_keep.append(f)
+    
+    raw = [func(true, pred) for func in functions_keep]
+    raw = np.asarray(map(lambda x: keras.backend.eval(x) if isinstance(x, tf.Tensor) else x, raw)).T
+    return data_table(
+        raw,
+        headers=[str(f) for f in names],
+        name=out_name
+    )
+
 def split_table_by_column(column_name, df, tag_names=None, keep_split_column=False, df_to_write=None):
     if df_to_write is None:
         df_to_write = df
@@ -642,15 +707,15 @@ def get_cutflow_table(glob_path):
     
     return df
 
-def get_training_data(glob_path):
+def get_training_data(glob_path, verbose=1):
     paths = glob.glob(glob_path)
-    d = data_loader("main sample")
+    d = data_loader("main sample", verbose=verbose)
     for p in paths:
         d.add_sample(p)
     return d.make_table()
 
-def get_training_data_jets(glob_path):
-    return split_to_jets(get_training_data(glob_path))
+def get_training_data_jets(glob_path, verbose=1):
+    return split_to_jets(get_training_data(glob_path, verbose))
 
 def get_subheaders(data):
     classes = {}
@@ -718,3 +783,317 @@ def split_to_jets(data):
 
 def log_uniform(low, high, size=None, base=10.):
     return float(base)**(np.random.uniform(np.log(low)/np.log(base), np.log(high)/np.log(base), size))
+
+def split_by_tag(data, tag_column="jetFlavor", printout=True):
+    tagged, tag_index = split_table_by_column(
+        "jetFlavor",
+        data,
+        delphes_jet_tags_dict,
+        False
+    )
+    if printout:
+        sizes = map(lambda x: x.shape[0], tagged)
+        for t,s in zip(tagged, sizes):
+            print  "{} jet: {}, {}%".format(t.name, s, round(100.*s/sum(sizes), 1))
+        
+    return tagged, tag_index
+    
+def compare_tags(datasets):
+    
+    tags = map(lambda x: dict([(t.name, t) for t in split_by_tag(x, printout=False)[0]]), datasets)
+    tag_ids = set().union(*[set([tn for tn in tlist]) for tlist in tags])
+    
+    for tag_id in tag_ids:
+        print "{}:".format(tag_id)
+        for t,d in zip(tags, datasets):
+            
+            if tag_id in t:
+                tag = t[tag_id]
+                print "\t{:.1f}% ({}) {}".format(100.*tag.shape[0]/d.shape[0], tag.shape[0], d.name)
+            
+def get_recon_errors(data_list, autoencoder, **kwargs):
+
+    if not isinstance(data_list, list):
+        data_list = [data_list]
+    
+    recon = []
+    errors = []
+    
+    for i,d in enumerate(data_list):
+        recon.append(
+            data_table(
+                autoencoder.predict(d.data),        
+                headers=d.headers,
+                name="{0} pred".format(d.name)
+            )
+        )
+        errors.append(
+            get_errors(recon[i].data, d.data, out_name="{0} error".format(d.name), **kwargs)
+        )
+        
+    return errors, recon
+
+def roc_auc(data_err, signal_errs):
+    ret = {}
+    for signal_err in signal_errs:
+        pred = np.hstack([signal_err[metric].values, data_err[metric].values])
+        true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
+
+        roc = roc_curve(true, pred)
+        auc = roc_auc_score(true, pred)
+
+        ret[signal_err.name] = {'roc': roc, 'auc': auc}
+    return ret
+
+def roc_auc_plot(data_errs, signal_errs, metrics='loss', *args, **kwargs):
+    from sklearn.metrics import roc_curve, roc_auc_score
+    if not isinstance(metrics, list):
+        metrics = [metrics]
+
+    if not isinstance(signal_errs, list):
+        signal_errs = [signal_errs]
+
+    if not isinstance(data_errs, list):
+        data_errs = [data_errs]
+    
+    if len(data_errs) == 1:
+        data_errs = [data_errs[0] for i in range(len(signal_errs))]
+        
+    fig, ax_begin, ax_end, plt_end, colors = get_plot_params(1, *args, **kwargs)
+    ax = ax_begin(0)
+    styles = [ '-','--','-.',':']
+    for i,(data_err,signal_err) in enumerate(zip(data_errs, signal_errs)):
+	
+        for j,metric in enumerate(metrics):
+            pred = np.hstack([signal_err[metric].values, data_err[metric].values])
+            true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
+
+            roc = roc_curve(true, pred)
+            auc = roc_auc_score(true, pred)
+        
+            ax.plot(roc[0], roc[1], styles[j%len(styles)], c=colors[i%len(colors)], label='{} {}, AUC {:.4f}'.format(signal_err.name, metric, auc))
+
+    ax.plot(roc[0], roc[0], '--', c='black')
+    ax_end("false positive rate", "true positive rate")
+    plt_end()
+    plt.show()
+    
+
+def load_all_data(data_path, name, cols_to_drop = ["jetM", "*MET*", "*Delta*"]):
+    repo_head = get_repo_info()['head']
+
+    if not os.path.exists(data_path):
+        assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+        data_path = os.path.join(repo_head, data_path)
+    
+    # if not os.path.exists(signal_path):
+    #     assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+    #     signal_path = os.path.join(repo_head, signal_path)
+        
+    # if not os.path.exists(model_path):
+    #     assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+    #     model_path = os.path.join(repo_head, model_path)
+
+    data, data_jets = get_training_data_jets(data_path, 0)
+
+    for i,d in enumerate(data_jets):
+        data_jets[i].name = d.name + " " + name
+
+    # signal, signal_jets = get_training_data_jets(signal_path, 0)
+
+    data.name = name
+
+    data.cdrop(cols_to_drop, inplace=True)
+    # signal.cdrop(cols_to_drop, inplace=True)
+    
+    print "{} tags:".format(name)
+    print "" 
+    tagged_data, tag_index_data = split_by_tag(data)
+    print ""
+    # print "signal tags:"
+    # print ""
+    # tagged_signal, tag_index_signal = split_by_tag(signal)
+    # print ""
+
+    return data, tagged_data, data_jets
+
+def evaluate_model(data_path, signal_path, model_path):
+    # get h5 datasets
+    repo_head = get_repo_info()['head']
+
+    if not os.path.exists(data_path):
+        assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+        data_path = os.path.join(repo_head, data_path)
+    
+    if not os.path.exists(signal_path):
+        assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+        signal_path = os.path.join(repo_head, signal_path)
+        
+    if not os.path.exists(model_path):
+        assert len(repo_head) > 0, "not running jupyter notebook from within a repo!! Prolly won't work :-)"
+        model_path = os.path.join(repo_head, model_path)
+
+        
+    data, data_jets = get_training_data_jets(data_path, 0)
+    signal, signal_jets = get_training_data_jets(signal_path, 0)
+
+    signal.name = "signal"
+    data.name = "background"
+
+    # drop some unused columns
+    cols_to_drop = ["jetM", "*MET*", "*Delta*"]
+
+    data.cdrop(cols_to_drop, inplace=True)
+    signal.cdrop(cols_to_drop, inplace=True)
+    
+    print "data tags:"
+    print "" 
+    tagged_data, tag_index_data = split_by_tag(data)
+    print ""
+    print "signal tags:"
+    print ""
+    tagged_signal, tag_index_signal = split_by_tag(signal)
+    print ""
+    
+    data_raw = data.cdrop("*Flavor")
+    signal_raw = signal.cdrop("*Flavor")
+
+    norm_args = {
+        "norm_type": "StandardScaler",
+    #     "feature_range": (0.01, 0.99)
+    }
+
+    data_norm = data_raw.norm(**norm_args)
+    signal_norm = data_raw.norm(signal_raw, **norm_args)
+    
+
+    instance = trainer.trainer(model_path, verbose=False)
+    autoencoder = instance.load_model()
+    encoder, decoder = autoencoder.layers[1:]
+    
+    tagged_norm = [data_raw.norm(t, **norm_args) for t in tagged_data]
+
+    errors, recon = get_recon_errors([data_norm, signal_norm] + tagged_norm, autoencoder)
+    
+    data_recon, signal_recon, tagged_recon = recon[0], recon[1], recon[2:]
+    data_error, signal_error, tagged_error = errors[0], errors[1], errors[2:]
+    
+    roc_auc_plot(data_error, signal_error)
+    
+    data_recon.name = "background pred"
+    signal_recon.name = "signal pred"
+    data_norm.name = "background (norm)"
+    signal_norm.name = "signal (norm)"
+    
+    data_norm.plot(
+        [data_recon, signal_norm, signal_recon],
+        normed=1, bins=70, cols=2, figsize=(10,20),
+#         rng=((0,2), (-3.2, 3.2), (0,2500), (0,1), (0, 0.8),(0,.1), (0,3000)),
+        figname="signal/data comparison"
+    )
+    
+    signal_error.plot(data_error, normed=1, bins=100, figname="signal vs data errors")
+
+def get_plot_params(
+    n_plots,
+    cols=4,
+    figsize=20.,
+    yscale='linear',
+    xscale='linear',
+    figloc='lower right',
+    figname='Untitled',
+    savename=None,
+    ticksize=8,
+    fontsize=5,
+):
+    rows =  n_plots/cols + bool(n_plots%cols)
+    if n_plots < cols:
+        cols = n_plots
+        rows = 1
+        
+    if not isinstance(figsize, tuple):
+        figsize = (figsize, rows*float(figsize)/cols)
+    
+    fig = plt.figure(figsize=figsize)
+    
+    def on_axis_begin(i):
+        return plt.subplot(rows, cols, i + 1)    
+    
+    def on_axis_end(xname, yname=''):
+        plt.xlabel(xname + " ({0}-scaled)".format(xscale))
+        plt.ylabel(yname + " ({0}-scaled)".format(yscale))
+        plt.xticks(size=ticksize)
+        plt.yticks(size=ticksize)
+        plt.xscale(xscale)
+        plt.yscale(yscale)
+        plt.gca().spines['left']._adjust_location()
+        plt.gca().spines['bottom']._adjust_location()
+        
+    def on_plot_end():
+        handles,labels = plt.gca().get_legend_handles_labels()
+        plt.figlegend(handles, labels, loc=figloc)
+        plt.suptitle(figname)
+        plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01, rect=[0, 0.03, 1, 0.95])
+        if savename is None:
+            plt.show()
+        else:
+            plt.savefig(savename)
+            
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    return fig, on_axis_begin, on_axis_end, on_plot_end, colors
+
+def plot_spdfs(inputs, outputs, bins=100, *args, **kwargs):
+    if not isinstance(inputs, list):
+        inputs = [inputs]
+    if not isinstance(outputs, list):
+        outputs = [outputs]
+        
+    # assert all([isinstance(inp, data_table) for inp in inputs]), "inputs mst be utils.data_table format"
+    assert len(inputs) > 0, "must have SOME inputs"
+    assert len(outputs) > 0, "must have SOME outputs"
+    assert len(inputs) == len(outputs), "# of outputs and inputs must be the same"
+    
+    columns = inputs[0].headers
+    assert all([columns == inp.headers for inp in inputs]), "all inputs must have identical column titles"
+
+    fig, ax_begin, ax_end, plt_end, colors = get_plot_params(len(columns), *args, **kwargs)
+    
+    for i,name in enumerate(columns):
+        
+        ax_begin(i)
+
+        for j, (IN, OUT) in enumerate(zip(inputs, outputs)):
+
+            dname = IN.name
+            centers, (content, content_new), width = get_bin_content(IN.data[:,i], OUT[0][:,i], OUT[1][:,i], bins) 
+
+            sfac = float(IN.shape[0])
+            plt.errorbar(centers, content/sfac, xerr=width/2., yerr=np.sqrt(content)/sfac, fmt='.', c=colors[j], label='{} input'.format(dname))
+            plt.errorbar(centers, content_new/sfac, xerr=width/2., fmt='--', c=colors[j], label='{} spdf'.format(dname), alpha=0.7)
+    #     plt.hist(mu, histtype='step', bins=bins)
+
+        ax_end(name)
+        
+    plt_end()
+
+def get_bin_content(aux, mu, sigma, bins=50):
+    
+    hrange = (np.percentile(aux, 0.1), np.percentile(aux, 99.9))
+    
+    content, edges = np.histogram(aux, bins=bins, range=hrange)
+    centers = 0.5*(edges[1:] + edges[:-1])
+    
+    width = centers[1] - centers[0]
+    
+    bin_content = np.sum(content)*width*sum_of_gaussians(centers, mu, sigma)
+    
+    return centers, (content, bin_content), width
+
+def sum_of_gaussians(x, mu_vec, sigma_vec):
+    x = np.atleast_2d(x)
+    if x.shape[0] <= x.shape[1]:
+        x = x.T
+    x_norm = (x - mu_vec)/sigma_vec
+    single_gaus_val = np.exp(-0.5*np.square(x_norm))/(sigma_vec*np.sqrt(2*np.pi))
+    return np.sum(single_gaus_val, axis=1)/mu_vec.shape[0]

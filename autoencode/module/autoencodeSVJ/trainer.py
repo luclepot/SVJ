@@ -117,7 +117,7 @@ class trainer(logger):
 
         self.config_file = smartpath(name)
         self.path = os.path.dirname(self.config_file)
-        
+
         if not self.config_file.endswith(".h5"):
             self.config_file += ".h5"
             
@@ -242,30 +242,31 @@ class trainer(logger):
         self,
         model=None,
         force=False,
+        custom_objects=None,
     ):
         w_path = self.config_file.replace(".h5", "_weights.h5")
         # if already trained
         if self.config['trained']:
             if self.config['model_json']:
                 if model is None:
-                    model = model_from_json(self.config['model_json'])
+                    model = model_from_json(self.config['model_json'], custom_objects=custom_objects)
                     model.load_weights(w_path)
                     self.log("using saved model")
                 else:
                     if not force:
-                        model = model_from_json(self.config['model_json'])
+                        model = model_from_json(self.config['model_json'], custom_objects=custom_objects)
                         model.load_weights(w_path)
                         self.error("IGNORING PASSED PARAMETER 'model'")
                         self.log("using saved model")
                     else:
                         if isinstance(model, str):
-                            model = load_model(model)
+                            model = load_model(model, custom_objects=custom_objects)
                         self.log("using model passed as function argument")
             else:
                 if model is None:
                     self._throw("no model passed, and saved model not found!")
                 if isinstance(model, str):
-                    model = load_model(model)
+                    model = load_model(model, custom_objects=custom_objects)
                 self.log("using model passed as function argument")
         
         if model is None:
@@ -289,6 +290,7 @@ class trainer(logger):
         verbose=1,
         use_callbacks=False,
         learning_rate=0.01,
+        custom_objects={}
     ):
         callbacks = None
         if use_callbacks:
@@ -300,7 +302,7 @@ class trainer(logger):
         
         w_path = self.config_file.replace(".h5", "_weights.h5")
 
-        model = self.load_model(model, force)
+        model = self.load_model(model, force, custom_objects)
 
         if optimizer is None:
             if hasattr(model, "optimizer"):
@@ -358,13 +360,14 @@ class trainer(logger):
                     nhistory = model.fit(
                         x=x_train,
                         y=y_train,
-                        steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
-                        validation_steps=int(np.ceil(len(x_test)/batch_size)),
+                        # steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
+                        # validation_steps=int(np.ceil(len(x_test)/batch_size)),
                         validation_data=[x_test, y_test],
                         initial_epoch=master_epoch_n,
                         epochs=master_epoch_n + 1,
                         verbose=verbose,
-                        callbacks=callbacks
+                        callbacks=callbacks,
+                        batch_size=batch_size,
                     ).history
 
                     if epoch == 0:
@@ -390,13 +393,14 @@ class trainer(logger):
             nhistory = model.fit(
                 x=x_train,
                 y=y_train,
-                steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
-                validation_steps=int(np.ceil(len(x_test)/batch_size)),
+#                steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
+#                validation_steps=int(np.ceil(len(x_test)/batch_size)),
                 validation_data=[x_test, y_test],
                 initial_epoch=master_epoch_n,
                 epochs=master_epoch_n + epochs,
                 verbose=verbose,
-                callbacks=callbacks
+                callbacks=callbacks,
+		batch_size=batch_size,
             ).history
 
             for metric in nhistory:

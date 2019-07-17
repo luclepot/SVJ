@@ -81,24 +81,27 @@ int main(int argc, char **argv) {
 
     core.start();
 
+
     for (Int_t entry = core.nMin; entry < core.nMax; ++entry) {
 
         // init
         core.InitCuts(); 
         core.GetEntry(entry);
 
-        bool last;
-
+        
         // require zero leptons which pass cuts
         // pre lepton cut
         core.Fill(Hists::pre_lep, Muons->size() + Electrons->size());
-        last = core.Cut(
+
+        core.Cut(
             (leptonCount(Muons, MuonIsolation) + leptonCount(Electrons, ElectronIsolation)) < 1,
             Cuts::leptonCounts
             );
 
-        if (!last)
+        if (!core.Cut(Cuts::leptonCounts)) {
+            core.UpdateCutFlow(); 
             continue;
+        }
 
         core.Fill(Hists::post_lep, Muons->size() + Electrons->size());
 
@@ -143,11 +146,12 @@ int main(int argc, char **argv) {
             core.Fill(Hists::pre_1pt, Jets->at(0).Pt()); 
             core.Fill(Hists::pre_2pt, Jets->at(1).Pt()); 
 
-            last = core.Cut(
+            core.Cut(
                 Vetos::JetPtVeto(Jets->at(0)) && Vetos::JetPtVeto(Jets->at(1)),
                 Cuts::jetPt
                 );
-            if (!last) {
+            if (!core.Cut(Cuts::jetPt)) {
+                core.UpdateCutFlow(); 
                 continue; 
             }
 
@@ -190,8 +194,8 @@ int main(int argc, char **argv) {
             }
         }
         core.UpdateCutFlow(); 
-        
     }
+
     core.Debug(true);
     core.end();
     core.logt();

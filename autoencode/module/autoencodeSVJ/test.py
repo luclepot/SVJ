@@ -57,6 +57,3 @@ class dtrans:
         self.pred = self.pred[self.index][self.subindex]
 
         self.params.drop('epochs', axis=1)
-
-
-
