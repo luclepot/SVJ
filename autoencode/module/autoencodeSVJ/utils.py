@@ -833,24 +833,48 @@ def get_recon_errors(data_list, autoencoder, **kwargs):
         
     return errors, recon
 
-def roc_auc_plot(data_err, signal_err, metric='mae'):
+def roc_auc(data_err, signal_errs):
+    ret = {}
+    for signal_err in signal_errs:
+        pred = np.hstack([signal_err[metric].values, data_err[metric].values])
+        true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
+
+        roc = roc_curve(true, pred)
+        auc = roc_auc_score(true, pred)
+
+        ret[signal_err.name] = {'roc': roc, 'auc': auc}
+    return ret
+
+def roc_auc_plot(data_errs, signal_errs, metric='loss', *args, **kwargs):
     from sklearn.metrics import roc_curve, roc_auc_score
-    pred = np.hstack([signal_err[metric].values, data_err[metric].values])
-    true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
 
-    roc = roc_curve(true, pred)
-    auc = roc_auc_score(true, pred)
-    print "auc value:", auc
+    if not isinstance(signal_errs, list):
+        signal_errs = [signal_errs]
 
+    if not isinstance(data_errs, list):
+        data_errs = [data_errs]
+    
+    if len(data_errs) == 1:
+        data_errs = [data_errs[0] for i in range(len(signal_errs))]
+        
+    fig, ax_begin, ax_end, plt_end, colors = get_plot_params(1, *args, **kwargs)
+    ax = ax_begin(0)
 
+    for i,(data_err,signal_err) in enumerate(zip(data_errs, signal_errs)):
 
-    plt.figure(figsize=(10,10))
-    # ax = fig.axes() 
-    plt.plot(roc[0], roc[1])
-    plt.plot((0,1), (0,1))
+        pred = np.hstack([signal_err[metric].values, data_err[metric].values])
+        true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
+
+        roc = roc_curve(true, pred)
+        auc = roc_auc_score(true, pred)
+        
+        ax.plot(roc[0], roc[1], c=colors[i], label='{}, AUC {:.4f}'.format(signal_err.name, auc))
+
+    ax.plot(roc[0], roc[0], '--', c='black')
+    ax_end("false positive rate", "true positive rate")
+    plt_end()
     plt.show()
     
-    return {"roc": roc, "auc": auc}
 
 def load_all_data(data_path, name, cols_to_drop = ["jetM", "*MET*", "*Delta*"]):
     repo_head = get_repo_info()['head']
@@ -966,3 +990,107 @@ def evaluate_model(data_path, signal_path, model_path):
     )
     
     signal_error.plot(data_error, normed=1, bins=100, figname="signal vs data errors")
+
+def get_plot_params(
+    n_plots,
+    cols=4,
+    figsize=20.,
+    yscale='linear',
+    xscale='linear',
+    figloc='lower right',
+    figname='Untitled',
+    savename=None,
+    ticksize=8,
+    fontsize=5,
+):
+    rows =  n_plots/cols + bool(n_plots%cols)
+    if n_plots < cols:
+        cols = n_plots
+        rows = 1
+        
+    if not isinstance(figsize, tuple):
+        figsize = (figsize, rows*float(figsize)/cols)
+    
+    fig = plt.figure(figsize=figsize)
+    
+    def on_axis_begin(i):
+        return plt.subplot(rows, cols, i + 1)    
+    
+    def on_axis_end(xname, yname=''):
+        plt.xlabel(xname + " ({0}-scaled)".format(xscale))
+        plt.ylabel(yname + " ({0}-scaled)".format(yscale))
+        plt.xticks(size=ticksize)
+        plt.yticks(size=ticksize)
+        plt.xscale(xscale)
+        plt.yscale(yscale)
+        plt.gca().spines['left']._adjust_location()
+        plt.gca().spines['bottom']._adjust_location()
+        
+    def on_plot_end():
+        handles,labels = plt.gca().get_legend_handles_labels()
+        plt.figlegend(handles, labels, loc=figloc)
+        plt.suptitle(figname)
+        plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01, rect=[0, 0.03, 1, 0.95])
+        if savename is None:
+            plt.show()
+        else:
+            plt.savefig(savename)
+            
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    return fig, on_axis_begin, on_axis_end, on_plot_end, colors
+
+def plot_spdfs(inputs, outputs, bins=100, *args, **kwargs):
+    if not isinstance(inputs, list):
+        inputs = [inputs]
+    if not isinstance(outputs, list):
+        outputs = [outputs]
+        
+    # assert all([isinstance(inp, data_table) for inp in inputs]), "inputs mst be utils.data_table format"
+    assert len(inputs) > 0, "must have SOME inputs"
+    assert len(outputs) > 0, "must have SOME outputs"
+    assert len(inputs) == len(outputs), "# of outputs and inputs must be the same"
+    
+    columns = inputs[0].headers
+    assert all([columns == inp.headers for inp in inputs]), "all inputs must have identical column titles"
+
+    fig, ax_begin, ax_end, plt_end, colors = get_plot_params(len(columns), *args, **kwargs)
+    
+    for i,name in enumerate(columns):
+        
+        ax_begin(i)
+
+        for j, (IN, OUT) in enumerate(zip(inputs, outputs)):
+
+            dname = IN.name
+            centers, (content, content_new), width = get_bin_content(IN.data[:,i], OUT[0][:,i], OUT[1][:,i], bins) 
+
+            sfac = float(IN.shape[0])
+            plt.errorbar(centers, content/sfac, xerr=width/2., yerr=np.sqrt(content)/sfac, fmt='.', c=colors[j], label='{} input'.format(dname))
+            plt.errorbar(centers, content_new/sfac, xerr=width/2., fmt='--', c=colors[j], label='{} spdf'.format(dname), alpha=0.7)
+    #     plt.hist(mu, histtype='step', bins=bins)
+
+        ax_end(name)
+        
+    plt_end()
+
+def get_bin_content(aux, mu, sigma, bins=50):
+    
+    hrange = (np.percentile(aux, 0.1), np.percentile(aux, 99.9))
+    
+    content, edges = np.histogram(aux, bins=bins, range=hrange)
+    centers = 0.5*(edges[1:] + edges[:-1])
+    
+    width = centers[1] - centers[0]
+    
+    bin_content = np.sum(content)*width*sum_of_gaussians(centers, mu, sigma)
+    
+    return centers, (content, bin_content), width
+
+def sum_of_gaussians(x, mu_vec, sigma_vec):
+    x = np.atleast_2d(x)
+    if x.shape[0] <= x.shape[1]:
+        x = x.T
+    x_norm = (x - mu_vec)/sigma_vec
+    single_gaus_val = np.exp(-0.5*np.square(x_norm))/(sigma_vec*np.sqrt(2*np.pi))
+    return np.sum(single_gaus_val, axis=1)/mu_vec.shape[0]
