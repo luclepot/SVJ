@@ -841,6 +841,9 @@ def roc_auc_plot(data_err, signal_err, metric='mae'):
     roc = roc_curve(true, pred)
     auc = roc_auc_score(true, pred)
     print "auc value:", auc
+
+
+
     plt.figure(figsize=(10,10))
     # ax = fig.axes() 
     plt.plot(roc[0], roc[1])
@@ -865,6 +868,10 @@ def load_all_data(data_path, name, cols_to_drop = ["jetM", "*MET*", "*Delta*"]):
     #     model_path = os.path.join(repo_head, model_path)
 
     data, data_jets = get_training_data_jets(data_path, 0)
+
+    for i,d in enumerate(data_jets):
+        data_jets[i].name = d.name + " " + name
+
     # signal, signal_jets = get_training_data_jets(signal_path, 0)
 
     data.name = name
