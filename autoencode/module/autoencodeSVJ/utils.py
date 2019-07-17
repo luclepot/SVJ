@@ -861,10 +861,9 @@ def roc_auc_plot(data_errs, signal_errs, metrics='loss', *args, **kwargs):
         
     fig, ax_begin, ax_end, plt_end, colors = get_plot_params(1, *args, **kwargs)
     ax = ax_begin(0)
-
+    styles = [ '-','--','-.',':']
     for i,(data_err,signal_err) in enumerate(zip(data_errs, signal_errs)):
-
-        styles = ['o', 'v', '^', '<', '>', '8', 's', 'p', '*', 'h', 'H', 'D', 'd', 'P', 'X']
+	
         for j,metric in enumerate(metrics):
             pred = np.hstack([signal_err[metric].values, data_err[metric].values])
             true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
@@ -872,7 +871,7 @@ def roc_auc_plot(data_errs, signal_errs, metrics='loss', *args, **kwargs):
             roc = roc_curve(true, pred)
             auc = roc_auc_score(true, pred)
         
-            ax.plot(roc[0], roc[1], styles[j], c=colors[i], label='{} {}, AUC {:.4f}'.format(signal_err.name, metric, auc))
+            ax.plot(roc[0], roc[1], styles[j%len(styles)], c=colors[i%len(colors)], label='{} {}, AUC {:.4f}'.format(signal_err.name, metric, auc))
 
     ax.plot(roc[0], roc[0], '--', c='black')
     ax_end("false positive rate", "true positive rate")
