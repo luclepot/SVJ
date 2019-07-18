@@ -18,4 +18,4 @@ your options are
 
 training is implemented entirely in the `autoencode` directory. Here there is a helper module, `autoencodeSVJ`, whose components can be used in python code analyses. A few current examples of such analyses (jupyter notebooks!) are given in the `autoencode/notebooks directory`. 
 
-The environment used for training is python `2.7.*`, with keras/tensorflow. On lxplus you might use the provided `setup.sh`. 
+The environment used for training is python `2.7.*`, with keras/tensorflow. On `LXPLUS` or any tier 3 server you might use the provided `setup.sh`. 
