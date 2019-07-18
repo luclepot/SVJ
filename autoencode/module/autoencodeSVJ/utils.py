@@ -880,6 +880,11 @@ def roc_auc_plot(data_errs, signal_errs, metrics='loss', *args, **kwargs):
     
 
 def load_all_data(data_path, name, cols_to_drop = ["jetM", "*MET*", "*Delta*"]):
+    """Returns: a tuple with... 
+        a data_table with all data, (columns dropped),
+        a list of data_tables, by jetFlavor tag (columns dropped),
+        a list of data_tables, split by jet # (columns dropped)
+    """
     repo_head = get_repo_info()['head']
 
     if not os.path.exists(data_path):
