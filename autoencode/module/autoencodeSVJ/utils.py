@@ -132,6 +132,9 @@ class data_table(logger):
         data_table.TABLE_COUNT += 1
         if headers is not None:
             self.headers = headers
+            data = np.asarray(data)
+            if len(data.shape) < 2:
+                data = np.expand_dims(data, 1)
             self.data = data
         elif isinstance(data, pd.DataFrame):
             self.headers = data.columns 
@@ -141,6 +144,10 @@ class data_table(logger):
             self.data = data.df.values
             self.name = data.name
         else:
+            data = np.asarray(data)
+            if len(data.shape) < 2:
+                data = np.expand_dims(data, 1)
+
             self.headers = ["dist " + str(i + 1) for i in range(data.shape[1])]
             self.data = data
 
@@ -1036,7 +1043,9 @@ def get_plot_params(
         
     def on_plot_end():
         handles,labels = plt.gca().get_legend_handles_labels()
-        plt.figlegend(handles, labels, loc=figloc)
+        by_label = odict(zip(map(str, labels), handles))
+        plt.figlegend(by_label.values(), by_label.keys(), loc=figloc)
+        # plt.figlegend(handles, labels, loc=figloc)
         plt.suptitle(figname)
         plt.tight_layout(pad=0.01, w_pad=0.01, h_pad=0.01, rect=[0, 0.03, 1, 0.95])
         if savename is None:

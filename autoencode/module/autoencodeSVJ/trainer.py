@@ -4,7 +4,7 @@ from collections import OrderedDict as odict
 import os
 import traceback
 from datetime import datetime
-from utils import logger, smartpath
+from utils import logger, smartpath, get_plot_params
 import h5py
 import matplotlib.pyplot as plt
 import glob
@@ -286,6 +286,7 @@ class trainer(logger):
         force=False,
         metrics=[],
         loss=None,
+        loss_weights=None,
         optimizer=None,
         verbose=1,
         use_callbacks=False,
@@ -312,8 +313,17 @@ class trainer(logger):
         if loss is None:
             if hasattr(model, "loss"):
                 loss = model.loss
+                loss_weights = model.loss_weights
             else:
                 loss = "mse"
+                loss_weights = [1.]
+        
+        if loss_weights is None:
+            if isinstance(loss, list):
+                loss_weights = [1. for i in range(len(loss))]
+            else:
+                loss = [loss]
+                loss_weights = [1.]
 
         if metrics is None:
             if hasattr(model, "metrics"):
@@ -321,7 +331,7 @@ class trainer(logger):
             else:
                 metrics = []
 
-        model.compile(optimizer=getattr(keras.optimizers, optimizer)(lr=learning_rate), loss=loss, metrics=metrics)
+        model.compile(optimizer=getattr(keras.optimizers, optimizer)(lr=learning_rate), loss=loss, metrics=metrics, loss_weights=loss_weights)
 
         start = datetime.now()
 
@@ -334,10 +344,11 @@ class trainer(logger):
         if y_test is None:
             y_test = x_test.copy()
 
-        assert x_test.shape[0] == y_test.shape[0]
-        assert x_train.shape[0] == y_train.shape[0]
-        assert x_test.shape[1] == x_train.shape[1]
-        assert y_test.shape[1] == y_train.shape[1]
+
+        # assert x_test.shape[0] == y_test.shape[0]
+        # assert x_train.shape[0] == y_train.shape[0]
+        # assert x_test.shape[1] == x_train.shape[1]
+        # assert y_test.shape[1] == y_train.shape[1]
 
 
         previous_epochs = eval(self.training['epoch_splits'])
@@ -393,8 +404,7 @@ class trainer(logger):
             nhistory = model.fit(
                 x=x_train,
                 y=y_train,
-#                steps_per_epoch=int(np.ceil(len(x_train)/batch_size)),
-#                validation_steps=int(np.ceil(len(x_test)/batch_size)),
+
                 validation_data=[x_test, y_test],
                 initial_epoch=master_epoch_n,
                 epochs=master_epoch_n + epochs,
@@ -490,11 +500,12 @@ class trainer(logger):
     def plot_metrics(
         self,
         fnmatch_criteria="*loss*",
-        yscale=None,
-        figsize=(7,5)
+        *args,
+        **kwargs
     ):
         names = []
         metrics = []
+
         for mname in self.metrics:
             if glob.fnmatch.fnmatch(mname, fnmatch_criteria):
                 names.append(mname)
@@ -510,24 +521,16 @@ class trainer(logger):
 
         # plot em'
 
-        plt.rcParams['figure.figsize'] = figsize
-        plt.rcParams.update({'font.size': 18})
-        if yscale is not None:
-            plt.yscale(yscale)
-        plt.xlabel("epoch number")
-        plt.ylabel("metric value" + (" ({}-scaled)".format(yscale) if yscale else ""))
-        
-        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-        for color,plot,name in zip(colors, plots, names):
-            for subplot in plot:
-                plt.plot(subplot[:,0], subplot[:,1], c=color, label=name)
+        fig, ax_begin, ax_end, plt_end, colors = get_plot_params(1, *args, **kwargs)
 
-        handles, labels = plt.gca().get_legend_handles_labels()
-        by_label = odict(zip(map(str, labels), handles))
-        plt.xticks()
-        plt.legend(by_label.values(), by_label.keys())
-        plt.tight_layout()
-        plt.show()
+        ax = ax_begin(0)
+
+        for color,plot,name in zip(colors[:len(plots)], plots, names):
+            for subplot in plot:
+                ax.plot(subplot[:,0], subplot[:,1], c=color, label=name)
+
+        ax_end("epoch number", "metric value")
+        plt_end()
 
     def remove(
         self,
