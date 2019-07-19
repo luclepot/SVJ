@@ -8,6 +8,7 @@ from traceback import format_exc
 import h5py
 import ROOT as rt
 from collections import OrderedDict as odict
+import energyflow as ef
 
 DELPHES_DIR = os.environ["DELPHES_DIR"]
 rt.gSystem.Load("{}/lib/libDelphes.so".format(DELPHES_DIR))
@@ -38,6 +39,7 @@ class Converter:
         jetDR=0.8,
         n_constituent_particles=100,
         save_constituents=False,
+        energyflow_basis_degree=-1,
     ):
         self.outputdir = outputdir
 
@@ -113,6 +115,18 @@ class Converter:
         particle_dict = {}
 
         self.save_constituents = save_constituents
+        self.efbn = energyflow_basis_degree
+
+        if self.efbn < 0:
+            self.save_eflow = False
+            self.efbn = 0
+            self.efp_size = 0
+        else:
+            self.save_eflow = True
+            self.log("creating energyflow particle set with degree d <= {0}...".format(self.efbn))
+            self.efpset = ef.EFPSet("d<={0}".format(self.efbn))
+            self.efp_size = self.efpset.count()
+
         # self.selections_abs = np.asarray([sum(self.sizes[:s[0]]) + s[1] for s in self.selections])
         self.log("found {0} selected events, out of a total of {1}".format(sum(map(len, self.selections.values())), self.nEvents))
 
@@ -155,6 +169,7 @@ class Converter:
         self.log("event feature shapes: {}".format(self.event_features.shape))
         self.jet_constituents = np.empty((total_size, self.n_jets, self.n_constituent_particles, len(self.jet_constituent_names)))
         self.log("jet constituent shapes: {}".format(self.jet_constituents.shape))
+        self.energy_flow_bases = np.empty((total_size, self.n_jets, self.efp_size))
             
         if not self.save_constituents:
             self.log("ignoring jet constituents")
@@ -166,7 +181,7 @@ class Converter:
         # selection is implicit: looping only through total selectinos
         for tree_n,tree_name in enumerate(self.inputfiles):
             for event_n,event_index in enumerate(selections_iter[tree_name]):
-                self.log('tree {0}, event {1}, index {2}'.format(tree_n, event_n, event_index))
+                self.log('tree {0}, event {1}, index {2}, total count {3}'.format(tree_n, event_n, event_index, total_count))
 
                 tree = self.trees[tree_n]
                 tree.GetEntry(event_index)
@@ -185,6 +200,9 @@ class Converter:
                         plist = np.concatenate([plist, new], axis=0)
                         subindex = np.concatenate([subindex, indicies], axis=0)
                 
+                    # plist is now the list of constituent particles
+                    if self.save_eflow:
+                        self.energy_flow_bases[total_count, jetn, :] = self.efpset.compute(plist)
                     # plist = np.concatenate([
                     #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowTrack, 0.1, "PT"),
                     #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowNeutralHadron, 0.5, "ET"),
@@ -204,14 +222,23 @@ class Converter:
                 self.event_features[total_count] = np.fromiter(self.get_jet_features(tree, track_index), float, count=len(self.event_feature_names))
                 
                 if return_debug_tree:
-                    return tree, self.event_features[total_count]
+                    return tree, self.event_features, self.jet_constituents
                 
                 total_count += 1 
 
-        if self.save_constituents:
-            return self.jet_constituents, self.event_features
 
-        return self.event_features
+        ret = {}
+        ret['event_features'] = self.event_features
+        
+
+
+        if self.save_constituents:
+            ret['jet_constituents'] = self.jet_constituents
+
+        if self.save_eflow:
+            ret['eflow'] = self.energy_flow_bases
+
+        return ret
 
     def save(
         self,
@@ -232,6 +259,11 @@ class Converter:
         if self.save_constituents:
             f.create_dataset('jet_constituent_data', data=self.jet_constituents)
             f.create_dataset('jet_constituent_names', data=self.jet_constituent_names)
+        if self.save_eflow:
+            eflow_names = np.asarray(['v{0}'.format(i) for i in range(self.energy_flow_bases.shape[2])])
+            f.create_dataset('energy_flow_data', data=self.energy_flow_bases)
+            f.create_dataset('energy_flow_names', data=eflow_names)
+
 
         self.log("Successfully saved!")
         f.close()
@@ -285,7 +317,7 @@ class Converter:
         for i, eft in track_index:
             if i < 0:
                 break
-            c = getattr(tree, core.EFlow_types[eft][0])[i].P4()
+            c = getattr(tree, self.EFlow_types[eft][0])[i].P4()
             # if eft == 0 and c.Pt() > 1.0:
             #     # means that the particle has charge, increase jet multiplicity
             #     mult += 1
@@ -347,12 +379,12 @@ class Converter:
         return np.asarray(selected), np.asarray(indicies)
 
 if __name__ == "__main__":
-    if len(sys.argv) == 9:
-        (_, outputdir, pathspec, name, dr, nc, rmin, rmax, constituents) = sys.argv
+    if len(sys.argv) == 10:
+        (_, outputdir, pathspec, name, dr, nc, rmin, rmax, constituents, basis_n) = sys.argv
         print outputdir
         print pathspec
         # print filespec
-        core = Converter(outputdir, pathspec, name, float(dr), int(nc), bool(int(constituents)))
+        core = Converter(outputdir, pathspec, name, float(dr), int(nc), bool(int(constituents)), int(basis_n))
         ret = core.convert((int(rmin), int(rmax)))
         core.save()
     # elif len(sys.argv) == 0:
@@ -363,5 +395,6 @@ if __name__ == "__main__":
             print track_index.shape
         except:
             print "dang"
-            core = Converter(".", "../data/tightSVJ/s10/data_0_selection.txt", "data")
-            ret = core.convert((0, 500), return_debug_tree=True)
+            core = Converter(".", "../data/tightSVJ/20select/data_0_selection.txt", "data", save_constituents=False, energyflow_basis_degree=5)
+            ret = core.convert((0, 40), return_debug_tree=False)
+            core.save("test.h5")
