@@ -63,6 +63,9 @@ int main(int argc, char **argv) {
     // histograms for pre/post lepton count wrt lepton cut
     core.AddHist(Hists::pre_lep, "h_pre_lep", "lepton count pre-cut", 10, 0, 10);
     core.AddHist(Hists::post_lep, "h_post_lep", "lepton count post-cut", 10, 0, 10);
+
+    // mt2 pre cut
+    core.AddHist(Hists::pre_MT, "h_pre_MT", "pre-cut m_{T}", 750, 0, 7500);
     
     // add componenets for jets (tlorentz)
     vector<TLorentzVector>* Jets = core.AddLorentz("Jet", {"Jet.PT","Jet.Eta","Jet.Phi","Jet.Mass"});
@@ -123,6 +126,9 @@ int main(int argc, char **argv) {
             double ptjj2 = ptjj*ptjj;
             double ptMet = Vjj.Px()*metFull_Px + Vjj.Py()*metFull_Py;
             double MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*(*metFull_Pt) - ptMet)); // SAVE
+
+            // fill pre-cut MT2 histogram
+            core.Fill(HistType::pre_MT, MT2); 
 
             // leading jet etas both meet eta veto
             core.Cut(
