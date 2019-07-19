@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
             double MT2 = sqrt(Mjj2 + 2*(sqrt(Mjj2 + ptjj2)*(*metFull_Pt) - ptMet)); // SAVE
 
             // fill pre-cut MT2 histogram
-            core.Fill(HistType::pre_MT, MT2); 
+            core.Fill(Hists::pre_MT, MT2); 
 
             // leading jet etas both meet eta veto
             core.Cut(
