@@ -419,6 +419,7 @@ class data_loader(logger):
     def add_sample(
         self,
         sample_path,
+        default_table_globstring="*feature_",
     ):
         filepath = smartpath(sample_path)
         assert os.path.exists(filepath)
@@ -432,7 +433,7 @@ class data_loader(logger):
 
             self._update_data(self.samples[filepath], self.samples[filepath].keys())
             try:
-                self.table = self.make_table(self.name, "*data", "*names")
+                self.table = self.make_table(self.name, default_table_globstring + "data", default_table_globstring + "names")
             except:
                 self.error(traceback.format_exc())
                 self.error("Couldn't make datatable with added elements!")
@@ -444,6 +445,7 @@ class data_loader(logger):
     ):
         if keys is None:
             raise AttributeError("please choose data keys to add to sample dataset! \noptions: {0}".format(list(self.sample_keys)))
+
         assert hasattr(keys, "__iter__") or isinstance(keys, basestring), "keys must be iterable of strings!"
 
         if isinstance(keys, str):
@@ -515,16 +517,18 @@ class data_loader(logger):
 
     def make_table(
         self,
-        name=None,
-        value_keys="*data",
-        header_keys="*names"
+        name,
+        value_keys,
+        header_keys=None,
     ):
         values, vdict = self.get_dataset(value_keys)
-        headers, hdict = None if header_keys is None else self.get_dataset(header_keys) 
+        headers, hdict = None,None if header_keys is None else self.get_dataset(header_keys) 
         name = name or self.name
 
+
         assert len(values.shape) == 2, "data must be 2-dimensional and numeric!"
-        assert values.shape[1] == headers.shape[0], "data must have the same number of columns as there are headers!!"
+        if headers is not None:
+            assert values.shape[1] == headers.shape[0], "data must have the same number of columns as there are headers!!"
 
         return data_table(values, headers, name)
 
@@ -719,6 +723,8 @@ def get_training_data(glob_path, verbose=1):
     d = data_loader("main sample", verbose=verbose)
     for p in paths:
         d.add_sample(p)
+    tables = []
+    
     return d.make_table()
 
 def get_training_data_jets(glob_path, verbose=1):
