@@ -473,8 +473,9 @@ class data_loader(logger):
         self.log("Grabbing dataset with keys {0}".format(list(data_dict.keys())))
 
         samples = set([x.shape[0] for x in data_dict.values()])
-        assert len(samples) == 1
+        assert len(samples) == 1, "all datasets with matching keys need to have IDENTICAL sizes!"
         sample_size = samples.pop()
+
 
         sizes = [reduce(mul, x.shape[1:], 1) for x in data_dict.values()]
         splits = [0,] + [sum(sizes[:i+1]) for i in range(len(sizes))]
@@ -518,8 +519,8 @@ class data_loader(logger):
     def make_table(
         self,
         name,
-        value_keys,
-        header_keys=None,
+        value_key,
+        header_key=None,
     ):
         values, vdict = self.get_dataset(value_keys)
         headers, hdict = None,None if header_keys is None else self.get_dataset(header_keys) 
@@ -725,7 +726,7 @@ def get_training_data(glob_path, verbose=1):
         d.add_sample(p)
     tables = []
     
-    return d.make_table()
+    return d.make_table("data", "*features_data", "*features_names") 
 
 def get_training_data_jets(glob_path, verbose=1):
     return split_to_jets(get_training_data(glob_path, verbose))
