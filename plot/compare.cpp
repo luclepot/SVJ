@@ -8,7 +8,7 @@ using namespace std;
 const string newname = "/eos/project/d/dshep/TOPCLASS/DijetAnomaly/ZprimeDark_2000GeV_13TeV_PU40/ZprimeDark_2000GeV_13TeV_PU40_1_ap.root";
 const string oldname = "/eos/project/d/dshep/TOPCLASS/DijetAnomaly/ZprimeDark_2000GeV_13TeV_PU40/ZprimeDark_2000GeV_13TeV_PU40_0.root";
 
-TCanvas *PlotTwo(TTree* tree1, TTree* tree2, string name, int bins=200) {
+TCanvas *PlotTwo(TTree* tree1, TTree* tree2, string name, int bins) {
 
     float min1 = tree1->GetMinimum(name.c_str());
     float min2 = tree2->GetMinimum(name.c_str()); 
@@ -53,7 +53,7 @@ TCanvas *PlotTwo(TTree* tree1, TTree* tree2, string name, int bins=200) {
     return cst; 
 } 
 
-void compare(string f1name, string f2name, vector<string> names, string treename="Delphes") {
+void compare(string f1name, string f2name, vector<string> names, string treename="Delphes", int bins=100) {
 
     TFile * f1 = new TFile(f1name.c_str());
     TFile * f2 = new TFile(f2name.c_str());
@@ -64,7 +64,7 @@ void compare(string f1name, string f2name, vector<string> names, string treename
     for (size_t i = 0; i < names.size(); ++i) {
         string name = names[i]; 
         TImage *img = TImage::Create();
-        TCanvas* canvas = PlotTwo(tree1, tree2, name); 
+        TCanvas* canvas = PlotTwo(tree1, tree2, name, bins); 
         img->FromPad(canvas);
         string outpath = name + ".png"; 
         cout << "saving image to file '" << outpath << "'" << endl;
