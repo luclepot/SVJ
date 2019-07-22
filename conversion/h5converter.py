@@ -36,7 +36,7 @@ class Converter:
         outputdir,
         spath,
         name,
-        jetDR=0.8,
+        jetDR=0.5,
         n_constituent_particles=100,
         save_constituents=False,
         energyflow_basis_degree=-1,
@@ -85,7 +85,7 @@ class Converter:
         for i in range(self.n_jets):
             self.event_feature_names += ['j{}'.format(i) + j for j in self.jet_base_names]
         
-        self.jet_constituent_names = ['pEta', 'pPhi', 'pPt']
+        self.jet_constituent_names = ['PT', 'Eta', 'Phi']
 
         self.EFlow_types = [
             [ "EFlowTrack", 0.1, "PT" ],
@@ -101,16 +101,6 @@ class Converter:
         self.event_features = None
         self.jet_constituents = None
 
-        # spathout = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
-        # spathin = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
-        # spath = None
-        # if os.path.exists(spathout):
-        #     spath = spathout
-        # elif os.path.exists(spathin):
-        #     spath = spathin            
-        # else:
-        #     raise AttributeError("Selection file does not exist in either input/output dirs!!")
-
         hlf_dict = {}
         particle_dict = {}
 
@@ -124,7 +114,7 @@ class Converter:
         else:
             self.save_eflow = True
             self.log("creating energyflow particle set with degree d <= {0}...".format(self.efbn))
-            self.efpset = ef.EFPSet("d<={0}".format(self.efbn))
+            self.efpset = ef.EFPSet("d<={0}".format(self.efbn), measure='hadr', beta=1, normed=True, verbose=True)
             self.efp_size = self.efpset.count()
 
         # self.selections_abs = np.asarray([sum(self.sizes[:s[0]]) + s[1] for s in self.selections])
@@ -170,6 +160,7 @@ class Converter:
         self.jet_constituents = np.empty((total_size, self.n_jets, self.n_constituent_particles, len(self.jet_constituent_names)))
         self.log("jet constituent shapes: {}".format(self.jet_constituents.shape))
         self.energy_flow_bases = np.empty((total_size, self.n_jets, self.efp_size))
+
             
         if not self.save_constituents:
             self.log("ignoring jet constituents")
@@ -180,29 +171,40 @@ class Converter:
 
         # selection is implicit: looping only through total selectinos
         for tree_n,tree_name in enumerate(self.inputfiles):
+
             for event_n,event_index in enumerate(selections_iter[tree_name]):
+
                 self.log('tree {0}, event {1}, index {2}, total count {3}'.format(tree_n, event_n, event_index, total_count))
 
+                # tree (and, get the entry)
                 tree = self.trees[tree_n]
                 tree.GetEntry(event_index)
 
-                jets = [tree.Jet[jetn].P4() for jetn in range(self.n_jets)]
-                
-                track_index = -np.ones((len(jets), self.n_constituent_particles, 2), dtype=int)
+                # jets
+                jets = [tree.Jet[i].P4() for i in range(min([self.n_jets, tree.Jet_size]))]
+               
+                # constituent 4-vectors (yesss)
+                constituents = self.get_constituents(tree, jets, self.jetDR)
 
                 for jetn, jet in enumerate(jets):
                     # grab
 
+                    constituent_index = self.get_jet_constituents(jet, tree, self.jetDR, pt_min)
+
                     plist = np.empty((0, len(self.jet_constituent_names)))
                     subindex = np.empty((0, 2))
+                    
                     for flow_type, pt_min, pt_type in self.EFlow_types:
                         new, indicies = self.get_jet_constituents(jet, self.jetDR, getattr(tree, flow_type), pt_min, pt_type, flow_type)
+
                         plist = np.concatenate([plist, new], axis=0)
                         subindex = np.concatenate([subindex, indicies], axis=0)
                 
                     # plist is now the list of constituent particles
                     if self.save_eflow:
-                        self.energy_flow_bases[total_count, jetn, :] = self.efpset.compute(plist)
+                        # must roll plist: plist is of form [eta, phi, pt], and efpset needs form [pt, eta, phi]
+                        self.energy_flow_bases[total_count, jetn, :] = self.efpset.compute(np.roll(plist, 1, axis=1))
+
                     # plist = np.concatenate([
                     #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowTrack, 0.1, "PT"),
                     #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowNeutralHadron, 0.5, "ET"),
@@ -229,14 +231,13 @@ class Converter:
 
         ret = {}
         ret['event_features'] = self.event_features
-        
-
 
         if self.save_constituents:
             ret['jet_constituents'] = self.jet_constituents
 
         if self.save_eflow:
             ret['eflow'] = self.energy_flow_bases
+    
 
         return ret
 
@@ -298,6 +299,7 @@ class Converter:
             yield tree.MissingET[0].Eta
             yield tree.MissingET[0].Phi
 
+
     def jets_axis2_pt2(
         self,
         jet,
@@ -351,31 +353,69 @@ class Converter:
         ptD = np.sqrt(sum_weight)/sum_pt if sum_weight > 0 else 0
         return ptD, axis2
         
+    def get_constituents(
+        self,
+        tree,
+        jets,
+        dr=0.8
+    ):
+        constituents = [[] for i in range(len(jets))]
+        for i,c in enumerate(tree.EFlowTrack): # .1
+            if c.PT > 0.1:
+                vec = c.P4()
+                for j,jet in enumerate(jets):
+                    deta = vec.Eta() - jet.Eta()
+                    dphi = jet.DeltaPhi(vec)
+                    if deta**2. + dphi**2. < dr**2.:
+                        constituents[j].append(vec)
+            
+        for i,c in enumerate(tree.EFlowNeutralHadron): #.5
+            if c.ET > 0.5:
+                vec = c.P4()
+                for j,jet in enumerate(jets):
+                    deta = vec.Eta() - jet.Eta()
+                    dphi = jet.DeltaPhi(vec)
+                    if deta**2. + dphi**2. < dr**2.:
+                        constituents[j].append(vec)
+
+            
+        for i,c in enumerate(tree.EFlowPhoton): #.2
+            if c.ET > 0.2:
+                vec = c.P4()
+                for j,jet in enumerate(jets):
+                    deta = vec.Eta() - jet.Eta()
+                    dphi = jet.DeltaPhi(vec)
+                    if deta**2. + dphi**2. < dr**2.:
+                        constituents[j].append(vec)
+
+                        
+        return map(np.asarray, constituents)
+
     def get_jet_constituents(
         self,
         jet,
         dr,
         component,
         min_value,
-        eType,
         flow_type
     ):
         rep = self.EFlow_dict[flow_type]
         selected = []
         indicies = []
         for i,c in enumerate(component):
-            pt = getattr(c, eType)
-            if pt > min_value:
-                deltaEta = c.Eta - jet.Eta()
-                deltaPhi = c.Phi - jet.Phi()
-                deltaPhi = deltaPhi - 2*np.pi*(deltaPhi >  np.pi) + 2*np.pi*(deltaPhi < -1.*np.pi)
+            cvec = c.P4()
+            if cvec.PT() > min_value:
+                deltaEta = cvec.Eta() - jet.Eta()
+                # deltaPhi = deltaPhi - 2*np.pi*(deltaPhi >  np.pi) + 2*np.pi*(deltaPhi < -1.*np.pi)
 
-                if deltaEta**2. + deltaPhi**2. < dr**2.:
-                    selected.append([deltaEta, deltaPhi, pt])
+                # constituent check
+                if cvec.DeltaPhi(jet)**2. + deltaEta**2. < dr**2.:
+                    selected.append(cvec)
                     indicies.append([i, rep])
         
         if len(selected) == 0:
-            return np.zeros((0,3)), -np.ones((0,2))
+            return np.zeros(0, dtype='obj'), -np.ones((0,2))
+        
         return np.asarray(selected), np.asarray(indicies)
 
 if __name__ == "__main__":
@@ -395,6 +435,6 @@ if __name__ == "__main__":
             print track_index.shape
         except:
             print "dang"
-            core = Converter(".", "../data/tightSVJ/20select/data_0_selection.txt", "data", save_constituents=False, energyflow_basis_degree=5)
-            ret = core.convert((0, 40), return_debug_tree=False)
-            core.save("test.h5")
+            core = Converter(".", "../data/background_process/20select/data_0_selection.txt", "data", save_constituents=False, energyflow_basis_degree=5)
+            ret = core.convert((0,100), return_debug_tree=False)
+            # core.save("test.h5")
