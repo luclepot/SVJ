@@ -32,7 +32,8 @@ namespace Vetos {
 
 size_t leptonCount(vector<TLorentzMock>* leptons, vector<double>* isos) {
     size_t n = 0;
-    for (size_t i = 0; i < leptons->size(); ++i)
+    size_t lepton_size = std::min(leptons->size(), isos->size());
+    for (size_t i = 0; i < lepton_size; ++i)
         if (Vetos::LeptonVeto(leptons->at(i)) && Vetos::IsolationVeto(isos->at(i))) 
             n++;
     return n;
@@ -66,12 +67,13 @@ int main(int argc, char **argv) {
 
     // mt2 pre cut
     core.AddHist(Hists::pre_MT, "h_pre_MT", "pre-cut m_{T}", 750, 0, 7500);
+    core.AddHist(Hists::pre_mjj, "h_pre_Mjj", "pre-cut m_{JJ}", 750, 0, 7500); 
     
     // add componenets for jets (tlorentz)
     vector<TLorentzVector>* Jets = core.AddLorentz("Jet", {"Jet.PT","Jet.Eta","Jet.Phi","Jet.Mass"});
     vector<TLorentzMock>* Electrons = core.AddLorentzMock("Electron", {"Electron.PT","Electron.Eta"});
-    vector<TLorentzMock>* Muons = core.AddLorentzMock("Muon", {"MuonLoose.PT","MuonLoose.Eta"});
-    vector<double>* MuonIsolation = core.AddVectorVar("MuonIsolation", "MuonLoose.IsolationVarRhoCorr");
+    vector<TLorentzMock>* Muons = core.AddLorentzMock("Muon", {core.MuonPrefix + ".PT", core.MuonPrefix + ".Eta"});
+    vector<double>* MuonIsolation = core.AddVectorVar("MuonIsolation", core.MuonPrefix + ".IsolationVarRhoCorr");
     vector<double>* ElectronIsolation = core.AddVectorVar("ElectronIsolation", "Electron.IsolationVarRhoCorr"); 
     double* metFull_Pt = core.AddVar("metMET", "MissingET.MET");
     double* metFull_Phi = core.AddVar("metPhi", "MissingET.Phi");
@@ -88,31 +90,41 @@ int main(int argc, char **argv) {
     for (Int_t entry = core.nMin; entry < core.nMax; ++entry) {
 
         // init
-        core.InitCuts(); 
+        core.InitCuts();
+        
         core.GetEntry(entry);
 
-        
         // require zero leptons which pass cuts
         // pre lepton cut
         core.Fill(Hists::pre_lep, Muons->size() + Electrons->size());
+
+        // made it here
 
         core.Cut(
             (leptonCount(Muons, MuonIsolation) + leptonCount(Electrons, ElectronIsolation)) < 1,
             Cuts::leptonCounts
             );
 
+        // didn't make it here 
+
+
+
         if (!core.Cut(Cuts::leptonCounts)) {
             core.UpdateCutFlow(); 
             continue;
         }
 
+
         core.Fill(Hists::post_lep, Muons->size() + Electrons->size());
+
 
         // require more than 1 jet
         core.Cut(
             Jets->size() > 1,
             Cuts::jetCounts
             );
+
+
 
         // rest of cuts, dependent on jetcount
         if (core.Cut(Cuts::jetCounts)) {
@@ -129,6 +141,7 @@ int main(int argc, char **argv) {
 
             // fill pre-cut MT2 histogram
             core.Fill(Hists::pre_MT, MT2); 
+            core.Fill(Hists::pre_mjj, Mjj); 
 
             // leading jet etas both meet eta veto
             core.Cut(
@@ -197,7 +210,9 @@ int main(int argc, char **argv) {
                 core.Fill(Hists::mjj, Vjj.M());
                 core.Fill(Hists::met2, MT2);
                 core.Fill(Hists::metPt, *metFull_Pt);
+                
             }
+
         }
         core.UpdateCutFlow(); 
     }
