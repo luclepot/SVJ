@@ -48,7 +48,6 @@ class Converter:
         self.selections = get_data_dict([spath])
         self.inputfiles = list(self.selections.keys())
 
-        self.log(self.inputfiles)
         # core tree, add files, add all trees
         self.files = [rf for rf in [rt.TFile(f) for f in self.inputfiles] if rf.GetListOfKeys().Contains("Delphes")]
         self.trees = [tf.Get("Delphes") for tf in self.files]
@@ -111,9 +110,9 @@ class Converter:
         else:
             self.save_eflow = True
             self.log("creating energyflow particle set with degree d <= {0}...".format(self.efbn))
-            self.efpset = ef.EFPSet("d<={0}".format(self.efbn), measure='hadr', beta=1, normed=True, verbose=True)
+            self.efpset = ef.EFPSet("d<={0}".format(self.efbn), measure='hadr', beta=1.0, normed=True, verbose=True)
             self.efp_size = self.efpset.count()
-
+            self.log("eflow set is size {}".format(self.efp_size))
         # self.selections_abs = np.asarray([sum(self.sizes[:s[0]]) + s[1] for s in self.selections])
         self.log("found {0} selected events, out of a total of {1}".format(sum(map(len, self.selections.values())), self.nEvents))
 
@@ -177,7 +176,7 @@ class Converter:
         constituentp4s
     ):
         j = jet_raw.P4()
-        nc, nn = map(float, [tree.Jet[i].NCharged, tree.Jet[i].NNeutrals])
+        nc, nn = map(float, [jet_raw.NCharged, jet_raw.NNeutrals])
         n_total = nc + nn
         jet_cfrac = nc / n_total if n_total > 0 else -1
 
@@ -213,7 +212,7 @@ class Converter:
         ptjj = Vjj.Pt()
         ptjj2 = ptjj*ptjj
         ptMet = Vjj.Px()*metpx + Vjj.Py()*metpy;
-        MT2 = np.sqrt(Mjj2 + 2*(np.sqrt(Mjj2 + ptjj2)*met - ptMet))
+        MT = np.sqrt(Mjj2 + 2*(np.sqrt(Mjj2 + ptjj2)*met - ptMet))
 
         return [
             met,
@@ -230,7 +229,8 @@ class Converter:
         ret = -np.ones((len(constituentp4s), len(self.jet_constituent_names)))
         for i,c in enumerate(constituentp4s):
             ret[i,:] = [c.Eta(), c.Phi(), c.Pt(), c.Rapidity(), c.E()]
-        return ret
+        
+        return self.pad_to_n(ret, self.n_constituent_particles, 2)
 
     def get_constituent_p4s(
         self,
@@ -268,6 +268,29 @@ class Converter:
                         
         return map(np.asarray, constituents)
 
+    def pad_to_n(
+        self,
+        data,
+        n,
+        sort_index
+    ):    
+        data = data[np.argsort(data[:,sort_index]),:][::-1][:n,:]
+        data = np.pad(data, ((0,n-data.shape[0]), (0,0)), 'constant')
+        return data
+
+    def get_eflow_variables(
+        self, 
+        constituents,
+    ):
+        return self.efpset.compute(
+            ef.utils.ptyphims_from_p4s(
+                map(
+                    lambda c: (c.E(), c.Px(), c.Py(), c.Pz()),
+                    constituents
+                )
+            )
+        )
+
     def convert(
         self,
         rng=(-1,-1),
@@ -297,7 +320,7 @@ class Converter:
         self.event_features = np.empty((total_size, len(self.event_feature_names)))
         self.log("event feature shapes: {}".format(self.event_features.shape))
 
-        self.jet_features = np.empty((total_size, self.n_jets*len(self.jet_feature_names)))
+        self.jet_features = np.empty((total_size, self.n_jets, len(self.jet_feature_names)))
         self.log("jet feature shapes: {}".format(self.event_features.shape))
 
         self.jet_constituents = np.empty((total_size, self.n_jets, self.n_constituent_particles, len(self.jet_constituent_names)))
@@ -331,45 +354,20 @@ class Converter:
                 # constituent 4-vectors per jet
                 constituents_by_jet = self.get_constituent_p4s(tree, jets, self.jetDR)
 
+                self.event_features[total_count, :] = np.asarray(self.get_event_features(tree))
+
                 for jet_n, (jet_raw, jet_p4, constituents) in enumerate(zip(jets_raw, jets, constituents_by_jet)):
                 
-                    jf = self.get_jet_features(jet_raw, constituents)
+                    self.jet_features[total_count, jet_n, :] =  self.get_jet_features(jet_raw, constituents)
+                    
+                    if self.save_constituents:
+                        self.jet_constituents[total_count, jet_n, :] = self.get_jet_constituents(constituents)
+                    
+                    if self.save_eflow:
+                        self.energy_flow_bases[total_count, jet_n, :] = self.get_eflow_variables(constituents)
 
-                    print jf.shape                    
-                #     if self.save_constituents:
-                #         self.jet_constituents[total_count, jetn, :]
-                #         # save constituents
-
-                #     if self.save_event_features:
-                #         # save event features
-
-                #     sort_index = plist[:,2].argsort()[::-1]
-
-                #     plist = plist[sort_index][0:self.n_constituent_particles,:]
-                #     subindex = subindex[sort_index][0:self.n_constituent_particles,:]
-
-                #     # pad && add
-                #     self.jet_constituents[total_count, jetn] = np.pad(plist, [(0, self.n_constituent_particles - plist.shape[0]),(0,0)], 'constant')
-                #     track_index[jetn,:len(subindex)] = subindex
-
-                # self.event_features[total_count] = np.fromiter(self.get_jet_features(tree, track_index), float, count=len(self.event_feature_names))
-                
-                # if return_debug_tree:
-                #     return tree, self.event_features, self.jet_constituents
-                
                 total_count += 1 
-
-
-        # ret = {}
-        # ret['event_features'] = self.event_features
-
-        # if self.save_constituents:
-        #     ret['jet_constituents'] = self.jet_constituents
-
-        # if self.save_eflow:
-        #     ret['eflow'] = self.energy_flow_bases
-    
-
+        
         return None
 
     def save(
@@ -386,83 +384,42 @@ class Converter:
         self.log("saving h5 data to file {0}".format(outputfile))
 
         f = h5py.File(outputfile, "w")
-        f.create_dataset('event_feature_data', data=self.event_features)
-        f.create_dataset('event_feature_names', data=self.event_feature_names)
+        features = f.create_group("event_features")
+        assert self.event_features.shape[-1] == len(self.event_feature_names)
+        self.log("creating feature 'event_features'")
+        features.create_dataset('data', data=self.event_features)
+        features.create_dataset('labels', data=self.event_feature_names)
+
+        jet_features = f.create_group("jet_features")
+        assert self.jet_features.shape[-1] == len(self.jet_feature_names)
+        self.log("creating feature 'jet_features'")
+        jet_features.create_dataset('data', data=self.jet_features)
+        jet_features.create_dataset('labels', data=self.jet_feature_names)
+
         if self.save_constituents:
-            f.create_dataset('jet_constituent_data', data=self.jet_constituents)
-            f.create_dataset('jet_constituent_names', data=self.jet_constituent_names)
+            jet_constituents = f.create_group("jet_constituents")
+            assert self.jet_constituents.shape[-1] == self.n_constituent_particles
+            self.log("creating feature 'jet_constituents'")
+            jet_constituents.create_dataset('data', data=self.jet_constituents)
+            jet_constituents.create_dataset('labels', data=[str(i) for i in range(self.n_constituent_particles)])
+
         if self.save_eflow:
-            eflow_names = np.asarray(['v{0}'.format(i) for i in range(self.energy_flow_bases.shape[2])])
-            f.create_dataset('energy_flow_data', data=self.energy_flow_bases)
-            f.create_dataset('energy_flow_names', data=eflow_names)
+            eflow = f.create_group("jet_eflow_variables")           
+            assert self.energy_flow_bases.shape[-1] == self.efp_size
+            self.log("creating feature 'jet_eflow_variables'")
+            eflow.create_dataset('data', data=self.energy_flow_bases)
+            eflow.create_dataset('labels', data=[str(i) for i in range(self.efp_size)])
 
 
         self.log("Successfully saved!")
         f.close()
 
-    # def get_jet_features(
-    #     self,
-    #     tree,
-    #     track_index,
-    # ):
-    #     # j1,j2 = tree.Jet[0].P4(), tree.Jet[1].P4()
-        
-    #     ## leading 2 jets
-    #     for i in range(self.n_jets):
-    #         j = tree.Jet[i].P4()
-    #         yield j.Eta()
-    #         yield j.Phi()
-    #         yield j.Pt()
-    #         yield j.M()
-
-    #         nc, nn = map(float, [tree.Jet[i].NCharged, tree.Jet[i].NNeutrals])
-    #         n_total = nc + nn
-    #         yield nc / n_total if n_total > 0 else -1
-        
-    #         for value in self.jets_axis2_pt2(j, tree, track_index[i]):
-    #             yield value
-
-    #         yield tree.Jet[i].Flavor
-    #         yield j.E()
-    #         yield tree.Jet[i].DeltaEta
-    #         yield tree.Jet[i].DeltaPhi
-    #         yield tree.MissingET[0].MET
-    #         yield tree.MissingET[0].Eta
-    #         yield tree.MissingET[0].Phi
-    
-
-    # def get_jet_constituents(
-    #     self,
-    #     jet,
-    #     dr,
-    #     component,
-    #     min_value,
-    #     flow_type
-    # ):
-    #     rep = self.EFlow_dict[flow_type]
-    #     selected = []
-    #     indicies = []
-    #     for i,c in enumerate(component):
-    #         cvec = c.P4()
-    #         if cvec.PT() > min_value:
-    #             deltaEta = cvec.Eta() - jet.Eta()
-    #             # deltaPhi = deltaPhi - 2*np.pi*(deltaPhi >  np.pi) + 2*np.pi*(deltaPhi < -1.*np.pi)
-
-    #             # constituent check
-    #             if cvec.DeltaPhi(jet)**2. + deltaEta**2. < dr**2.:
-    #                 selected.append(cvec)
-    #                 indicies.append([i, rep])
-        
-    #     if len(selected) == 0:
-    #         return np.zeros(0, dtype='obj'), -np.ones((0,2))
-        
-    #     return np.asarray(selected), np.asarray(indicies)
-
+ 
 if __name__ == "__main__":
     if len(sys.argv) == 10:
         (_, outputdir, pathspec, name, dr, nc, rmin, rmax, constituents, basis_n) = sys.argv
-        print outputdir
-        print pathspec
+        # print outputdir
+        # print pathspec
         # print filespec
         core = Converter(outputdir, pathspec, name, float(dr), int(nc), bool(int(constituents)), int(basis_n))
         ret = core.convert((int(rmin), int(rmax)))
@@ -475,6 +432,6 @@ if __name__ == "__main__":
             print track_index.shape
         except:
             print "dang"
-            core = Converter(".", "../data/signal_process/small/data_0_selection.txt", "data", save_constituents=False, energyflow_basis_degree=5)
-            ret = core.convert((0,100), return_debug_tree=False)
+            core = Converter(".", "../data/signal_process/small/data_1_selection.txt", "data", save_constituents=False, energyflow_basis_degree=3)
+            ret = core.convert((0,10000), return_debug_tree=False)
             # core.save("test.h5")
