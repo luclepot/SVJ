@@ -413,14 +413,13 @@ class Converter:
 
         self.log("Successfully saved!")
         f.close()
-
  
 if __name__ == "__main__":
     if len(sys.argv) == 10:
         (_, outputdir, pathspec, name, dr, nc, rmin, rmax, constituents, basis_n) = sys.argv
         # print outputdir
         # print pathspec
-        # print filespec
+        # print filespecls 
         core = Converter(outputdir, pathspec, name, float(dr), int(nc), bool(int(constituents)), int(basis_n))
         ret = core.convert((int(rmin), int(rmax)))
         core.save()
