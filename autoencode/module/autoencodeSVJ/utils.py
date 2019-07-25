@@ -319,12 +319,23 @@ class data_table(logger):
         self.log("plotting distrubution(s) for table(s) {}".format([self.name,] + [o.name for o in others]))
         plt.rcParams['figure.figsize'] = figsize
 
+        use_weights = False
+        if normed == 'n':
+            normed = 0
+            use_weights = True
+
         for i in range(n):
             ax = plt.subplot(rows, cols, i + 1)
-            # weights = np.ones_like(plot_data[i])/float(len(plot_data[i]))
+            if use_weights:
+                weights = np.ones_like(plot_data[i])/float(len(plot_data[i]))
+            
             ax.hist(plot_data[i], bins=bins, range=rng[i], histtype=histtype, normed=normed, label=self.name, weights=weights, alpha=alpha)
+            
             for j in range(len(others)):
-                # weights = np.ones_like(plot_others[j][i])/float(len(plot_others[j][i]))
+                if use_weights:
+                    weights = np.ones_like(plot_others[j][i])/float(len(plot_others[j][i]))
+
+                # ax.hist(plot_others[j][i]/plot_data[i].shape[0], bins=bins, range=rng[i], histtype=histtype, label=others[j].name, normed=0, weights=weights, alpha=alpha)
                 ax.hist(plot_others[j][i], bins=bins, range=rng[i], histtype=histtype, label=others[j].name, normed=normed, weights=weights, alpha=alpha)
 
             plt.xlabel(plot_data[i].name + " {}-scaled".format(xscale), fontsize=fontsize)
@@ -707,13 +718,16 @@ def split_table_by_column(column_name, df, tag_names=None, keep_split_column=Fal
     if tag_names is None:
         tag_names = dict([(u, str(u)) for u in unique])
 
+    if isinstance(df_to_write, pd.Series):
+        df_to_write = pd.DataFrame(df_to_write)
+
     assert df.shape[0] == df_to_write.shape[0], 'writing and splitting dataframes must have the same size!'
 
     gb = df.groupby(column_name)
     index = gb.groups
     for region, idx in index.items():
         if keep_split_column or column_name not in df_to_write:
-            tagged.append(data_table(df_to_write.iloc[idx], name=tag_names[region]))
+            tagged.append(data_table(df_to_write.iloc[idx], headers=list(df_to_write.columns), name=tag_names[region]))
         else:
             tagged.append(data_table(df_to_write.iloc[idx].drop(column_name, axis=1), name=tag_names[region]))
     return tagged, dict([(tag_names[k], v) for k,v in index.items()])
@@ -824,7 +838,7 @@ def log_uniform(low, high, size=None, base=10.):
 
 def split_by_tag(data, tag_column="jetFlavor", printout=True):
     tagged, tag_index = split_table_by_column(
-        "jetFlavor",
+        tag_column,
         data,
         delphes_jet_tags_dict,
         False
@@ -916,7 +930,7 @@ def roc_auc_plot(data_errs, signal_errs, metrics='loss', *args, **kwargs):
     plt_end()
     plt.show()
     
-def load_all_data(data_path, name, cols_to_drop = ["jetM", "*MET*", "*Delta*"]):
+def OLD_load_all_data(data_path, name, cols_to_drop = ["jetM", "*MET*", "*Delta*"]):
     """Returns: a tuple with... 
         a data_table with all data, (columns dropped),
         a list of data_tables, by jetFlavor tag (columns dropped),
@@ -1141,3 +1155,100 @@ def sum_of_gaussians(x, mu_vec, sigma_vec):
     x_norm = (x - mu_vec)/sigma_vec
     single_gaus_val = np.exp(-0.5*np.square(x_norm))/(sigma_vec*np.sqrt(2*np.pi))
     return np.sum(single_gaus_val, axis=1)/mu_vec.shape[0]
+
+def glob_in_repo(globstring):
+    repo_head = get_repo_info()['head']
+    files = glob.glob(os.path.abspath(globstring))
+    
+    if len(files) == 0:
+        files = glob.glob(os.path.join(repo_head, globstring))
+    
+    return files
+
+def all_modify(tables):
+    if not isinstance(tables, list) or isinstance(tables, tuple):
+        tables = [tables] 
+    for i,table in enumerate(tables):
+        tables[i].cdrop(["Energy", '0', 'Flavor'], inplace=True)
+        tables[i].df.rename(columns=dict([(c, "eflow {}".format(c)) for c in tables[i].df.columns if c.isdigit()]), inplace=True)
+        tables[i].headers = list(tables[i].df.columns)
+    if len(tables) == 1:
+        return tables[0]
+    return tables
+
+def hlf_modify(tables):
+    if not isinstance(tables, list) or isinstance(tables, tuple):
+        tables = [tables] 
+    for i,table in enumerate(tables):
+        tables[i].cdrop(["Energy", 'Flavor'], inplace=True)
+    if len(tables) == 1:
+        return tables[0]
+    return tables
+
+def eflow_modify(tables):
+    if not isinstance(tables, list) or isinstance(tables, tuple):
+        tables = [tables] 
+    for i,table in enumerate(tables):
+        tables[i].cdrop(['0'], inplace=True)
+        tables[i].df.rename(columns=dict([(c, "eflow {}".format(c)) for c in tables[i].df.columns if c.isdigit()]), inplace=True)
+        tables[i].headers = list(tables[i].df.columns)
+    if len(tables) == 1:
+        return tables[0]
+    return tables
+
+def jet_flavor_check(flavors):
+    d = split_table_by_column("Flavor", flavors, tag_names=delphes_jet_tags_dict)[1]
+    for name,index in d.items():
+        tp = "{}:".format(name).rjust(10)
+        tp = tp + "{}".format(len(index)).rjust(10)
+        tp = tp + "({} %)".format(round(100.*len(index)/len(flavors), 1)).rjust(10)
+        print tp
+
+def jet_flavor_split(to_split, ref=None):
+    if ref is None:
+        ref = to_split
+    return split_table_by_column("Flavor", ref, tag_names=delphes_jet_tags_dict, df_to_write=to_split, keep_split_column=False)[0]
+
+def load_all_data(globstring, name, include_hlf=True, include_eflow=True):
+    
+    """returns...
+        - data: full data matrix wrt variables
+        - jets: list of data matricies, in order of jet order (leading, subleading, etc.)
+        - event: event-specific variable data matrix, information on MET and MT etc. 
+        - flavors: matrix of jet flavors to (later) split your data with
+    """
+
+    files = glob_in_repo(globstring)
+    
+    if len(files) == 0:
+        raise AttributeError("No files found matching spec '{}'".format(globstring))
+
+    to_include = []
+    if include_hlf:
+        to_include.append("jet_features")
+    
+    if include_eflow:
+        to_include.append("jet_eflow_variables")
+        
+        
+    if not (include_hlf or include_eflow):
+        raise AttributeError("both HLF and EFLOW are not included! Please include one or both, at least.")
+        
+    d = data_loader(name)
+    for f in files:
+        d.add_sample(f)
+        
+    train_modify=None
+    if include_hlf and include_eflow:
+        train_modify = all_modify
+    elif include_hlf:
+        train_modify = hlf_modify
+    else:
+        train_modify = eflow_modify
+        
+    event = d.make_table('event_features', name + ' event features')
+    data = train_modify(d.make_tables(to_include, name, 'stack'))
+    jets = train_modify(d.make_tables(to_include, name, 'split'))
+    flavors = d.make_table('jet_features', name + ' jet flavor', 'stack').cfilter("Flavor")
+    
+    return data, jets, event, flavors
