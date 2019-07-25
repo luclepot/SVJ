@@ -15,6 +15,7 @@ import prettytable
 from StringIO import StringIO
 from enum import Enum
 import subprocess
+import json
 
 plt.rcParams['figure.figsize'] = (10,10)
 plt.rcParams.update({'font.size': 18})
@@ -885,16 +886,37 @@ def get_recon_errors(data_list, autoencoder, **kwargs):
         
     return errors, recon
 
-def roc_auc(data_err, signal_errs):
-    ret = {}
-    for signal_err in signal_errs:
-        pred = np.hstack([signal_err[metric].values, data_err[metric].values])
-        true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
+def roc_auc_dict(data_errs, signal_errs, metrics=['mse', 'mae'], *args, **kwargs):
+    from sklearn.metrics import roc_curve, roc_auc_score
+    if not isinstance(metrics, list):
+        metrics = [metrics]
 
-        roc = roc_curve(true, pred)
-        auc = roc_auc_score(true, pred)
+    if not isinstance(signal_errs, list):
+        signal_errs = [signal_errs]
 
-        ret[signal_err.name] = {'roc': roc, 'auc': auc}
+    if not isinstance(data_errs, list):
+        data_errs = [data_errs]
+    
+    if len(data_errs) == 1:
+        data_errs = [data_errs[0] for i in range(len(signal_errs))]
+
+    ret = {}    
+    
+    for i,(data_err,signal_err) in enumerate(zip(data_errs, signal_errs)):
+        
+        ret[signal_err.name] = {}
+        
+        for j,metric in enumerate(metrics):
+            ret[signal_err.name][metric] = {} 
+            pred = np.hstack([signal_err[metric].values, data_err[metric].values])
+            true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
+
+            roc = roc_curve(true, pred)
+            auc = roc_auc_score(true, pred)
+            
+            ret[signal_err.name][metric]['roc'] = roc
+            ret[signal_err.name][metric]['auc'] = auc
+
     return ret
 
 def roc_auc_plot(data_errs, signal_errs, metrics='loss', *args, **kwargs):
@@ -1237,7 +1259,7 @@ def load_all_data(globstring, name, include_hlf=True, include_eflow=True):
     if not (include_hlf or include_eflow):
         raise AttributeError("both HLF and EFLOW are not included! Please include one or both, at least.")
         
-    d = data_loader(name)
+    d = data_loader(name, verbose=False)
     for f in files:
         d.add_sample(f)
         
@@ -1255,3 +1277,86 @@ def load_all_data(globstring, name, include_hlf=True, include_eflow=True):
     flavors = d.make_table('jet_features', name + ' jet flavor', 'stack').cfilter("Flavor")
     
     return data, jets, event, flavors
+
+def dump_summary_json(*dicts):
+    from collections import OrderedDict
+    import json
+
+    summary = OrderedDict()
+
+    assert 'filename' in summary, 'NEED to include a filename arg, so we can save the dict!'
+    head = os.path.join(get_repo_info()['head'], 'autoencode/data/summary/')
+    fpath = os.path.join(head, summary['filename'] + '.summary')
+
+    if os.path.exists(fpath):
+        print "warning.. filepath '{}' exists!".format(fpath)
+
+        newpath = fpath
+
+        while os.path.exists(newpath):
+            newpath = fpath.replace(".summary", "_1.summary")
+
+        # just a check
+        assert not os.path.exists(newpath)
+        fpath = newpath
+        print "saving to path '{}' instead :-)".format(fpath)
+
+    summary['summary_path'] = fpath
+
+    for d in dicts:
+        summary.update(d)
+
+    for k,v in summary.items():
+        print k, ":", v
+    
+    print
+
+    with open(fpath, "w+") as f:
+        json.dump(summary, f)
+    print "successfully dumped size-{} summary dict to file '{}'".format(len(summary), fpath)
+
+def summary_dir():
+    return os.path.join(get_repo_info()['head'], 'autoencode/data/summary')
+
+def summary_by_name(name):
+   
+    if not name.endswith(".summary"):
+        name += ".summary"
+
+    if os.path.exists(name):
+        return name
+    
+    matches = glob.glob(os.path.join(summary_dir(), name))
+    
+    if len(matches) == 0:
+        raise AttributeError("No summary found with name '{}'".format(name))
+    elif len(matches) > 1:
+        raise AttributeError("Multiple summaries found with name '{}'".format(name))
+    
+    return matches[0]
+
+def load_summary(path):
+    assert os.path.exists(path)
+    with open(path, 'r') as f:
+         ret = json.load(f)
+    return ret
+        
+def summary():
+    
+    files = glob.glob(os.path.join(summary_dir(),"*.summary"))
+    
+    data = []
+    for f in files: 
+        with open(f) as to_read:
+            data.append(json.load(to_read))
+    
+    return pd.DataFrame(data)
+
+def summary_by_features(**kwargs):
+    data = summary()
+    
+    for k in kwargs:
+        if k in data:
+            data = data[data[k] == kwargs[k]]
+    
+    return data
