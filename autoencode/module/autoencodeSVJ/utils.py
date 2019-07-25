@@ -361,6 +361,7 @@ class data_table(logger):
         for d in to_drop:
             modify.df.drop(d, axis=1, inplace=True)
         modify.headers = list(modify.df.columns)
+        modify.data = np.asarray(modify.df)
         return modify
 
     def cfilter(
@@ -381,6 +382,14 @@ class data_table(logger):
             modify.df.drop(d, axis=1, inplace=True)
         modify.headers = list(modify.df.columns)
         return modify
+
+    def merge(
+        self,
+        other,
+        out_name,
+    ):
+        assert self.shape[0] == other.shape[0], 'data tables must have same number of samples'
+        return data_table(self.df.join(other.df), name=out_name)
 
     def _rows(
         self,
@@ -412,32 +421,114 @@ class data_loader(logger):
         self.samples = odict()
         self.sample_keys = None
         self.data = odict()
-        self.size = 0
-        self.shapes = []
-        self.table = None
+        self.labels = odict()
 
     def add_sample(
         self,
         sample_path,
-        default_table_globstring="*feature_",
     ):
-        filepath = smartpath(sample_path)
+        filepath = smartpath(sample_path)        
+        
         assert os.path.exists(filepath)
-        if filepath not in self.samples:
-            self.log("Adding sample at path '{}'".format(filepath))
-            self.samples[filepath] = h5py.File(filepath)
-            if self.sample_keys is None:
-                self.sample_keys = set(self.samples[filepath].keys())
-            else:
-                self.sample_keys = self.sample_keys.intersection(set(self.samples[filepath].keys()))
 
-            self._update_data(self.samples[filepath], self.samples[filepath].keys())
-            try:
-                self.table = self.make_table(self.name, default_table_globstring + "data", default_table_globstring + "names")
-            except:
-                self.error(traceback.format_exc())
-                self.error("Couldn't make datatable with added elements!")
-                self.table = None
+        if filepath not in self.samples:
+            with h5py.File(filepath) as f:
+
+                self.log("Adding sample at path '{}'".format(filepath))
+                self.samples[filepath] = f
+
+                keys = set(f.keys())
+
+                if self.sample_keys is None:
+                    self.sample_keys = keys
+                else:
+                    if keys != self.sample_keys:
+                        raise AttributeError("Cannot add current sample with keys {} to established sample with keys {}!".format(keys, self.sample_keys))
+
+                self._update_data(f, keys)
+
+    def make_table(
+        self,
+        key,
+        name=None,
+        third_dim_handle="stack", # stack, combine, or split
+    ):
+        assert third_dim_handle in ['stack', 'combine', 'split']
+        assert key in self.sample_keys
+
+        data = self.data[key]
+        labels = self.labels[key]
+        name = name or self.name
+
+        if len(data.shape) == 1:
+            return data_table(np.expand_dims(data, 1), headers=labels, name=name)
+        elif len(data.shape) == 2:
+            return data_table(data, headers=labels, name=name)
+        elif len(data.shape) == 3:
+            # isa jet behavior
+            if third_dim_handle == 'stack':
+                # stack behavior
+                return data_table(
+                    np.vstack(data),
+                    headers=labels,
+                    name=name
+                )
+            elif third_dim_handle == 'split':
+                return [
+                    data_table(
+                        data[:,i,:],
+                        headers=labels,
+                        name="{}_{}".format(name,i)
+                    ) for i in range(data.shape[1])
+                ]
+            else:
+                prefix = 'jet' if key.startswith('jet') else 'var'
+                return data_table(
+                    self.stack_data(data, axis=1),
+                    headers=self.stack_labels(labels, data.shape[1], prefix),
+                    name=name,
+                )
+                # combine behavior
+        else:
+            raise AttributeError("cannot process table for data with dimension {}".format(data.shape))
+
+    def make_tables(
+        self,
+        keylist,
+        name,
+        third_dim_handle="stack",
+    ):
+        tables = []
+        for k in keylist:
+            tables.append(self.make_table(k, None, third_dim_handle))
+        assert len(tables) > 0
+        ret, tables = tables[0], tables[1:]
+        for table in tables:
+            if third_dim_handle=="split":
+                for i,(r,t) in enumerate(zip(ret, table)):
+                    ret[i] = r.merge(t, name + str(i))
+            else:
+                ret = ret.merge(table, name)
+        return ret
+
+    def stack_data(
+        self,
+        data,
+        axis=1,
+    ):
+        return np.hstack(np.asarray(np.split(data, data.shape[axis], axis=axis)).squeeze())
+
+    def stack_labels(
+        self, 
+        labels,
+        n,
+        prefix,
+    ):
+        new = []
+        for j in range(n):
+            for l in labels:
+                new.append("{}{}_{}".format(prefix, j, l))
+        return np.asarray(new)
 
     def get_dataset(
         self,
@@ -509,92 +600,25 @@ class data_loader(logger):
         f.close()
         return 0
 
-    # def plot(
-    #     self,
-    #     *args,
-    #     **kwargs
-    # ):
-    #     return self.table.plot(*args, **kwargs)
-
-    def make_table(
-        self,
-        name,
-        value_key,
-        header_key=None,
-    ):
-        values, vdict = self.get_dataset(value_keys)
-        headers, hdict = None,None if header_keys is None else self.get_dataset(header_keys) 
-        name = name or self.name
-
-
-        assert len(values.shape) == 2, "data must be 2-dimensional and numeric!"
-        if headers is not None:
-            assert values.shape[1] == headers.shape[0], "data must have the same number of columns as there are headers!!"
-
-        return data_table(values, headers, name)
-
-    # def norm_min_max(
-    #     self,
-    #     dataset,
-    #     ab=(0,1)
-    # ):
-    #     if isinstance(dataset, basestring) or isinstance(dataset, list):
-    #         dataset = self.get_dataset(dataset)
-    #     a,b = ab
-    #     rng = dataset.min(axis=0), dataset.max(axis=0)
-    #     return (b-a)*(dataset - rng[0])/(rng[1] - rng[0]) + a, rng
-
-    # def inorm_min_max(
-    #     self,
-    #     dataset,
-    #     rng,
-    #     ab=(0,1)
-    # ):
-    #     a,b = ab
-    #     return ((dataset - a)/(b - a))*(rng[1] - rng[0]) + rng[0]
-        
-    # def norm_mean_std(
-    #     self,
-    #     dataset,
-    # ):
-    #     if isinstance(dataset, basestring) or isinstance(dataset, list):
-    #         dataset = self.get_dataset(dataset)
-
-    #     musigma = dataset.mean(axis=0), dataset.std(axis=0)
-    #     return (dataset - musigma[0])/(musigma[1]), musigma
-
-    # def inorm_mean_std(
-    #     self,
-    #     dataset,
-    #     musigma,
-    # ):
-    #     return dataset*musigma[1] + musigma[0]
-        
     def _update_data(
         self,
         sample_file,
         keys_to_add,
     ):
         for key in keys_to_add:
-            if key in sample_file.keys():
-                self._add_key(key, sample_file, self.data)
-             
-    @staticmethod
-    def _add_key(
-        key,
-        sfile,
-        d
-    ):
-        if key not in d:
-            d[key] = np.asarray(sfile[key])
-        else:
-            # string data: no dupes!
-            if d[key].dtype.kind == 'S':
-                assert d[key].shape == sfile[key].shape
-                assert all([k1 == k2 for k1,k2 in zip(d[key], sfile[key])])
+            assert 'data' in sample_file[key]
+            assert 'labels' in sample_file[key]
+            
+            if key not in self.labels:
+                self.labels[key] = np.asarray(sample_file[key]['labels'])
             else:
-                assert d[key].shape[1:] == sfile[key].shape[1:]
-                d[key] = np.concatenate([d[key], sfile[key]])
+                assert (self.labels[key] == np.asarray(sample_file[key]['labels'])).all()
+
+            if key not in self.data:
+                self.data[key] = np.asarray(sample_file[key]['data'])
+            else:
+                self.data[key] = np.concatenate([self.data[key], sample_file[key]['data']])
+
 
 def parse_globlist(glob_list, match_list):
     if not hasattr(glob_list, "__iter__") or isinstance(glob_list, str):
@@ -892,7 +916,6 @@ def roc_auc_plot(data_errs, signal_errs, metrics='loss', *args, **kwargs):
     plt_end()
     plt.show()
     
-
 def load_all_data(data_path, name, cols_to_drop = ["jetM", "*MET*", "*Delta*"]):
     """Returns: a tuple with... 
         a data_table with all data, (columns dropped),
