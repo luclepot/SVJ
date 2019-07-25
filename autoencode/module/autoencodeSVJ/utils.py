@@ -1198,11 +1198,14 @@ def eflow_modify(tables):
 
 def jet_flavor_check(flavors):
     d = split_table_by_column("Flavor", flavors, tag_names=delphes_jet_tags_dict)[1]
+    print flavors.name.center(30)
+    print "-"*30
     for name,index in d.items():
         tp = "{}:".format(name).rjust(10)
         tp = tp + "{}".format(len(index)).rjust(10)
         tp = tp + "({} %)".format(round(100.*len(index)/len(flavors), 1)).rjust(10)
         print tp
+    print 
 
 def jet_flavor_split(to_split, ref=None):
     if ref is None:
