@@ -16,6 +16,7 @@ from StringIO import StringIO
 from enum import Enum
 import subprocess
 import json
+import datetime
 
 plt.rcParams['figure.figsize'] = (10,10)
 plt.rcParams.update({'font.size': 18})
@@ -139,7 +140,7 @@ class data_table(logger):
             self.data = data
         elif isinstance(data, pd.DataFrame):
             self.headers = data.columns 
-            self.data = data.values
+            self.data = data
         elif isinstance(data, data_table):
             self.headers = data.headers
             self.data = data.df.values
@@ -155,8 +156,12 @@ class data_table(logger):
         assert len(self.data.shape) == 2, "data must be matrix!"
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
         assert len(self.data) > 0, "n samples must be greater than zero"
-        self.df = pd.DataFrame(self.data, columns=self.headers)
         self.scaler = None
+        if  isinstance(self.data, pd.DataFrame):
+            self.df = self.data
+            self.data = self.df.values
+        else:
+            self.df = pd.DataFrame(self.data, columns=self.headers)
 
     def norm(
         self,
@@ -258,8 +263,8 @@ class data_table(logger):
         shuffle=True
     ):
         dtrain, dtest = train_test_split(self, test_size=test_fraction, random_state=random_state)
-        return (data_table(np.asarray(dtrain), np.asarray(dtrain.columns), "train"),
-            data_table(np.asarray(dtest), np.asarray(dtest.columns), "test"))
+        return (data_table(dtrain, name="train"),
+            data_table(dtest, name="test"))
     
     def plot(
         self,
@@ -724,8 +729,12 @@ def split_table_by_column(column_name, df, tag_names=None, keep_split_column=Fal
 
     assert df.shape[0] == df_to_write.shape[0], 'writing and splitting dataframes must have the same size!'
 
+    df = df.copy().reset_index(drop=True)
+    df_to_write = df_to_write.copy().reset_index(drop=True)
+    
     gb = df.groupby(column_name)
     index = gb.groups
+    
     for region, idx in index.items():
         if keep_split_column or column_name not in df_to_write:
             tagged.append(data_table(df_to_write.iloc[idx], headers=list(df_to_write.columns), name=tag_names[region]))
@@ -1083,6 +1092,7 @@ def get_plot_params(
     savename=None,
     ticksize=8,
     fontsize=5,
+    colors=None
 ):
     rows =  n_plots/cols + bool(n_plots%cols)
     if n_plots < cols:
@@ -1119,8 +1129,12 @@ def get_plot_params(
         else:
             plt.savefig(savename)
             
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-
+    if colors is None:
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    if len(colors) < n_plots:
+        print "too many plots for specified colors. overriding with RAINbow"
+        import matplotlib.cm as cm
+        colors = cm.rainbow(np.linspace(0, 1, n_plots)) 
     return fig, on_axis_begin, on_axis_end, on_plot_end, colors
 
 def plot_spdfs(inputs, outputs, bins=100, *args, **kwargs):
@@ -1345,13 +1359,15 @@ def load_summary(path):
 def summary():
     
     files = glob.glob(os.path.join(summary_dir(),"*.summary"))
-    
+
     data = []
     for f in files: 
         with open(f) as to_read:
-            data.append(json.load(to_read))
-    
-    return pd.DataFrame(data)
+            d = json.load(to_read)
+            d['time'] = datetime.datetime.fromtimestamp(os.path.getmtime(f))
+            data.append(d)
+
+    return data_table(pd.DataFrame(data), name='summary')
 
 def summary_match(globstr):
     if not (os.path.dirname(globstr) == summary_dir()):
