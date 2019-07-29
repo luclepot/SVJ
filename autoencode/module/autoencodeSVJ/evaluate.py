@@ -106,24 +106,33 @@ class ae_evaluation:
         signal_vec, 
         split_by_leading_jet,
         split_by_flavor,
+        include_names=False,
     ):  
         if split_by_flavor and split_by_leading_jet:
             raise AttributeError("Cannot split by both Flavor and leading/subleading jets (too messy of a plot)")
 
-        this = signal_vec
-        others = test_vec
+        signal_out = signal_vec
+        qcd_out = [test_vec]
+        flag = 0
 
         if split_by_flavor:
-            others = utils.jet_flavor_split(test_vec, self.test_flavor)
+            qcd_out = utils.jet_flavor_split(test_vec, self.test_flavor)
+            if include_names:
+                for i in range(len(qcd_out)):
+                    qcd_out[i].name = qcd_out[i].name + ", " + test_vec.name 
 
         if split_by_leading_jet:
             j1s, j2s = map(utils.data_table, [signal_vec.iloc[0::2], signal_vec.iloc[1::2]])
             j1s.name = 'leading signal jet'
             j2s.name = 'subleading signal jet'
-            others = [j1s, j2s]
-            this = test_vec
+            if include_names:
+                j1s.name += ", " + signal_vec.name
+                j2s.name += ", " + signal_vec.name
+            signal_out = [j1s, j2s]
+            qcd_out = test_vec
+            flag = 1
 
-        return this, others
+        return signal_out, qcd_out, flag
 
     def retdict(
         self,
@@ -158,31 +167,47 @@ class ae_evaluation:
         
         this_arr, signal_arr = [], []
 
-        this_pre, others_pre = self.split_my_jets(self.test_norm, self.signal_norm, split_by_leading_jet, split_by_flavor)
-        this_post, others_post = self.split_my_jets(self.qcd_recon, self.signal_recon, split_by_leading_jet, split_by_flavor)
+        signal_pre, qcd_pre, flag_pre = self.split_my_jets(self.test_norm, self.signal_norm, split_by_leading_jet, split_by_flavor, include_names=True)
+        signal_post, qcd_post, flag_post = self.split_my_jets(self.qcd_recon, self.signal_recon, split_by_leading_jet, split_by_flavor, include_names=True)
 
-        return (this_pre, others_pre), (this_post, others_post)
-        
-    
+        to_plot = []
 
-
-        if signal and qcd:
+        if signal:
             if pre:
-                this_arr.append(ret[0]), signal_arr.append(ret[1])
+                if flag_pre:
+                    to_plot += signal_pre
+                else:
+                    to_plot.append(signal_pre)
             if post:
-                ret = self.split_my_jets(self.qcd_recon, self.signal_recon, split_by_leading_jet, split_by_flavor)
-            
+                if flag_post:
+                    to_plot += signal_post
+                else:
+                    to_plot.append(signal_post)
+
+        if qcd:
+            if pre:
+                if flag_pre:
+                    to_plot.append(qcd_pre)
+                else:
+                    to_plot += qcd_pre
+            if post:
+                if flag_post:
+                    to_plot.append(qcd_post)            
+                else:
+                    to_plot += qcd_post
+
+        assert len(to_plot) > 0
 
         if show_plot:
-            this.plot(
-                others,
+            to_plot[0].plot(
+                to_plot[1:],
                 alpha=alpha, normed=normed,
                 figname=figname, figsize=figsize,
                 cols=cols, *args, **kwargs
             )
             return
 
-        return self.retdict(this, others)
+        return self.retdict(to_plot[0], to_plot[1:])
 
     def node_reps(
         self,
@@ -199,7 +224,12 @@ class ae_evaluation:
         **kwargs
     ):
          
-        this, others = self.split_my_jets(self.qcd_reps, self.signal_reps, split_by_leading_jet, split_by_flavor)
+        sig, qcd, flag = self.split_my_jets(self.qcd_reps, self.signal_reps, split_by_leading_jet, split_by_flavor)
+        
+        if flag:
+            this, others = qcd, sig
+        else:
+            this, others = sig, qcd
 
         if show_plot:             
             this.plot(
@@ -231,7 +261,13 @@ class ae_evaluation:
         split_by_leading_jet=False, split_by_flavor=False,
         figloc="upper right", *args, **kwargs
     ):
-        this, others = self.split_my_jets(self.qcd_err, self.signal_err, split_by_leading_jet, split_by_flavor)
+        sig, qcd, flag = self.split_my_jets(self.qcd_err, self.signal_err, split_by_leading_jet, split_by_flavor)
+
+        if flag:
+            this, others = qcd, sig
+        else:
+            this, others = sig, qcd
+
         if show_plot:
             this.plot(
                 others, figsize=figsize, normed=normed, 
@@ -255,7 +291,7 @@ class ae_evaluation:
 
         qcd, signal = self.qcd_err, self.signal_err
         if split_by_leading_jet:
-            qcd, signal = self.split_my_jets(self.qcd_err, self.signal_err, True, False)
+            signal, qcd, _ = self.split_my_jets(self.qcd_err, self.signal_err, True, False)
             signal += [self.signal_err]
             signal[-1].name = "combined signal error"
         
