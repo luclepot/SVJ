@@ -2,6 +2,8 @@ import utils
 import trainer
 import numpy as np
 import tensorflow as tf
+import os
+import models
 
 class ae_evaluation:
     
@@ -146,20 +148,17 @@ class ae_evaluation:
         show_plot=True,
         metrics=['mae', 'mse'],
         figsize=8,
-        figname=None,
         figloc=(0.3, 0.2),
         *args,
         **kwargs
     ):
         
         if show_plot:
-            if figname is None:
-                figname = 'ROC (hlf & eflow with $d\leq' + str(self.eflow_base) + '$)',
 
             utils.roc_auc_plot(
                 self.qcd_err, self.signal_err,
                 metrics=metrics, figsize=figsize,
-                figname=figname, figloc=figloc
+                figloc=figloc
             )
             
             return
@@ -172,4 +171,163 @@ class ae_evaluation:
         result_args = dict([(r + '_auc', roc_dict[r]['auc']) for r in roc_dict])
         
         return result_args
+
+eflow_base_lookup = {
+    12: 3,
+    13: 3,
+    35: 4, 
+    36: 4, 
+}
+
+def ae_train(
+    signal_path,
+    qcd_path,
+    target_dim,
+    hlf=True,
+    eflow=True,
+    version=None,
+    seed=40,
+    test_split=0.15, 
+    val_split=0.15,
+    norm_args={
+        "norm_type": "StandardScaler"
+    },
+    train_me=True,
+    batch_size=64,
+    loss='mse',
+    optimizer='adam',
+    epochs=100,
+    learning_rate=0.0005,
+    custom_objects={},
+    interm_architecture=(30,30),
+):
+
+    """Training function for basic autoencoder (inputs == outputs). 
+    Will create and save a summary file for this training run, with relevant
+    training details etc.
+
+    Not super flexible, but gives a good idea of how good your standard AE is.
+    """
+    # set random seed
+    np.random.seed(seed)
+    tf.set_random_seed(seed)
+
+    # get all our data
+    (signal,
+     signal_jets,
+     signal_event,
+     signal_flavor) = utils.load_all_data(
+        signal_path,
+        "signal", include_hlf=hlf, include_eflow=eflow
+    )
+
+    (qcd,
+     qcd_jets,
+     qcd_event,
+     qcd_flavor) = utils.load_all_data(
+        qcd_path, 
+        "qcd background", include_hlf=hlf, include_eflow=eflow
+    )
+
+    if eflow:
+        qcd_eflow = len(filter(lambda x: "eflow" in x, qcd.columns))
+        signal_eflow = len(filter(lambda x: "eflow" in x, signal.columns))
+
+        assert qcd_eflow == signal_eflow, 'signal and qcd eflow basis must be the same!!'
+        eflow_base = eflow_base_lookup[qcd_eflow]
+    else:
+        eflow_base = 0
+
+    filename = "{}{}{}_".format('hlf_' if hlf else '', 'eflow{}_'.format(eflow_base) if eflow else '', target_dim)
+    
+    if version is None:
+        existing_ids = map(lambda x: int(os.path.basename(x).rstrip('.summary').split('_')[-1].lstrip('v')), utils.summary_match(filename + "v*"))
+        assert len(existing_ids) == len(set(existing_ids)), "no duplicate ids"
+        id_set = set(existing_ids)
+        this_num = 0
+        while this_num in id_set:
+            this_num += 1
         
+        version = this_num
+
+    filename += "v{}".format(version)
+
+    assert len(utils.summary_match(filename)) == 0, "filename '{}' exists already! Change version id, or leave blank.".format(filename)
+
+    input_dim = len(signal.columns)
+
+    data_args = {
+        'target_dim': target_dim,
+        'input_dim': input_dim,
+        'test_split': test_split,
+        'val_split': val_split,
+        'hlf': hlf, 
+        'eflow': eflow,
+        'eflow_base': eflow_base,
+        'seed': seed,
+        'filename': filename,
+        'filepath': os.path.abspath(filename),
+        'qcd_path': qcd_path,
+        'signal_path': signal_path,
+    }
+
+    all_train, test = qcd.train_test_split(test_split, seed)
+    train, val = all_train.train_test_split(val_split, seed)
+
+    train_norm = train.norm(out_name="qcd train norm", **norm_args)
+    val_norm = train.norm(val, out_name="qcd val norm", **norm_args)
+    
+    test_norm = test.norm(out_name="qcd test norm", **norm_args)
+    signal_norm = signal.norm(out_name="signal norm", **norm_args)
+
+    train.name = "qcd training data"
+    test.name = "qcd test data"
+    val.name = "qcd validation data"
+
+    instance = trainer.trainer(filename)
+
+    aes = models.base_autoencoder()
+    aes.add(input_dim)
+    for elt in interm_architecture:
+        aes.add(elt, activation='relu')
+    aes.add(target_dim, activation='relu')
+    for elt in reversed(interm_architecture):
+        aes.add(elt, activation='relu')
+    aes.add(input_dim, activation='linear')
+
+    ae = aes.build()
+    ae.summary()
+    train_args = {
+        'batch_size': batch_size, 
+        'loss': loss, 
+        'optimizer': optimizer,
+        'epochs': epochs,
+        'learning_rate': learning_rate,
+    }
+
+    print "TRAINING WITH PARAMS >>>"
+    for arg in train_args:
+        print arg, ":", train_args[arg]
+
+    if train_me:
+        ae = instance.train(
+            x_train=train_norm.data,
+            x_test=val_norm.data,
+            y_train=train_norm.data,
+            y_test=val_norm.data,
+            model=ae,
+            force=True,
+            use_callbacks=True,
+            custom_objects=custom_objects, 
+            **train_args
+        )
+    else:
+        ae = instance.load_model(custom_objects=custom_objects)
+
+    [data_err, signal_err], [data_recon, signal_recon] = utils.get_recon_errors([test_norm, signal_norm], ae)
+    roc_dict = utils.roc_auc_dict(data_err, signal_err, metrics=['mae', 'mse']).values()[0]
+    result_args = dict([(r + '_auc', roc_dict[r]['auc']) for r in roc_dict])
+
+    utils.dump_summary_json(result_args, train_args, data_args, norm_args)
+
+    return filename
