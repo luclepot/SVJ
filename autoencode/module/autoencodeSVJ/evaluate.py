@@ -35,8 +35,8 @@ class ae_evaluation:
         self.hlf = self.d['hlf']
         self.eflow = self.d['eflow']
         self.eflow_base = self.d['eflow_base']
-    #     signal_path = "data/signal/base_{}/*.h5".format(eflow_base)
-    #     qcd_path = "data/background/base_{}/*.h5".format(eflow_base)
+        #     signal_path = "data/signal/base_{}/*.h5".format(eflow_base)
+        #     qcd_path = "data/background/base_{}/*.h5".format(eflow_base)
 
         (self.signal,
          self.signal_jets,
@@ -64,6 +64,9 @@ class ae_evaluation:
         self.test_split = self.d['test_split']
         self.val_split = self.d['val_split']
         self.filename = self.d['filename']
+        self.filepath = self.d['filepath']
+
+        print self.filepath
 
         self.norm_args = {
             "norm_type": str(self.d["norm_type"])
@@ -85,14 +88,102 @@ class ae_evaluation:
         
         self.custom_objects = custom_objects
         
-        self.instance = trainer.trainer(self.filename)
+
+        self.instance = trainer.trainer(self.filepath)
+
         self.ae = self.instance.load_model(custom_objects=self.custom_objects)
         
         [self.qcd_err, self.signal_err], [self.qcd_recon, self.signal_recon] = utils.get_recon_errors([self.test_norm, self.signal_norm], self.ae)
 
         self.qcd_reps = utils.data_table(self.ae.layers[1].predict(self.test_norm.data), name='background reps')
         self.signal_reps = utils.data_table(self.ae.layers[1].predict(self.signal_norm.data), name='signal reps')
+
+        self.test_flavor = self.qcd_flavor.iloc[self.test.index]
+
+    def split_my_jets(
+        self,
+        test_vec,
+        signal_vec, 
+        split_by_leading_jet,
+        split_by_flavor,
+    ):  
+        if split_by_flavor and split_by_leading_jet:
+            raise AttributeError("Cannot split by both Flavor and leading/subleading jets (too messy of a plot)")
+
+        this = signal_vec
+        others = test_vec
+
+        if split_by_flavor:
+            others = utils.jet_flavor_split(test_vec, self.test_flavor)
+
+        if split_by_leading_jet:
+            j1s, j2s = map(utils.data_table, [signal_vec.iloc[0::2], signal_vec.iloc[1::2]])
+            j1s.name = 'leading signal jet'
+            j2s.name = 'subleading signal jet'
+            others = [j1s, j2s]
+            this = test_vec
+
+        return this, others
+
+    def retdict(
+        self,
+        this,
+        others,
+    ):
+        ret = {}
+        for elt in [this] + others:
+            assert elt.name not in ret
+            ret[elt.name] = elt
+        return ret
+
+    def recon(
+        self,
+        show_plot=True,
+        signal=True,
+        qcd=True,
+        pre=True,
+        post=True,        
+        alpha=1,
+        normed=1,
+        figname='variable reconstructions',
+        figsize=15,
+        cols=4,
+        split_by_leading_jet=False,
+        split_by_flavor=False,
+        *args,
+        **kwargs
+    ):
+        assert signal or qcd, "must select one of either 'signal' or 'qcd' distributions to show"
+        assert pre or post, "must select one of either 'pre' or 'post' distributions to show"
         
+        this_arr, signal_arr = [], []
+
+        this_pre, others_pre = self.split_my_jets(self.test_norm, self.signal_norm, split_by_leading_jet, split_by_flavor)
+        this_post, others_post = self.split_my_jets(self.qcd_recon, self.signal_recon, split_by_leading_jet, split_by_flavor)
+
+        return (this_pre, others_pre), (this_post, others_post)
+        
+    
+
+
+        if signal and qcd:
+            if pre:
+                this_arr.append(ret[0]), signal_arr.append(ret[1])
+            if post:
+                ret = self.split_my_jets(self.qcd_recon, self.signal_recon, split_by_leading_jet, split_by_flavor)
+            
+
+        if show_plot:
+            this.plot(
+                others,
+                alpha=alpha, normed=normed,
+                figname=figname, figsize=figsize,
+                cols=cols, *args, **kwargs
+            )
+            return
+
+        return self.retdict(this, others)
+
     def node_reps(
         self,
         show_plot=True,
@@ -102,17 +193,23 @@ class ae_evaluation:
         figsize=10,
         figloc='upper right',
         cols=4,
+        split_by_leading_jet=False,
+        split_by_flavor=False,
         *args,
         **kwargs
     ):
-        if show_plot:
-            self.qcd_reps.plot(
-                self.signal_reps, alpha=alpha,
+         
+        this, others = self.split_my_jets(self.qcd_reps, self.signal_reps, split_by_leading_jet, split_by_flavor)
+
+        if show_plot:             
+            this.plot(
+                others, alpha=alpha,
                 normed=normed, figname=figname, figsize=figsize,
                 figloc=figloc, cols=cols, *args, **kwargs
             )
             return 
-        return {'qcd': self.qcd_reps, 'signal': self.signal_reps}
+
+        return self.retdict(this, others)
         
     def metrics(
         self,
@@ -131,17 +228,19 @@ class ae_evaluation:
         figsize=15, normed='n', 
         figname='error for eflow variables', 
         yscale='linear', rng=((0, 0.08), (0, 0.3)), 
+        split_by_leading_jet=False, split_by_flavor=False,
         figloc="upper right", *args, **kwargs
     ):
+        this, others = self.split_my_jets(self.qcd_err, self.signal_err, split_by_leading_jet, split_by_flavor)
         if show_plot:
-            self.qcd_err.plot(
-                self.signal_err, figsize=figsize, normed=normed, 
+            this.plot(
+                others, figsize=figsize, normed=normed, 
                 figname=figname, 
                 yscale=yscale, rng=rng, 
                 figloc=figloc, *args, **kwargs
             )
             return
-        return {'qcd': self.qcd_err, 'signal': self.signal_err}
+        return self.retdict(this, others)
     
     def roc(
         self,
@@ -149,28 +248,30 @@ class ae_evaluation:
         metrics=['mae', 'mse'],
         figsize=8,
         figloc=(0.3, 0.2),
+        split_by_leading_jet=False,
         *args,
         **kwargs
     ):
+
+        qcd, signal = self.qcd_err, self.signal_err
+        if split_by_leading_jet:
+            qcd, signal = self.split_my_jets(self.qcd_err, self.signal_err, True, False)
+            signal += [self.signal_err]
+            signal[-1].name = "combined signal error"
         
         if show_plot:
-
             utils.roc_auc_plot(
-                self.qcd_err, self.signal_err,
+                qcd, signal,
                 metrics=metrics, figsize=figsize,
                 figloc=figloc
             )
             
             return
 
-        roc_dict = utils.roc_auc_dict(
-            self.qcd_err, self.signal_err,
+        return utils.roc_auc_dict(
+            qcd, signal,
             metrics=metrics
-        ).values()[0]
-
-        result_args = dict([(r + '_auc', roc_dict[r]['auc']) for r in roc_dict])
-        
-        return result_args
+        )
 
 eflow_base_lookup = {
     12: 3,
@@ -200,6 +301,7 @@ def ae_train(
     learning_rate=0.0005,
     custom_objects={},
     interm_architecture=(30,30),
+    output_data_path=None,
 ):
 
     """Training function for basic autoencoder (inputs == outputs). 
@@ -211,6 +313,9 @@ def ae_train(
     # set random seed
     np.random.seed(seed)
     tf.set_random_seed(seed)
+
+    if output_data_path is None:
+        output_data_path = os.path.join(utils.get_repo_info()['head'], "autoencode/data/training_runs")
 
     # get all our data
     (signal,
@@ -254,6 +359,7 @@ def ae_train(
 
     assert len(utils.summary_match(filename)) == 0, "filename '{}' exists already! Change version id, or leave blank.".format(filename)
 
+    filepath = os.path.join(output_data_path, filename)
     input_dim = len(signal.columns)
 
     data_args = {
@@ -266,9 +372,10 @@ def ae_train(
         'eflow_base': eflow_base,
         'seed': seed,
         'filename': filename,
-        'filepath': os.path.abspath(filename),
+        'filepath': filepath,
         'qcd_path': qcd_path,
         'signal_path': signal_path,
+        'arch': (input_dim,) + interm_architecture + (target_dim,) + tuple(reversed(interm_architecture)) + (input_dim,)
     }
 
     all_train, test = qcd.train_test_split(test_split, seed)
@@ -284,7 +391,7 @@ def ae_train(
     test.name = "qcd test data"
     val.name = "qcd validation data"
 
-    instance = trainer.trainer(filename)
+    instance = trainer.trainer(filepath)
 
     aes = models.base_autoencoder()
     aes.add(input_dim)
@@ -331,3 +438,5 @@ def ae_train(
     utils.dump_summary_json(result_args, train_args, data_args, norm_args)
 
     return filename
+
+
