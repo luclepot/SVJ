@@ -1283,9 +1283,13 @@ def dump_summary_json(*dicts):
     import json
 
     summary = OrderedDict()
+    
+    for d in dicts:
+        summary.update(d)
 
     assert 'filename' in summary, 'NEED to include a filename arg, so we can save the dict!'
     head = os.path.join(get_repo_info()['head'], 'autoencode/data/summary/')
+    
     fpath = os.path.join(head, summary['filename'] + '.summary')
 
     if os.path.exists(fpath):
@@ -1302,9 +1306,6 @@ def dump_summary_json(*dicts):
         print "saving to path '{}' instead :-)".format(fpath)
 
     summary['summary_path'] = fpath
-
-    for d in dicts:
-        summary.update(d)
 
     for k,v in summary.items():
         print k, ":", v
@@ -1326,7 +1327,7 @@ def summary_by_name(name):
     if os.path.exists(name):
         return name
     
-    matches = glob.glob(os.path.join(summary_dir(), name))
+    matches = summary_match(name)
     
     if len(matches) == 0:
         raise AttributeError("No summary found with name '{}'".format(name))
@@ -1351,6 +1352,16 @@ def summary():
             data.append(json.load(to_read))
     
     return pd.DataFrame(data)
+
+def summary_match(globstr):
+    if not (os.path.dirname(globstr) == summary_dir()):
+        globstr = os.path.join(summary_dir(), globstr)
+    else:
+        globstr = os.path.abspath(globstr)
+    
+    ret = glob.glob(globstr)
+    print "found {} matches with search '{}'".format(len(ret), globstr)
+    return ret
 
 def summary_by_features(**kwargs):
     data = summary()
