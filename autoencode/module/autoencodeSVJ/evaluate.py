@@ -98,6 +98,9 @@ class ae_evaluation:
         self.qcd_reps = utils.data_table(self.ae.layers[1].predict(self.test_norm.data), name='background reps')
         self.signal_reps = utils.data_table(self.ae.layers[1].predict(self.signal_norm.data), name='signal reps')
 
+        self.qcd_err_jets = [utils.data_table(self.qcd_err.loc[self.qcd_err.index % 2 == i], name=self.qcd_err.name + " jet " + str(i)) for i in range(2)]
+        self.signal_err_jets = [utils.data_table(self.signal_err.loc[self.signal_err.index % 2 == i], name=self.signal_err.name + " jet " + str(i)) for i in range(2)]
+
         self.test_flavor = self.qcd_flavor.iloc[self.test.index]
 
     def split_my_jets(
