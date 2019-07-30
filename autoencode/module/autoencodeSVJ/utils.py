@@ -188,7 +188,7 @@ class data_table(logger):
         if out_name is None:
             out_name = "'{}' normed to '{}'".format(data.name,self.name)
 
-        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name=out_name)
+        ret = data_table(pd.DataFrame(self.scaler.transform(data.df), columns=data.df.columns, index=data.df.index), name=out_name)
         return ret
 
     def inorm(
@@ -217,7 +217,9 @@ class data_table(logger):
         if out_name is None:
             out_name = "'{}' inv_normed to '{}'".format(data.name,self.name)
 
-        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name=out_name)
+        ret = data_table(pd.DataFrame(self.scaler.inverse_transform(data.df), columns=data.df.columns, index=data.df.index), name=out_name)
+
+        # ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name=out_name)
         return ret
         
     def __getattr__(
@@ -400,7 +402,7 @@ class data_table(logger):
         modify.headers = list(modify.df.columns)
         return modify
 
-    def merge(
+    def cmerge(
         self,
         other,
         out_name,
@@ -536,9 +538,9 @@ class data_loader(logger):
         for table in tables:
             if third_dim_handle=="split":
                 for i,(r,t) in enumerate(zip(ret, table)):
-                    ret[i] = r.merge(t, name + str(i))
+                    ret[i] = r.cmerge(t, name + str(i))
             else:
-                ret = ret.merge(table, name)
+                ret = ret.cmerge(table, name)
         return ret
 
     def stack_data(
@@ -705,7 +707,7 @@ def plot_error_ratios(main_error, compare_errors, metric='mse', bins= 40, log=Fa
     plt.show()
     return ratios
 
-def get_errors(true, pred, out_name="errors", functions=["mse", "mae"], names=[None, None]):
+def get_errors(true, pred, out_name="errors", functions=["mse", "mae"], names=[None, None], index=None):
     import tensorflow as tf
     import keras
     if names is None:
@@ -723,8 +725,7 @@ def get_errors(true, pred, out_name="errors", functions=["mse", "mae"], names=[N
     raw = [func(true, pred) for func in functions_keep]
     raw = np.asarray(map(lambda x: keras.backend.eval(x) if isinstance(x, tf.Tensor) else x, raw)).T
     return data_table(
-        raw,
-        headers=[str(f) for f in names],
+        pd.DataFrame(raw, columns=[str(f) for f in names], index=index),
         name=out_name
     )
 
@@ -896,13 +897,12 @@ def get_recon_errors(data_list, autoencoder, **kwargs):
     for i,d in enumerate(data_list):
         recon.append(
             data_table(
-                autoencoder.predict(d.data),        
-                headers=d.headers,
+                pd.DataFrame(autoencoder.predict(d.data), columns=d.columns, index=d.index),
                 name="{0} pred".format(d.name)
             )
         )
         errors.append(
-            get_errors(recon[i].data, d.data, out_name="{0} error".format(d.name), **kwargs)
+            get_errors(recon[i].data, d.data, out_name="{0} error".format(d.name), index=d.df.index, **kwargs)
         )
         
     return errors, recon
