@@ -482,22 +482,35 @@ class data_loader(logger):
         elif len(data.shape) == 2:
             return data_table(data, headers=labels, name=name)
         elif len(data.shape) == 3:
-            # isa jet behavior
-            if third_dim_handle == 'stack':
-                # stack behavior
-                return data_table(
+            ret = data_table(
                     np.vstack(data),
                     headers=labels,
                     name=name
                 )
+            # isa jet behavior
+            if third_dim_handle == 'stack':
+                # stack behavior
+                return ret 
             elif third_dim_handle == 'split':
+                if key.startswith("jet"):
+                    prefix = "jet"
+                else:
+                    prefix = "var"
+
                 return [
                     data_table(
-                        data[:,i,:],
-                        headers=labels,
-                        name="{}_{}".format(name,i)
-                    ) for i in range(data.shape[1])
-                ]
+                        ret.iloc[i::data.shape[1]],
+                        name="{} {} {}".format(ret.name, prefix, i)
+                        ) for i in range(data.shape[1])
+                    ]
+                
+                # [
+                #     data_table(
+                #         data[:,i,:],
+                #         headers=labels,
+                #         name="{}_{}".format(name,i)
+                #     ) for i in range(data.shape[1])
+                # ]
             else:
                 prefix = 'jet' if key.startswith('jet') else 'var'
                 return data_table(
@@ -635,7 +648,6 @@ class data_loader(logger):
                 self.data[key] = np.asarray(sample_file[key]['data'])
             else:
                 self.data[key] = np.concatenate([self.data[key], sample_file[key]['data']])
-
 
 def parse_globlist(glob_list, match_list):
     if not hasattr(glob_list, "__iter__") or isinstance(glob_list, str):
