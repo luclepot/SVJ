@@ -192,6 +192,7 @@ def setup_parser():
     convert.add_argument('-c', '--constituents', dest='NC', action='store', type=int, default=-1, help='number of jet constituents to save')
     convert.add_argument('-r', '--range', dest='range', action='store', type=_range_input, default=(-1,-1), help='range of data to parse')
     convert.add_argument('-s', '--split-samples',  dest='split', action='store', type=int, default=-1, help='split samplelist processing into chunks of N')
+    convert.add_argument('-b', '--basis-degree',  dest='basis_n', action='store', type=int, default=-1, help='degree of energy flow basis; -1 is default (don\'t save')
     
     # training args
 
@@ -272,7 +273,7 @@ def select_main(inputdir, outputdir, name, batch, filter, range, debug, timing, 
 
     sys.exit(0)
 
-def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split):
+def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split, basis_n):
     log("running command 'convert'")
 
     if inputdir is None:
@@ -319,7 +320,7 @@ def convert_main(inputdir, outputdir, name, batch, range, DR, NC, dryrun, split)
 
         setup_command = "source " + os.path.abspath("conversion/setup.sh")
         python_command = "python " + os.path.abspath("conversion/h5converter.py")
-        python_command += " " + " ".join(map(str, [outputdir, process_path, sname, DR, n_constituents, range[0], range[1], save_constituents]))
+        python_command += " " + " ".join(map(str, [outputdir, process_path, sname, DR, n_constituents, range[0], range[1], save_constituents, basis_n]))
 
         master_command = BASE_COMMAND.replace("<CMD>", "; ".join([setup_command, python_command]))
 

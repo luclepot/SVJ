@@ -30,16 +30,18 @@ class ParallelTreeChain{
         }
 
         vector<TLeaf*> FindLeaf(string & spec) {
-            vector<TLeaf*> v;
-            for (size_t i = 0; i < ntrees; ++i) 
-                v.push_back(trees[i]->FindLeaf(spec.c_str()));
-            return v;
+            return FindLeaf(spec.c_str()); 
         }
 
         vector<TLeaf*> FindLeaf(const char* spec) {
             vector<TLeaf*> v;
-            for (size_t i = 0; i < ntrees; ++i)
+            for (size_t i = 0; i < ntrees; ++i) {
+                if (!Contains(spec)) {
+                    cout << "WARNING:: TREE DOES NOT CONTAIN SPEC " << spec << endl;
+                    cout << "WARNING:: ALL POINTERS WILL BE NULL" << endl;  
+                }
                 v.push_back(trees[i]->FindLeaf(spec));
+            }
             return v;
         }
 
@@ -89,6 +91,16 @@ class ParallelTreeChain{
             }   
             ntrees = trees.size();
             return cleanTreenames; 
+        }
+
+        bool Contains(string spec) {
+            // loop through trees and make sure that the spec is contained either the leaf/branch lists of eaech tree
+            for (size_t i = 0; i < trees.size(); ++i) {
+                if (!(trees[i]->GetListOfBranches()->Contains(spec.c_str()) || trees[i]->GetListOfLeaves()->Contains(spec.c_str()))) {
+                    return false;
+                }
+            }
+            return true; 
         }
 
         int currentEntry, currentTree;

@@ -8,6 +8,7 @@ from traceback import format_exc
 import h5py
 import ROOT as rt
 from collections import OrderedDict as odict
+import energyflow as ef
 
 DELPHES_DIR = os.environ["DELPHES_DIR"]
 rt.gSystem.Load("{}/lib/libDelphes.so".format(DELPHES_DIR))
@@ -35,9 +36,10 @@ class Converter:
         outputdir,
         spath,
         name,
-        jetDR=0.8,
+        jetDR=0.5,
         n_constituent_particles=100,
         save_constituents=False,
+        energyflow_basis_degree=-1,
     ):
         self.outputdir = outputdir
 
@@ -59,7 +61,8 @@ class Converter:
         self.jetDR = jetDR
 
         self.n_jets = 2
-        self.jet_base_names = [
+
+        self.jet_feature_names = [
             'Eta',
             'Phi',
             'Pt',
@@ -69,50 +72,47 @@ class Converter:
             'Axis2',
             'Flavor',
             'Energy',
-            'DeltaEta',
-            'DeltaPhi',
-            'MET',
-            'METEta',
-            'METPhi',
-            # 'MT',
         ]
 
         ## ADD MET
-        self.event_feature_names =  []
-
-        for i in range(self.n_jets):
-            self.event_feature_names += ['j{}'.format(i) + j for j in self.jet_base_names]
-        
-        self.jet_constituent_names = ['pEta', 'pPhi', 'pPt']
-
-        self.EFlow_types = [
-            [ "EFlowTrack", 0.1, "PT" ],
-            [ "EFlowNeutralHadron", 0.5, "ET" ],
-            [ "EFlowPhoton", 0.2, "ET" ]
+        self.event_feature_names =  [
+            'MET',
+            'METEta',
+            'METPhi',
+            'MT',
+            'Mjj',
         ]
 
-        self.EFlow_dict = odict()
-        for i, eft in enumerate(self.EFlow_types):
-            self.EFlow_dict[eft[0]] = i
+        self.jet_constituent_names = [
+            'Eta',
+            'Phi',
+            'PT',
+            'Rapidity',
+            'Energy',
+        ]
 
         self.n_constituent_particles=n_constituent_particles
         self.event_features = None
+        self.jet_features = None
         self.jet_constituents = None
-
-        # spathout = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
-        # spathin = os.path.join(self.outputdir, "{}_selection.txt".format(self.name))
-        # spath = None
-        # if os.path.exists(spathout):
-        #     spath = spathout
-        # elif os.path.exists(spathin):
-        #     spath = spathin            
-        # else:
-        #     raise AttributeError("Selection file does not exist in either input/output dirs!!")
+        self.energy_flow_bases = None
 
         hlf_dict = {}
         particle_dict = {}
 
         self.save_constituents = save_constituents
+        self.efbn = energyflow_basis_degree
+
+        if self.efbn < 0:
+            self.save_eflow = False
+            self.efbn = 0
+            self.efp_size = 0
+        else:
+            self.save_eflow = True
+            self.log("creating energyflow particle set with degree d <= {0}...".format(self.efbn))
+            self.efpset = ef.EFPSet("d<={0}".format(self.efbn), measure='hadr', beta=1.0, normed=True, verbose=True)
+            self.efp_size = self.efpset.count()
+            self.log("eflow set is size {}".format(self.efp_size))
         # self.selections_abs = np.asarray([sum(self.sizes[:s[0]]) + s[1] for s in self.selections])
         self.log("found {0} selected events, out of a total of {1}".format(sum(map(len, self.selections.values())), self.nEvents))
 
@@ -125,6 +125,171 @@ class Converter:
                 print self.LOGMSG + line
         else:
             print self.LOGMSG + str(msg)
+
+    def jet_axis2_pt2(
+        self,
+        jet,
+        constituents,
+    ):
+        sum_weight = 0
+        sum_pt = 0
+        sum_deta = 0
+        sum_dphi = 0
+        sum_deta2 = 0
+        sum_detadphi = 0 
+        sum_dphi2 = 0
+
+        for i,c in enumerate(constituents):
+            deta = c.Eta() - jet.Eta()
+            dphi = c.DeltaPhi(jet)
+            cpt = c.Pt()
+            weight = cpt*cpt
+
+            sum_weight += weight
+            sum_pt += cpt
+            sum_deta += deta*weight
+            sum_dphi += dphi*weight
+            sum_deta2 += deta*deta*weight
+            sum_detadphi += deta*dphi*weight
+            sum_dphi2 += dphi*dphi*weight
+
+        a,b,c,ave_deta,ave_dphi,ave_deta2,ave_dphi2=0,0,0,0,0,0,0
+
+        if sum_weight > 0.:
+            ave_deta = sum_deta/sum_weight
+            ave_dphi = sum_dphi/sum_weight
+            ave_deta2 = sum_deta2/sum_weight
+            ave_dphi2 = sum_dphi2/sum_weight
+            a = ave_deta2 - ave_deta*ave_deta                                                    
+            b = ave_dphi2 - ave_dphi*ave_dphi                                                    
+            c = -(sum_detadphi/sum_weight - ave_deta*ave_dphi)
+        
+        delta = np.sqrt(np.abs((a - b)*(a - b) + 4*c*c))
+        axis2 = np.sqrt(0.5*(a+b-delta)) if a + b - delta > 0 else 0
+        ptD = np.sqrt(sum_weight)/sum_pt if sum_weight > 0 else 0
+
+        return ptD, axis2
+
+    def get_jet_features(
+        self,
+        jet_raw,
+        constituentp4s
+    ):
+        j = jet_raw.P4()
+        nc, nn = map(float, [jet_raw.NCharged, jet_raw.NNeutrals])
+        n_total = nc + nn
+        jet_cfrac = nc / n_total if n_total > 0 else -1
+
+        ptd, axis2 = self.jet_axis2_pt2(j, constituentp4s)
+
+        return [
+            j.Eta(),
+            j.Phi(),
+            j.Pt(), 
+            j.M(),
+            jet_cfrac,
+            ptd,
+            axis2,
+            jet_raw.Flavor,
+            j.E(),
+        ]
+    
+    def get_event_features(
+        self,
+        tree
+    ):
+
+        assert tree.Jet_size > 1
+        met, meteta, metphi = tree.MissingET[0].MET, tree.MissingET[0].Eta, tree.MissingET[0].Phi
+
+        Vjj = tree.Jet[0].P4() + tree.Jet[1].P4()
+
+        metpy = met*np.sin(metphi)
+        metpx = met*np.cos(metphi)
+
+        Mjj = Vjj.M()
+        Mjj2 = Mjj*Mjj
+        ptjj = Vjj.Pt()
+        ptjj2 = ptjj*ptjj
+        ptMet = Vjj.Px()*metpx + Vjj.Py()*metpy;
+        MT = np.sqrt(Mjj2 + 2*(np.sqrt(Mjj2 + ptjj2)*met - ptMet))
+
+        return [
+            met,
+            meteta,
+            metphi,
+            Mjj,
+            MT
+        ]
+
+    def get_jet_constituents(
+        self,
+        constituentp4s
+    ):
+        ret = -np.ones((len(constituentp4s), len(self.jet_constituent_names)))
+        for i,c in enumerate(constituentp4s):
+            ret[i,:] = [c.Eta(), c.Phi(), c.Pt(), c.Rapidity(), c.E()]
+        
+        return self.pad_to_n(ret, self.n_constituent_particles, 2)
+
+    def get_constituent_p4s(
+        self,
+        tree,
+        jets,
+        dr=0.8
+    ):
+        constituents = [[] for i in range(len(jets))]
+        for i,c in enumerate(tree.EFlowTrack): # .1
+            if c.PT > 0.1:
+                vec = c.P4()
+                for j,jet in enumerate(jets):
+                    deta = vec.Eta() - jet.Eta()
+                    dphi = jet.DeltaPhi(vec)
+                    if deta**2. + dphi**2. < dr**2.:
+                        constituents[j].append(vec)
+            
+        for i,c in enumerate(tree.EFlowNeutralHadron): #.5
+            if c.ET > 0.5:
+                vec = c.P4()
+                for j,jet in enumerate(jets):
+                    deta = vec.Eta() - jet.Eta()
+                    dphi = jet.DeltaPhi(vec)
+                    if deta**2. + dphi**2. < dr**2.:
+                        constituents[j].append(vec)
+            
+        for i,c in enumerate(tree.EFlowPhoton): #.2
+            if c.ET > 0.2:
+                vec = c.P4()
+                for j,jet in enumerate(jets):
+                    deta = vec.Eta() - jet.Eta()
+                    dphi = jet.DeltaPhi(vec)
+                    if deta**2. + dphi**2. < dr**2.:
+                        constituents[j].append(vec)
+                        
+        return map(np.asarray, constituents)
+
+    def pad_to_n(
+        self,
+        data,
+        n,
+        sort_index
+    ):    
+        data = data[np.argsort(data[:,sort_index]),:][::-1][:n,:]
+        data = np.pad(data, ((0,n-data.shape[0]), (0,0)), 'constant')
+        return data
+
+    def get_eflow_variables(
+        self, 
+        constituents,
+    ):
+        return self.efpset.compute(
+            ef.utils.ptyphims_from_p4s(
+                map(
+                    lambda c: (c.E(), c.Px(), c.Py(), c.Pz()),
+                    constituents
+                )
+            )
+        )
 
     def convert(
         self,
@@ -143,6 +308,7 @@ class Converter:
 
         nmin, nmax = rng
         selections_iter = self.selections.copy()
+
         for k,v in selections_iter.items():
             v = np.asarray(v).astype(int)
             selections_iter[k] = v[(v > nmin) & (v < nmax)]
@@ -153,8 +319,15 @@ class Converter:
         self.log("selecting on range {0}".format(rng))
         self.event_features = np.empty((total_size, len(self.event_feature_names)))
         self.log("event feature shapes: {}".format(self.event_features.shape))
+
+        self.jet_features = np.empty((total_size, self.n_jets, len(self.jet_feature_names)))
+        self.log("jet feature shapes: {}".format(self.event_features.shape))
+
         self.jet_constituents = np.empty((total_size, self.n_jets, self.n_constituent_particles, len(self.jet_constituent_names)))
         self.log("jet constituent shapes: {}".format(self.jet_constituents.shape))
+
+        self.energy_flow_bases = np.empty((total_size, self.n_jets, self.efp_size))
+        self.log("eflow bases shapes: {}".format(self.energy_flow_bases.shape))
             
         if not self.save_constituents:
             self.log("ignoring jet constituents")
@@ -165,53 +338,37 @@ class Converter:
 
         # selection is implicit: looping only through total selectinos
         for tree_n,tree_name in enumerate(self.inputfiles):
-            for event_n,event_index in enumerate(selections_iter[tree_name]):
-                self.log('tree {0}, event {1}, index {2}'.format(tree_n, event_n, event_index))
 
+            for event_n,event_index in enumerate(selections_iter[tree_name]):
+
+                self.log('tree {0}, event {1}, index {2}, total count {3}'.format(tree_n, event_n, event_index, total_count))
+
+                # tree (and, get the entry)
                 tree = self.trees[tree_n]
                 tree.GetEntry(event_index)
 
-                jets = [tree.Jet[jetn].P4() for jetn in range(self.n_jets)]
-                
-                track_index = -np.ones((len(jets), self.n_constituent_particles, 2), dtype=int)
+                # jets
+                jets_raw = [tree.Jet[i] for i in range(min([self.n_jets, tree.Jet_size]))]
+                jets = [j.P4() for j in jets_raw]
+               
+                # constituent 4-vectors per jet
+                constituents_by_jet = self.get_constituent_p4s(tree, jets, self.jetDR)
 
-                for jetn, jet in enumerate(jets):
-                    # grab
+                self.event_features[total_count, :] = np.asarray(self.get_event_features(tree))
 
-                    plist = np.empty((0, len(self.jet_constituent_names)))
-                    subindex = np.empty((0, 2))
-                    for flow_type, pt_min, pt_type in self.EFlow_types:
-                        new, indicies = self.get_jet_constituents(jet, self.jetDR, getattr(tree, flow_type), pt_min, pt_type, flow_type)
-                        plist = np.concatenate([plist, new], axis=0)
-                        subindex = np.concatenate([subindex, indicies], axis=0)
+                for jet_n, (jet_raw, jet_p4, constituents) in enumerate(zip(jets_raw, jets, constituents_by_jet)):
                 
-                    # plist = np.concatenate([
-                    #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowTrack, 0.1, "PT"),
-                    #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowNeutralHadron, 0.5, "ET"),
-                    #     self.get_jet_constituents(jet, self.jetDR, tree.EFlowPhoton, 0.2, "ET"),
-                    # ], axis=0)
+                    self.jet_features[total_count, jet_n, :] =  self.get_jet_features(jet_raw, constituents)
                     
-                    # sort
-                    sort_index = plist[:,2].argsort()[::-1]
+                    if self.save_constituents:
+                        self.jet_constituents[total_count, jet_n, :] = self.get_jet_constituents(constituents)
+                    
+                    if self.save_eflow:
+                        self.energy_flow_bases[total_count, jet_n, :] = self.get_eflow_variables(constituents)
 
-                    plist = plist[sort_index][0:self.n_constituent_particles,:]
-                    subindex = subindex[sort_index][0:self.n_constituent_particles,:]
-
-                    # pad && add
-                    self.jet_constituents[total_count, jetn] = np.pad(plist, [(0, self.n_constituent_particles - plist.shape[0]),(0,0)], 'constant')
-                    track_index[jetn,:len(subindex)] = subindex
-
-                self.event_features[total_count] = np.fromiter(self.get_jet_features(tree, track_index), float, count=len(self.event_feature_names))
-                
-                if return_debug_tree:
-                    return tree, self.event_features[total_count]
-                
                 total_count += 1 
-
-        if self.save_constituents:
-            return self.jet_constituents, self.event_features
-
-        return self.event_features
+        
+        return None
 
     def save(
         self,
@@ -227,132 +384,43 @@ class Converter:
         self.log("saving h5 data to file {0}".format(outputfile))
 
         f = h5py.File(outputfile, "w")
-        f.create_dataset('event_feature_data', data=self.event_features)
-        f.create_dataset('event_feature_names', data=self.event_feature_names)
+        features = f.create_group("event_features")
+        assert self.event_features.shape[-1] == len(self.event_feature_names)
+        self.log("creating feature 'event_features'")
+        features.create_dataset('data', data=self.event_features)
+        features.create_dataset('labels', data=self.event_feature_names)
+
+        jet_features = f.create_group("jet_features")
+        assert self.jet_features.shape[-1] == len(self.jet_feature_names)
+        self.log("creating feature 'jet_features'")
+        jet_features.create_dataset('data', data=self.jet_features)
+        jet_features.create_dataset('labels', data=self.jet_feature_names)
+
         if self.save_constituents:
-            f.create_dataset('jet_constituent_data', data=self.jet_constituents)
-            f.create_dataset('jet_constituent_names', data=self.jet_constituent_names)
+            jet_constituents = f.create_group("jet_constituents")
+            assert self.jet_constituents.shape[-1] == self.n_constituent_particles
+            self.log("creating feature 'jet_constituents'")
+            jet_constituents.create_dataset('data', data=self.jet_constituents)
+            jet_constituents.create_dataset('labels', data=[str(i) for i in range(self.n_constituent_particles)])
+
+        if self.save_eflow:
+            eflow = f.create_group("jet_eflow_variables")           
+            assert self.energy_flow_bases.shape[-1] == self.efp_size
+            self.log("creating feature 'jet_eflow_variables'")
+            eflow.create_dataset('data', data=self.energy_flow_bases)
+            eflow.create_dataset('labels', data=[str(i) for i in range(self.efp_size)])
+
 
         self.log("Successfully saved!")
         f.close()
-
-    def get_jet_features(
-        self,
-        tree,
-        track_index,
-    ):
-        # j1,j2 = tree.Jet[0].P4(), tree.Jet[1].P4()
-        
-        ## leading 2 jets
-        for i in range(self.n_jets):
-            j = tree.Jet[i].P4()
-            yield j.Eta()
-            yield j.Phi()
-            yield j.Pt()
-            yield j.M()
-
-            nc, nn = map(float, [tree.Jet[i].NCharged, tree.Jet[i].NNeutrals])
-            n_total = nc + nn
-            yield nc / n_total if n_total > 0 else -1
-        
-            for value in self.jets_axis2_pt2(j, tree, track_index[i]):
-                yield value
-
-            yield tree.Jet[i].Flavor
-            yield j.E()
-            yield tree.Jet[i].DeltaEta
-            yield tree.Jet[i].DeltaPhi
-            yield tree.MissingET[0].MET
-            yield tree.MissingET[0].Eta
-            yield tree.MissingET[0].Phi
-
-    def jets_axis2_pt2(
-        self,
-        jet,
-        tree,
-        track_index
-    ):
-        ret = np.empty((self.n_jets,3))
-        # mult = 0
-        sum_weight = 0
-        sum_pt = 0
-        sum_deta = 0
-        sum_dphi = 0
-        sum_deta2 = 0
-        sum_detadphi = 0 
-        sum_dphi2 = 0
-        
-        for i, eft in track_index:
-            if i < 0:
-                break
-            c = getattr(tree, core.EFlow_types[eft][0])[i].P4()
-            # if eft == 0 and c.Pt() > 1.0:
-            #     # means that the particle has charge, increase jet multiplicity
-            #     mult += 1
-
-            deta = c.Eta() - jet.Eta()
-            dphi = c.DeltaPhi(jet)
-            cpt = c.Pt()
-            weight = cpt*cpt
-
-            sum_weight += weight
-            sum_pt += cpt
-            sum_deta += deta*weight
-            sum_dphi += dphi*weight
-            sum_deta2 += deta*deta*weight
-            sum_detadphi += deta*dphi*weight
-            sum_dphi2 += dphi*dphi*weight
-
-        a,b,c,ave_deta,ave_dphi,ave_deta2,ave_dphi2=0,0,0,0,0,0,0
-
-        if sum_weight > 0:
-            ave_deta = sum_deta/sum_weight
-            ave_dphi = sum_dphi/sum_weight
-            ave_deta2 = sum_deta2/sum_weight
-            ave_dphi2 = sum_dphi2/sum_weight
-            a = ave_deta2 - ave_deta*ave_deta                                                    
-            b = ave_dphi2 - ave_dphi*ave_dphi                                                    
-            c = -(sum_detadphi/sum_weight - ave_deta*ave_dphi)
-        
-        delta = np.sqrt(np.abs((a - b)*(a - b) + 4*c*c))
-        axis2 = np.sqrt(0.5*(a+b-delta)) if a + b - delta > 0 else 0
-        ptD = np.sqrt(sum_weight)/sum_pt if sum_weight > 0 else 0
-        return ptD, axis2
-        
-    def get_jet_constituents(
-        self,
-        jet,
-        dr,
-        component,
-        min_value,
-        eType,
-        flow_type
-    ):
-        rep = self.EFlow_dict[flow_type]
-        selected = []
-        indicies = []
-        for i,c in enumerate(component):
-            pt = getattr(c, eType)
-            if pt > min_value:
-                deltaEta = c.Eta - jet.Eta()
-                deltaPhi = c.Phi - jet.Phi()
-                deltaPhi = deltaPhi - 2*np.pi*(deltaPhi >  np.pi) + 2*np.pi*(deltaPhi < -1.*np.pi)
-
-                if deltaEta**2. + deltaPhi**2. < dr**2.:
-                    selected.append([deltaEta, deltaPhi, pt])
-                    indicies.append([i, rep])
-        
-        if len(selected) == 0:
-            return np.zeros((0,3)), -np.ones((0,2))
-        return np.asarray(selected), np.asarray(indicies)
-
+ 
 if __name__ == "__main__":
-    if len(sys.argv) == 9:
-        (_, outputdir, pathspec, name, dr, nc, rmin, rmax, constituents) = sys.argv
-        print outputdir
-        print pathspec
-        # print filespec
-        core = Converter(outputdir, pathspec, name, float(dr), int(nc), bool(int(constituents)))
+    if len(sys.argv) == 10:
+        (_, outputdir, pathspec, name, dr, nc, rmin, rmax, constituents, basis_n) = sys.argv
+        # print outputdir
+        # print pathspec
+        # print filespecls 
+        core = Converter(outputdir, pathspec, name, float(dr), int(nc), bool(int(constituents)), int(basis_n))
         ret = core.convert((int(rmin), int(rmax)))
         core.save()
     # elif len(sys.argv) == 0:
@@ -363,5 +431,6 @@ if __name__ == "__main__":
             print track_index.shape
         except:
             print "dang"
-            core = Converter(".", "../data/tightSVJ/s10/data_0_selection.txt", "data")
-            ret = core.convert((0, 500), return_debug_tree=True)
+            core = Converter(".", "../data/signal_process/small/data_1_selection.txt", "data", save_constituents=False, energyflow_basis_degree=3)
+            ret = core.convert((0,10000), return_debug_tree=False)
+            # core.save("test.h5")

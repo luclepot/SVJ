@@ -19,6 +19,7 @@
 #include <chrono>
 #include "ParallelTreeChain.h"
 #include "TMath.h"
+#include <stdexcept> 
 
 using std::fabs;
 using std::chrono::microseconds;  
@@ -85,6 +86,9 @@ namespace Hists {
 
         pre_lep,
         post_lep,
+
+        pre_MT,
+        pre_mjj,
 
         COUNT
     };
@@ -199,6 +203,24 @@ public:
 
             if (nMax < 0 || nMax > nEvents)
                 nMax = nEvents;
+
+
+            vector<string> possibleMuons = {
+                "Muon",
+                "MuonLoose",
+                "MuonTight"
+            };
+
+            for (size_t i = 0; i < possibleMuons.size(); ++i) {
+                if (chain->Contains(possibleMuons[i])) {
+                    MuonPrefix = possibleMuons[i]; 
+                    break;
+                }
+            }
+
+            if (MuonPrefix == "") {
+                throw std::invalid_argument("Invalid Muon Specification");
+            }
 
             log("Success");
             end();
@@ -579,6 +601,8 @@ public:
         // general init vars, parsed from argv
         string sample, inputspec, outputdir;
 
+        string MuonPrefix = ""; 
+
         // number of events
         Int_t nEvents, nMin, nMax;
         // internal debug switch
@@ -635,6 +659,7 @@ private:
         void SetLorentz(size_t leafIndex, size_t lvIndex, size_t treeIndex) {
             vector<vector<TLeaf*>> & v = compVectors[leafIndex];
             vector<TLorentzVector> * ret = LorentzVectors[lvIndex];
+
             ret->clear();
             size_t n = v[0][treeIndex]->GetLen();
             // cout << endl << n << v[1]->GetLen() << v[2]->GetLen() << v[3]->GetLen() << endl;
@@ -651,10 +676,10 @@ private:
 
         void SetMock(size_t leafIndex, size_t mvIndex, size_t treeIndex) {
             vector<vector<TLeaf*>> & v = compVectors[leafIndex];
-            vector<TLorentzMock>* ret = MockVectors[mvIndex];            
-            ret->clear();
+            vector<TLorentzMock>* ret = MockVectors[mvIndex];          
 
             size_t n = v[0][treeIndex]->GetLen(), size = v.size();
+
             for(size_t i = 0; i < n; ++i) {
                 switch(size) {
                     case 2: {

@@ -15,6 +15,8 @@ import prettytable
 from StringIO import StringIO
 from enum import Enum
 import subprocess
+import json
+import datetime
 
 plt.rcParams['figure.figsize'] = (10,10)
 plt.rcParams.update({'font.size': 18})
@@ -138,7 +140,7 @@ class data_table(logger):
             self.data = data
         elif isinstance(data, pd.DataFrame):
             self.headers = data.columns 
-            self.data = data.values
+            self.data = data
         elif isinstance(data, data_table):
             self.headers = data.headers
             self.data = data.df.values
@@ -154,8 +156,12 @@ class data_table(logger):
         assert len(self.data.shape) == 2, "data must be matrix!"
         assert len(self.headers) == self.data.shape[1], "n columns must be equal to n column headers"
         assert len(self.data) > 0, "n samples must be greater than zero"
-        self.df = pd.DataFrame(self.data, columns=self.headers)
         self.scaler = None
+        if  isinstance(self.data, pd.DataFrame):
+            self.df = self.data
+            self.data = self.df.values
+        else:
+            self.df = pd.DataFrame(self.data, columns=self.headers)
 
     def norm(
         self,
@@ -182,7 +188,7 @@ class data_table(logger):
         if out_name is None:
             out_name = "'{}' normed to '{}'".format(data.name,self.name)
 
-        ret = data_table(self.scaler.transform(data.df), headers = self.headers, name=out_name)
+        ret = data_table(pd.DataFrame(self.scaler.transform(data.df), columns=data.df.columns, index=data.df.index), name=out_name)
         return ret
 
     def inorm(
@@ -211,7 +217,9 @@ class data_table(logger):
         if out_name is None:
             out_name = "'{}' inv_normed to '{}'".format(data.name,self.name)
 
-        ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name=out_name)
+        ret = data_table(pd.DataFrame(self.scaler.inverse_transform(data.df), columns=data.df.columns, index=data.df.index), name=out_name)
+
+        # ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name=out_name)
         return ret
         
     def __getattr__(
@@ -254,12 +262,23 @@ class data_table(logger):
         self,
         test_fraction=0.25,
         random_state=None,
-        shuffle=True
     ):
         dtrain, dtest = train_test_split(self, test_size=test_fraction, random_state=random_state)
-        return (data_table(np.asarray(dtrain), np.asarray(dtrain.columns), "train"),
-            data_table(np.asarray(dtest), np.asarray(dtest.columns), "test"))
-    
+        return (data_table(dtrain, name="train"),
+            data_table(dtest, name="test"))
+
+    def split_by_event(
+        self,
+        test_fraction=0.25,
+        random_state=None,
+        n_skip=2,
+    ):
+        # shuffle event indicies
+        train_idx, test_idx = train_test_split(self.df.index[0::n_skip], test_size=test_fraction, random_state=random_state)
+        train, test = map(lambda x: np.asarray([x + i for i in range(n_skip)]).T.flatten(), [train_idx, test_idx])
+        return (data_table(self.df.loc[train], name="train"),
+            data_table(self.df.loc[test], name="test"))
+
     def plot(
         self,
         others=[],
@@ -319,12 +338,23 @@ class data_table(logger):
         self.log("plotting distrubution(s) for table(s) {}".format([self.name,] + [o.name for o in others]))
         plt.rcParams['figure.figsize'] = figsize
 
+        use_weights = False
+        if normed == 'n':
+            normed = 0
+            use_weights = True
+
         for i in range(n):
             ax = plt.subplot(rows, cols, i + 1)
-            # weights = np.ones_like(plot_data[i])/float(len(plot_data[i]))
+            if use_weights:
+                weights = np.ones_like(plot_data[i])/float(len(plot_data[i]))
+            
             ax.hist(plot_data[i], bins=bins, range=rng[i], histtype=histtype, normed=normed, label=self.name, weights=weights, alpha=alpha)
+            
             for j in range(len(others)):
-                # weights = np.ones_like(plot_others[j][i])/float(len(plot_others[j][i]))
+                if use_weights:
+                    weights = np.ones_like(plot_others[j][i])/float(len(plot_others[j][i]))
+
+                # ax.hist(plot_others[j][i]/plot_data[i].shape[0], bins=bins, range=rng[i], histtype=histtype, label=others[j].name, normed=0, weights=weights, alpha=alpha)
                 ax.hist(plot_others[j][i], bins=bins, range=rng[i], histtype=histtype, label=others[j].name, normed=normed, weights=weights, alpha=alpha)
 
             plt.xlabel(plot_data[i].name + " {}-scaled".format(xscale), fontsize=fontsize)
@@ -361,6 +391,7 @@ class data_table(logger):
         for d in to_drop:
             modify.df.drop(d, axis=1, inplace=True)
         modify.headers = list(modify.df.columns)
+        modify.data = np.asarray(modify.df)
         return modify
 
     def cfilter(
@@ -381,6 +412,14 @@ class data_table(logger):
             modify.df.drop(d, axis=1, inplace=True)
         modify.headers = list(modify.df.columns)
         return modify
+
+    def cmerge(
+        self,
+        other,
+        out_name,
+    ):
+        assert self.shape[0] == other.shape[0], 'data tables must have same number of samples'
+        return data_table(self.df.join(other.df), name=out_name)
 
     def _rows(
         self,
@@ -412,31 +451,127 @@ class data_loader(logger):
         self.samples = odict()
         self.sample_keys = None
         self.data = odict()
-        self.size = 0
-        self.shapes = []
-        self.table = None
+        self.labels = odict()
 
     def add_sample(
         self,
         sample_path,
     ):
-        filepath = smartpath(sample_path)
+        filepath = smartpath(sample_path)        
+        
         assert os.path.exists(filepath)
-        if filepath not in self.samples:
-            self.log("Adding sample at path '{}'".format(filepath))
-            self.samples[filepath] = h5py.File(filepath)
-            if self.sample_keys is None:
-                self.sample_keys = set(self.samples[filepath].keys())
-            else:
-                self.sample_keys = self.sample_keys.intersection(set(self.samples[filepath].keys()))
 
-            self._update_data(self.samples[filepath], self.samples[filepath].keys())
-            try:
-                self.table = self.make_table(self.name, "*data", "*names")
-            except:
-                self.error(traceback.format_exc())
-                self.error("Couldn't make datatable with added elements!")
-                self.table = None
+        if filepath not in self.samples:
+            with h5py.File(filepath) as f:
+
+                self.log("Adding sample at path '{}'".format(filepath))
+                self.samples[filepath] = f
+
+                keys = set(f.keys())
+
+                if self.sample_keys is None:
+                    self.sample_keys = keys
+                else:
+                    if keys != self.sample_keys:
+                        raise AttributeError("Cannot add current sample with keys {} to established sample with keys {}!".format(keys, self.sample_keys))
+
+                self._update_data(f, keys)
+
+    def make_table(
+        self,
+        key,
+        name=None,
+        third_dim_handle="stack", # stack, combine, or split
+    ):
+        assert third_dim_handle in ['stack', 'combine', 'split']
+        assert key in self.sample_keys
+
+        data = self.data[key]
+        labels = self.labels[key]
+        name = name or self.name
+
+        if len(data.shape) == 1:
+            return data_table(np.expand_dims(data, 1), headers=labels, name=name)
+        elif len(data.shape) == 2:
+            return data_table(data, headers=labels, name=name)
+        elif len(data.shape) == 3:
+            ret = data_table(
+                    np.vstack(data),
+                    headers=labels,
+                    name=name
+                )
+            # isa jet behavior
+            if third_dim_handle == 'stack':
+                # stack behavior
+                return ret 
+            elif third_dim_handle == 'split':
+                if key.startswith("jet"):
+                    prefix = "jet"
+                else:
+                    prefix = "var"
+
+                return [
+                    data_table(
+                        ret.iloc[i::data.shape[1]],
+                        name="{} {} {}".format(ret.name, prefix, i)
+                        ) for i in range(data.shape[1])
+                    ]
+                
+                # [
+                #     data_table(
+                #         data[:,i,:],
+                #         headers=labels,
+                #         name="{}_{}".format(name,i)
+                #     ) for i in range(data.shape[1])
+                # ]
+            else:
+                prefix = 'jet' if key.startswith('jet') else 'var'
+                return data_table(
+                    self.stack_data(data, axis=1),
+                    headers=self.stack_labels(labels, data.shape[1], prefix),
+                    name=name,
+                )
+                # combine behavior
+        else:
+            raise AttributeError("cannot process table for data with dimension {}".format(data.shape))
+
+    def make_tables(
+        self,
+        keylist,
+        name,
+        third_dim_handle="stack",
+    ):
+        tables = []
+        for k in keylist:
+            tables.append(self.make_table(k, None, third_dim_handle))
+        assert len(tables) > 0
+        ret, tables = tables[0], tables[1:]
+        for table in tables:
+            if third_dim_handle=="split":
+                for i,(r,t) in enumerate(zip(ret, table)):
+                    ret[i] = r.cmerge(t, name + str(i))
+            else:
+                ret = ret.cmerge(table, name)
+        return ret
+
+    def stack_data(
+        self,
+        data,
+        axis=1,
+    ):
+        return np.hstack(np.asarray(np.split(data, data.shape[axis], axis=axis)).squeeze())
+
+    def stack_labels(
+        self, 
+        labels,
+        n,
+        prefix,
+    ):
+        new = []
+        for j in range(n):
+            for l in labels:
+                new.append("{}{}_{}".format(prefix, j, l))
+        return np.asarray(new)
 
     def get_dataset(
         self,
@@ -444,6 +579,7 @@ class data_loader(logger):
     ):
         if keys is None:
             raise AttributeError("please choose data keys to add to sample dataset! \noptions: {0}".format(list(self.sample_keys)))
+
         assert hasattr(keys, "__iter__") or isinstance(keys, basestring), "keys must be iterable of strings!"
 
         if isinstance(keys, str):
@@ -471,8 +607,9 @@ class data_loader(logger):
         self.log("Grabbing dataset with keys {0}".format(list(data_dict.keys())))
 
         samples = set([x.shape[0] for x in data_dict.values()])
-        assert len(samples) == 1
+        assert len(samples) == 1, "all datasets with matching keys need to have IDENTICAL sizes!"
         sample_size = samples.pop()
+
 
         sizes = [reduce(mul, x.shape[1:], 1) for x in data_dict.values()]
         splits = [0,] + [sum(sizes[:i+1]) for i in range(len(sizes))]
@@ -506,90 +643,24 @@ class data_loader(logger):
         f.close()
         return 0
 
-    # def plot(
-    #     self,
-    #     *args,
-    #     **kwargs
-    # ):
-    #     return self.table.plot(*args, **kwargs)
-
-    def make_table(
-        self,
-        name=None,
-        value_keys="*data",
-        header_keys="*names"
-    ):
-        values, vdict = self.get_dataset(value_keys)
-        headers, hdict = None if header_keys is None else self.get_dataset(header_keys) 
-        name = name or self.name
-
-        assert len(values.shape) == 2, "data must be 2-dimensional and numeric!"
-        assert values.shape[1] == headers.shape[0], "data must have the same number of columns as there are headers!!"
-
-        return data_table(values, headers, name)
-
-    # def norm_min_max(
-    #     self,
-    #     dataset,
-    #     ab=(0,1)
-    # ):
-    #     if isinstance(dataset, basestring) or isinstance(dataset, list):
-    #         dataset = self.get_dataset(dataset)
-    #     a,b = ab
-    #     rng = dataset.min(axis=0), dataset.max(axis=0)
-    #     return (b-a)*(dataset - rng[0])/(rng[1] - rng[0]) + a, rng
-
-    # def inorm_min_max(
-    #     self,
-    #     dataset,
-    #     rng,
-    #     ab=(0,1)
-    # ):
-    #     a,b = ab
-    #     return ((dataset - a)/(b - a))*(rng[1] - rng[0]) + rng[0]
-        
-    # def norm_mean_std(
-    #     self,
-    #     dataset,
-    # ):
-    #     if isinstance(dataset, basestring) or isinstance(dataset, list):
-    #         dataset = self.get_dataset(dataset)
-
-    #     musigma = dataset.mean(axis=0), dataset.std(axis=0)
-    #     return (dataset - musigma[0])/(musigma[1]), musigma
-
-    # def inorm_mean_std(
-    #     self,
-    #     dataset,
-    #     musigma,
-    # ):
-    #     return dataset*musigma[1] + musigma[0]
-        
     def _update_data(
         self,
         sample_file,
         keys_to_add,
     ):
         for key in keys_to_add:
-            if key in sample_file.keys():
-                self._add_key(key, sample_file, self.data)
-             
-    @staticmethod
-    def _add_key(
-        key,
-        sfile,
-        d
-    ):
-        if key not in d:
-            d[key] = np.asarray(sfile[key])
-        else:
-            # string data: no dupes!
-            if d[key].dtype.kind == 'S':
-                assert d[key].shape == sfile[key].shape
-                assert all([k1 == k2 for k1,k2 in zip(d[key], sfile[key])])
+            assert 'data' in sample_file[key]
+            assert 'labels' in sample_file[key]
+            
+            if key not in self.labels:
+                self.labels[key] = np.asarray(sample_file[key]['labels'])
             else:
-                assert d[key].shape[1:] == sfile[key].shape[1:]
-                d[key] = np.concatenate([d[key], sfile[key]])
+                assert (self.labels[key] == np.asarray(sample_file[key]['labels'])).all()
+
+            if key not in self.data:
+                self.data[key] = np.asarray(sample_file[key]['data'])
+            else:
+                self.data[key] = np.concatenate([self.data[key], sample_file[key]['data']])
 
 def parse_globlist(glob_list, match_list):
     if not hasattr(glob_list, "__iter__") or isinstance(glob_list, str):
@@ -647,7 +718,7 @@ def plot_error_ratios(main_error, compare_errors, metric='mse', bins= 40, log=Fa
     plt.show()
     return ratios
 
-def get_errors(true, pred, out_name="errors", functions=["mse", "mae"], names=[None, None]):
+def get_errors(true, pred, out_name="errors", functions=["mse", "mae"], names=[None, None], index=None):
     import tensorflow as tf
     import keras
     if names is None:
@@ -665,8 +736,7 @@ def get_errors(true, pred, out_name="errors", functions=["mse", "mae"], names=[N
     raw = [func(true, pred) for func in functions_keep]
     raw = np.asarray(map(lambda x: keras.backend.eval(x) if isinstance(x, tf.Tensor) else x, raw)).T
     return data_table(
-        raw,
-        headers=[str(f) for f in names],
+        pd.DataFrame(raw, columns=[str(f) for f in names], index=index),
         name=out_name
     )
 
@@ -678,13 +748,20 @@ def split_table_by_column(column_name, df, tag_names=None, keep_split_column=Fal
     if tag_names is None:
         tag_names = dict([(u, str(u)) for u in unique])
 
+    if isinstance(df_to_write, pd.Series):
+        df_to_write = pd.DataFrame(df_to_write)
+
     assert df.shape[0] == df_to_write.shape[0], 'writing and splitting dataframes must have the same size!'
 
+    df = df.copy().reset_index(drop=True)
+    df_to_write = df_to_write.copy().reset_index(drop=True)
+    
     gb = df.groupby(column_name)
     index = gb.groups
+    
     for region, idx in index.items():
         if keep_split_column or column_name not in df_to_write:
-            tagged.append(data_table(df_to_write.iloc[idx], name=tag_names[region]))
+            tagged.append(data_table(df_to_write.iloc[idx], headers=list(df_to_write.columns), name=tag_names[region]))
         else:
             tagged.append(data_table(df_to_write.iloc[idx].drop(column_name, axis=1), name=tag_names[region]))
     return tagged, dict([(tag_names[k], v) for k,v in index.items()])
@@ -719,7 +796,9 @@ def get_training_data(glob_path, verbose=1):
     d = data_loader("main sample", verbose=verbose)
     for p in paths:
         d.add_sample(p)
-    return d.make_table()
+    tables = []
+    
+    return d.make_table("data", "*features_data", "*features_names") 
 
 def get_training_data_jets(glob_path, verbose=1):
     return split_to_jets(get_training_data(glob_path, verbose))
@@ -793,7 +872,7 @@ def log_uniform(low, high, size=None, base=10.):
 
 def split_by_tag(data, tag_column="jetFlavor", printout=True):
     tagged, tag_index = split_table_by_column(
-        "jetFlavor",
+        tag_column,
         data,
         delphes_jet_tags_dict,
         False
@@ -829,27 +908,47 @@ def get_recon_errors(data_list, autoencoder, **kwargs):
     for i,d in enumerate(data_list):
         recon.append(
             data_table(
-                autoencoder.predict(d.data),        
-                headers=d.headers,
+                pd.DataFrame(autoencoder.predict(d.data), columns=d.columns, index=d.index),
                 name="{0} pred".format(d.name)
             )
         )
         errors.append(
-            get_errors(recon[i].data, d.data, out_name="{0} error".format(d.name), **kwargs)
+            get_errors(recon[i].data, d.data, out_name="{0} error".format(d.name), index=d.df.index, **kwargs)
         )
         
     return errors, recon
 
-def roc_auc(data_err, signal_errs):
-    ret = {}
-    for signal_err in signal_errs:
-        pred = np.hstack([signal_err[metric].values, data_err[metric].values])
-        true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
+def roc_auc_dict(data_errs, signal_errs, metrics=['mse', 'mae'], *args, **kwargs):
+    from sklearn.metrics import roc_curve, roc_auc_score
+    if not isinstance(metrics, list):
+        metrics = [metrics]
 
-        roc = roc_curve(true, pred)
-        auc = roc_auc_score(true, pred)
+    if not isinstance(signal_errs, list):
+        signal_errs = [signal_errs]
 
-        ret[signal_err.name] = {'roc': roc, 'auc': auc}
+    if not isinstance(data_errs, list):
+        data_errs = [data_errs]
+    
+    if len(data_errs) == 1:
+        data_errs = [data_errs[0] for i in range(len(signal_errs))]
+
+    ret = {}    
+    
+    for i,(data_err,signal_err) in enumerate(zip(data_errs, signal_errs)):
+        
+        ret[signal_err.name] = {}
+        
+        for j,metric in enumerate(metrics):
+            ret[signal_err.name][metric] = {} 
+            pred = np.hstack([signal_err[metric].values, data_err[metric].values])
+            true = np.hstack([np.ones(signal_err.shape[0]), np.zeros(data_err.shape[0])])
+
+            roc = roc_curve(true, pred)
+            auc = roc_auc_score(true, pred)
+            
+            ret[signal_err.name][metric]['roc'] = roc
+            ret[signal_err.name][metric]['auc'] = auc
+
     return ret
 
 def roc_auc_plot(data_errs, signal_errs, metrics='loss', *args, **kwargs):
@@ -885,8 +984,7 @@ def roc_auc_plot(data_errs, signal_errs, metrics='loss', *args, **kwargs):
     plt_end()
     plt.show()
     
-
-def load_all_data(data_path, name, cols_to_drop = ["jetM", "*MET*", "*Delta*"]):
+def OLD_load_all_data(data_path, name, cols_to_drop = ["jetM", "*MET*", "*Delta*"]):
     """Returns: a tuple with... 
         a data_table with all data, (columns dropped),
         a list of data_tables, by jetFlavor tag (columns dropped),
@@ -1017,6 +1115,7 @@ def get_plot_params(
     savename=None,
     ticksize=8,
     fontsize=5,
+    colors=None
 ):
     rows =  n_plots/cols + bool(n_plots%cols)
     if n_plots < cols:
@@ -1053,8 +1152,12 @@ def get_plot_params(
         else:
             plt.savefig(savename)
             
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-
+    if colors is None:
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    if len(colors) < n_plots:
+        print "too many plots for specified colors. overriding with RAINbow"
+        import matplotlib.cm as cm
+        colors = cm.rainbow(np.linspace(0, 1, n_plots)) 
     return fig, on_axis_begin, on_axis_end, on_plot_end, colors
 
 def plot_spdfs(inputs, outputs, bins=100, *args, **kwargs):
@@ -1111,3 +1214,247 @@ def sum_of_gaussians(x, mu_vec, sigma_vec):
     x_norm = (x - mu_vec)/sigma_vec
     single_gaus_val = np.exp(-0.5*np.square(x_norm))/(sigma_vec*np.sqrt(2*np.pi))
     return np.sum(single_gaus_val, axis=1)/mu_vec.shape[0]
+
+def glob_in_repo(globstring):
+    repo_head = get_repo_info()['head']
+    files = glob.glob(os.path.abspath(globstring))
+    
+    if len(files) == 0:
+        files = glob.glob(os.path.join(repo_head, globstring))
+    
+    return files
+
+def all_modify(tables):
+    if not isinstance(tables, list) or isinstance(tables, tuple):
+        tables = [tables] 
+    for i,table in enumerate(tables):
+        tables[i].cdrop(["Energy", '0', 'Flavor'], inplace=True)
+        tables[i].df.rename(columns=dict([(c, "eflow {}".format(c)) for c in tables[i].df.columns if c.isdigit()]), inplace=True)
+        tables[i].headers = list(tables[i].df.columns)
+    if len(tables) == 1:
+        return tables[0]
+    return tables
+
+def hlf_modify(tables):
+    if not isinstance(tables, list) or isinstance(tables, tuple):
+        tables = [tables] 
+    for i,table in enumerate(tables):
+        tables[i].cdrop(["Energy", 'Flavor'], inplace=True)
+    if len(tables) == 1:
+        return tables[0]
+    return tables
+
+def eflow_modify(tables):
+    if not isinstance(tables, list) or isinstance(tables, tuple):
+        tables = [tables] 
+    for i,table in enumerate(tables):
+        tables[i].cdrop(['0'], inplace=True)
+        tables[i].df.rename(columns=dict([(c, "eflow {}".format(c)) for c in tables[i].df.columns if c.isdigit()]), inplace=True)
+        tables[i].headers = list(tables[i].df.columns)
+    if len(tables) == 1:
+        return tables[0]
+    return tables
+
+def jet_flavor_check(flavors):
+    d = split_table_by_column("Flavor", flavors, tag_names=delphes_jet_tags_dict)[1]
+    print flavors.name.center(30)
+    print "-"*30
+    for name,index in d.items():
+        tp = "{}:".format(name).rjust(10)
+        tp = tp + "{}".format(len(index)).rjust(10)
+        tp = tp + "({} %)".format(round(100.*len(index)/len(flavors), 1)).rjust(10)
+        print tp
+    print 
+
+def jet_flavor_split(to_split, ref=None):
+    if ref is None:
+        ref = to_split
+    return split_table_by_column("Flavor", ref, tag_names=delphes_jet_tags_dict, df_to_write=to_split, keep_split_column=False)[0]
+
+def load_all_data(globstring, name, include_hlf=True, include_eflow=True):
+    
+    """returns...
+        - data: full data matrix wrt variables
+        - jets: list of data matricies, in order of jet order (leading, subleading, etc.)
+        - event: event-specific variable data matrix, information on MET and MT etc. 
+        - flavors: matrix of jet flavors to (later) split your data with
+    """
+
+    files = glob_in_repo(globstring)
+    
+    if len(files) == 0:
+        raise AttributeError("No files found matching spec '{}'".format(globstring))
+
+    to_include = []
+    if include_hlf:
+        to_include.append("jet_features")
+    
+    if include_eflow:
+        to_include.append("jet_eflow_variables")
+        
+        
+    if not (include_hlf or include_eflow):
+        raise AttributeError("both HLF and EFLOW are not included! Please include one or both, at least.")
+        
+    d = data_loader(name, verbose=False)
+    for f in files:
+        d.add_sample(f)
+        
+    train_modify=None
+    if include_hlf and include_eflow:
+        train_modify = all_modify
+    elif include_hlf:
+        train_modify = hlf_modify
+    else:
+        train_modify = eflow_modify
+        
+    event = d.make_table('event_features', name + ' event features')
+    data = train_modify(d.make_tables(to_include, name, 'stack'))
+    jets = train_modify(d.make_tables(to_include, name, 'split'))
+    flavors = d.make_table('jet_features', name + ' jet flavor', 'stack').cfilter("Flavor")
+    
+    return data, jets, event, flavors
+
+def dump_summary_json(*dicts):
+    from collections import OrderedDict
+    import json
+
+    summary = OrderedDict()
+    
+    for d in dicts:
+        summary.update(d)
+
+    assert 'filename' in summary, 'NEED to include a filename arg, so we can save the dict!'
+    head = os.path.join(get_repo_info()['head'], 'autoencode/data/summary/')
+    
+    fpath = os.path.join(head, summary['filename'] + '.summary')
+
+    if os.path.exists(fpath):
+        print "warning.. filepath '{}' exists!".format(fpath)
+
+        newpath = fpath
+
+        while os.path.exists(newpath):
+            newpath = fpath.replace(".summary", "_1.summary")
+
+        # just a check
+        assert not os.path.exists(newpath)
+        fpath = newpath
+        print "saving to path '{}' instead :-)".format(fpath)
+
+    summary['summary_path'] = fpath
+
+    for k,v in summary.items():
+        print k, ":", v
+    
+    print
+
+    with open(fpath, "w+") as f:
+        json.dump(summary, f)
+    print "successfully dumped size-{} summary dict to file '{}'".format(len(summary), fpath)
+
+def summary_dir():
+    return os.path.join(get_repo_info()['head'], 'autoencode/data/summary')
+
+def summary_by_name(name):
+   
+    if not name.endswith(".summary"):
+        name += ".summary"
+
+    if os.path.exists(name):
+        return name
+    
+    matches = summary_match(name)
+    
+    if len(matches) == 0:
+        raise AttributeError("No summary found with name '{}'".format(name))
+    elif len(matches) > 1:
+        raise AttributeError("Multiple summaries found with name '{}'".format(name))
+    
+    return matches[0]
+
+def load_summary(path):
+    assert os.path.exists(path)
+    with open(path, 'r') as f:
+         ret = json.load(f)
+    return ret
+        
+def summary(custom_dir=None):
+
+    if custom_dir is None:
+        custom_dir = summary_dir()
+
+    files = glob.glob(os.path.join(custom_dir,"*.summary"))
+
+    data = []
+    for f in files: 
+        with open(f) as to_read:
+            d = json.load(to_read)
+            d['time'] = datetime.datetime.fromtimestamp(os.path.getmtime(f))
+            data.append(d)
+
+    return data_table(pd.DataFrame(data), name='summary')
+
+def summary_match(globstr):
+    if not (os.path.dirname(globstr) == summary_dir()):
+        globstr = os.path.join(summary_dir(), globstr)
+    else:
+        globstr = os.path.abspath(globstr)
+    
+    ret = glob.glob(globstr)
+    print "found {} matches with search '{}'".format(len(ret), globstr)
+    return ret
+
+def summary_by_features(**kwargs):
+    data = summary()
+    
+    for k in kwargs:
+        if k in data:
+            data = data[data[k] == kwargs[k]]
+    
+    return data
+    
+def get_event_index(jet_tags):
+    """Get all events index ids from a list of N jet tags 
+    in which all N jets originated from that event.
+    """
+    assert len(jet_tags) > 0
+    ret = set(jet_tags[0].index)
+    to_add = jet_tags[1:]
+    
+    for i,elt in enumerate(to_add):
+        ret = ret.intersection(elt.index - i - 1)
+    
+    return np.sort(np.asarray(list(ret)))
+
+def tagged_jet_dict(tags):
+    """Dictionary tags
+    """
+    return dict(
+        [
+            (
+                i,
+                tags[tags.sum(axis=1) == i].index
+            ) for i in range(tags.shape[1] + 1)
+        ]
+    )
+
+def event_error_tags(
+    err_jets,
+    error_threshold,
+    name,
+    error_metric="mae",
+):
+    tag = [err[error_metric] > error_threshold for err in err_jets]
+    tag_idx = get_event_index(tag)
+    tag_data = [d.loc[tag_idx + i] for i,d in enumerate(tag)]
+    jet_tags = data_table(
+        pd.DataFrame(
+            np.asarray(tag_data).T,
+            columns=['jet {}'.format(i) for i in range(len(tag))],
+            index=tag_idx/2,
+        ),
+        name=name + " jet tags",
+    )
+    return tagged_jet_dict(jet_tags)
+
