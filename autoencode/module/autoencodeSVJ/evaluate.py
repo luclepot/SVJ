@@ -72,8 +72,9 @@ class ae_evaluation:
             "norm_type": str(self.d["norm_type"])
         }
         
-        
-        self.all_train, self.test = self.qcd.train_test_split(self.test_split, self.seed)
+
+        self.all_train, self.test = self.qcd.split_by_event(test_fraction=self.test_split, random_state=self.seed, n_skip=len(self.qcd_jets))
+        # self.all_train, self.test = self.qcd.train_test_split(self.test_split, self.seed)
         self.train, self.val = self.all_train.train_test_split(self.val_split, self.seed)
 
         self.train_norm = self.train.norm(out_name="qcd train norm", **self.norm_args)
@@ -88,7 +89,6 @@ class ae_evaluation:
         
         self.custom_objects = custom_objects
         
-
         self.instance = trainer.trainer(self.filepath)
 
         self.ae = self.instance.load_model(custom_objects=self.custom_objects)
@@ -312,6 +312,57 @@ class ae_evaluation:
             metrics=metrics
         )
 
+    def cut_at_threshold(
+        self,
+        threshold,
+        metric="mae"
+    ):
+        sig = utils.event_error_tags(self.signal_err_jets, threshold, "signal", metric)
+        qcd = utils.event_error_tags(self.qcd_err_jets, threshold, "qcd", metric)
+
+        return {"signal": sig, "qcd": qcd}
+
+    def fill_at_threshold(
+        self,
+        threshold,
+        output_dir=None,
+        metric='mae',
+        rng=(0., 3000.),
+        bins=50,
+        var="MT"
+    ):
+        import ROOT as rt
+        import root_numpy as rtnp
+
+        cuts = self.cut_at_threshold(threshold, metric)
+
+        if output_dir is None:
+            output_dir = os.path.abspath(".")
+
+        out_prefix = os.path.join(output_dir, self.filename)
+
+        all_data = {}
+        for name,cut in cuts.items():
+            out_name = out_prefix + "_" + name + ".root"
+            if os.path.exists(out_name):
+                raise AttributeError("File at path " + out_name + " already exists!! Choose another.")
+            print "saving root file at " + out_name
+            f = rt.TFile(out_name, "RECREATE")
+
+            all_data[out_name] = []
+            for jet_n, idx  in cut.items():
+                
+                hname = name + "_{}_jet".format(jet_n)
+                hist = rt.TH1F(hname, hname, bins, *rng)
+                
+                data = getattr(self, name + "_event").loc[idx][var]
+                all_data[out_name].append(rtnp.fill_hist(hist, data, return_indices=True))
+                
+
+            f.Write()
+            
+        return all_data
+
 eflow_base_lookup = {
     12: 3,
     13: 3,
@@ -417,7 +468,7 @@ def ae_train(
         'arch': (input_dim,) + interm_architecture + (target_dim,) + tuple(reversed(interm_architecture)) + (input_dim,)
     }
 
-    all_train, test = qcd.train_test_split(test_split, seed)
+    all_train, test = qcd.split_by_event(test_fraction=test_split, random_state=seed, n_skip=len(qcd_jets))
     train, val = all_train.train_test_split(val_split, seed)
 
     train_norm = train.norm(out_name="qcd train norm", **norm_args)

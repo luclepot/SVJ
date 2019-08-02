@@ -262,12 +262,23 @@ class data_table(logger):
         self,
         test_fraction=0.25,
         random_state=None,
-        shuffle=True
     ):
         dtrain, dtest = train_test_split(self, test_size=test_fraction, random_state=random_state)
         return (data_table(dtrain, name="train"),
             data_table(dtest, name="test"))
-    
+
+    def split_by_event(
+        self,
+        test_fraction=0.25,
+        random_state=None,
+        n_skip=2,
+    ):
+        # shuffle event indicies
+        train_idx, test_idx = train_test_split(self.df.index[0::n_skip], test_size=test_fraction, random_state=random_state)
+        train, test = map(lambda x: np.asarray([x + i for i in range(n_skip)]).T.flatten(), [train_idx, test_idx])
+        return (data_table(self.df.loc[train], name="train"),
+            data_table(self.df.loc[test], name="test"))
+
     def plot(
         self,
         others=[],
@@ -1399,3 +1410,48 @@ def summary_by_features(**kwargs):
             data = data[data[k] == kwargs[k]]
     
     return data
+    
+def get_event_index(jet_tags):
+    """Get all events index ids from a list of N jet tags 
+    in which all N jets originated from that event.
+    """
+    assert len(jet_tags) > 0
+    ret = set(jet_tags[0].index)
+    to_add = jet_tags[1:]
+    
+    for i,elt in enumerate(to_add):
+        ret = ret.intersection(elt.index - i - 1)
+    
+    return np.sort(np.asarray(list(ret)))
+
+def tagged_jet_dict(tags):
+    """Dictionary tags
+    """
+    return dict(
+        [
+            (
+                i,
+                tags[tags.sum(axis=1) == i].index
+            ) for i in range(tags.shape[1] + 1)
+        ]
+    )
+
+def event_error_tags(
+    err_jets,
+    error_threshold,
+    name,
+    error_metric="mae",
+):
+    tag = [err[error_metric] > error_threshold for err in err_jets]
+    tag_idx = get_event_index(tag)
+    tag_data = [d.loc[tag_idx + i] for i,d in enumerate(tag)]
+    jet_tags = data_table(
+        pd.DataFrame(
+            np.asarray(tag_data).T,
+            columns=['jet {}'.format(i) for i in range(len(tag))],
+            index=tag_idx/2,
+        ),
+        name=name + " jet tags",
+    )
+    return tagged_jet_dict(jet_tags)
+
