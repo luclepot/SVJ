@@ -110,7 +110,7 @@ class ae_evaluation:
         split_by_leading_jet,
         split_by_flavor,
         include_names=False,
-    ):  
+    ):
         if split_by_flavor and split_by_leading_jet:
             raise AttributeError("Cannot split by both Flavor and leading/subleading jets (too messy of a plot)")
 

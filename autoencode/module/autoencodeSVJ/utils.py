@@ -1379,9 +1379,12 @@ def load_summary(path):
          ret = json.load(f)
     return ret
         
-def summary():
-    
-    files = glob.glob(os.path.join(summary_dir(),"*.summary"))
+def summary(custom_dir=None):
+
+    if custom_dir is None:
+        custom_dir = summary_dir()
+
+    files = glob.glob(os.path.join(custom_dir,"*.summary"))
 
     data = []
     for f in files: 
