@@ -66,7 +66,14 @@ class ae_evaluation:
         self.filename = self.d['filename']
         self.filepath = self.d['filepath']
 
-        print self.filepath
+        if not os.path.exists(self.filepath + ".h5"):
+            self.filepath = utils.path_in_repo(self.filepath + ".h5")
+            print self.filepath
+            if self.filepath is None:
+                raise AttributeError("filepath does not exist with spec {}".format(self.d['filepath']))
+            else:
+                if self.filepath.endswith(".h5"):
+                    self.filepath.rstrip(".h5")
 
         self.norm_args = {
             "norm_type": str(self.d["norm_type"])
@@ -89,6 +96,7 @@ class ae_evaluation:
         
         self.custom_objects = custom_objects
         
+
         self.instance = trainer.trainer(self.filepath)
 
         self.ae = self.instance.load_model(custom_objects=self.custom_objects)
@@ -322,11 +330,25 @@ class ae_evaluation:
 
         return {"signal": sig, "qcd": qcd}
 
-    def fill_at_threshold(
+    def check_cuts(
         self,
-        threshold,
+        cuts,
+    ):
+        for k in cuts:
+            s = 0
+            print k +":"
+            for subk in cuts[k]:
+                print " -", str(subk) + ":", cuts[k][subk].shape
+                s += len(cuts[k][subk])
+            print " - size:", s
+
+        print " - og signal size:", len(e.signal)/2 
+        print " - og test size:", len(e.test)/2
+
+    def fill_cuts(
+        self,
+        cuts,
         output_dir=None,
-        metric='mae',
         rng=(0., 3000.),
         bins=50,
         var="MT"
@@ -334,34 +356,34 @@ class ae_evaluation:
         import ROOT as rt
         import root_numpy as rtnp
 
-        cuts = self.cut_at_threshold(threshold, metric)
-
         if output_dir is None:
             output_dir = os.path.abspath(".")
 
         out_prefix = os.path.join(output_dir, self.filename)
 
         all_data = {}
+
         for name,cut in cuts.items():
             out_name = out_prefix + "_" + name + ".root"
             if os.path.exists(out_name):
                 raise AttributeError("File at path " + out_name + " already exists!! Choose another.")
             print "saving root file at " + out_name
             f = rt.TFile(out_name, "RECREATE")
-
+            histos = []
             all_data[out_name] = []
             for jet_n, idx  in cut.items():
-                
                 hname = name + "_{}_jet".format(jet_n)
                 hist = rt.TH1F(hname, hname, bins, *rng)
                 
                 data = getattr(self, name + "_event").loc[idx][var]
-                all_data[out_name].append(rtnp.fill_hist(hist, data, return_indices=True))
-                
+                rtnp.fill_hist(hist, data)
+                all_data[out_name].append(np.histogram(data, bins=bins, range=rng))
+                histos.append(hist)
 
             f.Write()
             
         return all_data
+
 
 eflow_base_lookup = {
     12: 3,
@@ -377,7 +399,7 @@ def ae_train(
     hlf=True,
     eflow=True,
     version=None,
-    seed=40,
+    seed=None,
     test_split=0.15, 
     val_split=0.15,
     norm_args={
@@ -400,6 +422,10 @@ def ae_train(
 
     Not super flexible, but gives a good idea of how good your standard AE is.
     """
+
+    if seed is None:
+        seed = np.random.randint(0, 99999999)
+
     # set random seed
     np.random.seed(seed)
     tf.set_random_seed(seed)
