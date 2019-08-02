@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import os
 import models
+import datetime
 
 class ae_evaluation:
     
@@ -518,8 +519,12 @@ def ae_train(
         aes.add(elt, activation='relu')
     aes.add(input_dim, activation='linear')
 
+
     ae = aes.build()
     ae.summary()
+
+    start_time = str(datetime.datetime.now())
+
     train_args = {
         'batch_size': batch_size, 
         'loss': loss, 
@@ -547,11 +552,14 @@ def ae_train(
     else:
         ae = instance.load_model(custom_objects=custom_objects)
 
+    end_time = str(datetime.datetime.now())
+
     [data_err, signal_err], [data_recon, signal_recon] = utils.get_recon_errors([test_norm, signal_norm], ae)
     roc_dict = utils.roc_auc_dict(data_err, signal_err, metrics=['mae', 'mse']).values()[0]
     result_args = dict([(r + '_auc', roc_dict[r]['auc']) for r in roc_dict])
 
-    utils.dump_summary_json(result_args, train_args, data_args, norm_args)
+    time_args = {'start_time': start_time, 'end_time': end_time}
+    utils.dump_summary_json(result_args, train_args, data_args, norm_args, time_args)
 
     return locals()
 
