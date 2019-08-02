@@ -527,6 +527,6 @@ def ae_train(
 
     utils.dump_summary_json(result_args, train_args, data_args, norm_args)
 
-    return filename
+    return locals()
 
 
