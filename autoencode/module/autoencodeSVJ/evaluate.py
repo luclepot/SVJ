@@ -261,8 +261,7 @@ class ae_evaluation:
     ):
         if show_plot:
             self.instance.plot_metrics(*args, **kwargs)
-            return
-        return self.instance.metrics
+        return self.instance.config['metrics']
     
     def error(
         self,
@@ -384,7 +383,6 @@ class ae_evaluation:
             f.Write()
             
         return all_data
-
 
 eflow_base_lookup = {
     12: 3,

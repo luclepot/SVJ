@@ -8,93 +8,70 @@ from utils import logger, smartpath, get_plot_params
 import h5py
 import matplotlib.pyplot as plt
 import glob
-from keras.callbacks import EarlyStopping, ReduceLROnPlateau, TerminateOnNaN
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau, TerminateOnNaN, ModelCheckpoint
 import keras.optimizers
+import os
+import collections
+import pickle
 
-plt.rcParams.update({'font.size': 18})
-plt.rcParams['figure.figsize'] = (10,10)
+class pkl_file(collections.MutableMapping):
+    """Dictionary which saves all attributes to a .pkl file on access/altering"""
 
-class h5_element_wrapper(logger):
-    def __init__(
-        self,
-        h5file,
-        group,
-        name,
-        istype=None,
-        verbose=True,
-        overwrite=False
-    ):
-        self._LOG_PREFIX = "h5_elt '{}' :: ".format(name)
-        self.VERBOSE = verbose
+    def __init__(self, path, *args, **kwargs):
+        
+        if not path.endswith(".pkl"):
+            path += ".pkl"
+        
+        self.path = smartpath(path)
+        self.store = {}
+        
+        if os.path.exists(self.path):
+            try:
+                self.update_store()
+            except:
+                raise AttributeError("failed to load pickle file!")
+                                
+        self.update_pkl()
+        
+        print "loaded pickle file with path '{}'".format(path)
+        
+    def __getitem__(self, key):
+        self.update_store()
+        return self.store[key]
+    
+    def __setitem__(self, key, value):
+        self.update_store()
+        self.store[key] = value
+        self.update_pkl()
+        
+    def __delitem__(self, key):
+        self.update_store()
+        del self.store[key]
+        self.update_pkl()
+    
+    def __iter__(self):
+        self.update_store()
+        return iter(self.store)
+    
+    def __len__(self):
+        self.update_store()
+        return len(self.store)
+    
+    def update_pkl(self):
+        with open(self.path, 'wb') as f:
+            pickle.dump(self.store, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-        self.h5file = h5file
-        self.group = group
-        self.name = name
-        self.fnamefull = self.h5file.filename
-        self.fname = os.path.basename(self.fnamefull)
-
-        if self.group not in self.h5file.keys():
-            self.log("creating group '{}' in file '{}'".format(self.group, self.fname))
-            self.h5file.create_group(self.group)
-
-        if self.name not in self.h5file[self.group].keys():
-            self.log("creating dataset '{}/{}' in file '{}'".format(self.group, self.name, self.fname))
-            self.h5file[self.group].create_dataset(self.name,(0,))
-
-        elif overwrite:
-            del self.h5file[self.group][self.name]
-            self.log("recreating dataset '{}/{}' in file '{}'".format(self.group, self.name, self.fname))
-            self.h5file[self.group].create_dataset(self.name,(0,))
-        else:
-            self.log("loading dataset '{}/{}' from file '{}'".format(self.group, self.name, self.fname))
-
-        self.core = self.h5file[self.group][self.name]
-
-        self.comp = np.asarray if istype is None else self.dict_comp
-        self.conv = np.asarray if istype is None else istype
-        self.rep = self.conv(self.core)
-
-    def __str__(
-        self
-    ):
-        return str(self.rep)
-
-    def __repr__(
-        self,
-    ):
-        return repr(self.rep)
-
-    def dict_comp(
-        self,
-        dict_in,
-    ):
-        return np.asarray([dict_in.keys(), dict_in.values()], dtype="S").T
-
-    def update(
-        self,
-        new_data,
-    ):
-        if self.name in self.h5file[self.group]:
-            del self.h5file[self.group][self.name]
-        self.h5file[self.group].create_dataset(name=self.name, data=self.comp(new_data))
-        self.core = self.h5file[self.group][self.name]
-        self.rep = self.conv(self.core)
-
-    def h5(
-        self,
-    ):
-        return self.core
-
-    def empty(
-        self,
-    ):
-        return len(self) == 0
-
-    def __getattr__(
-        self,
-        attr,
-    ):
-        return getattr(self.rep, attr)
+    def update_store(self):
+        with open(self.path, 'rb') as f:
+            self.store.update(pickle.load(f))
+            
+    def __str__(self):
+        self.update_store()
+        return str(self.store)
+    
+    def __repr__(self): 
+        self.update_store()
+        return "pkl_file instance\n" + str(self) 
 
 class trainer(logger):
     """
@@ -118,72 +95,30 @@ class trainer(logger):
         self.config_file = smartpath(name)
         self.path = os.path.dirname(self.config_file)
 
-        if not self.config_file.endswith(".h5"):
-            self.config_file += ".h5"
+        if not self.config_file.endswith(".pkl"):
+            self.config_file += ".pkl"
             
-        preexisting = os.path.exists(self.config_file) and not overwrite
-        self.file = None
-
-        if self.locked(self.config_file):
-            self._throw("filename '{}' is already being edited in another instance!!".format(self.config_file))
-
-        self.file = h5py.File(self.config_file)
-
-        # self._lock_file(self.config_file)
-
-        try:
-            file_attrs = {
-                "params": (["training", "config"], dict),
-                "data": ([
-                    "metric_names"
-                    ], None)
-            }
-            
-            for attr in file_attrs:
-                for subattr in file_attrs[attr][0]:
-                    setattr(self, subattr, h5_element_wrapper(self.file, attr, subattr, file_attrs[attr][1], overwrite=overwrite))
-                setattr(self, attr, self.file[attr])
-
-            for subattr in self.metric_names:
-                setattr(self, subattr, h5_element_wrapper(self.file, "metric_names", subattr, None, overwrite=overwrite))
-                        
-        except Exception as e:
-            self.error(traceback.format_exc())
-            self._throw(e, unlock=False)
-
-        cdict = self.config.copy()
-        tdict = self.training.copy()
+        self.config = pkl_file(self.config_file)
         
-        if not preexisting:
-            cdict = odict()
-            cdict['name'] = name
-            cdict['trained'] = ''
-            cdict['model_json'] = ''
-            # cdict['model_weights'] = ''
-            tdict['batch_size'] = '[]'
-            tdict['epoch_splits'] = '[]'
+        defaults = {
+            'name': name,
+            'trained': False,
+            'model_json': '',
+            'batch_size': [],
+            'epoch_splits': [],
+            'metrics': {},
+        }
 
-        self.metrics = odict()
-        self.training.update(tdict)
-        self.config.update(cdict)
-        self._update_metrics_dict(self.metrics)
-
-    def _update_metrics_dict(
-        self, 
-        mdict_to_fill
-    ):  
-        for metric in self.metric_names:
-            if hasattr(self, metric):
-                mdict_to_fill[metric] = getattr(self, metric).rep
+        for k,v in defaults.items():
+            if k not in self.config:
+                self.config[k] = v
 
     def _throw(
         self,
         msg,
         exc=AttributeError,
-        unlock=False,
     ):
-        if unlock:
-            self.close()
+        self.close()
         self.error(msg)
         raise exc, msg
 
@@ -191,13 +126,7 @@ class trainer(logger):
         self,
     ):
         try:
-            if self.file is not None:
-                self.file.close()
-                self.file = None
-        except:
-            pass
-        try:
-            self._unlock_file(self.config_file)
+            del self.config
         except:
             pass
 
@@ -205,36 +134,6 @@ class trainer(logger):
         self,
     ):
         self.close()
-
-    ### LOCKING
-
-    def _lock_file(
-        self,
-        fname,
-    ):
-        self.log("locking file '{}'".format(fname))
-        open(self._get_lock(fname), "w+").close()
-
-    def _unlock_file(
-        self,
-        fname,
-    ):
-        to_remove = self._get_lock(fname)
-        if os.path.exists(to_remove):
-            self.log("unlocking file '{}'".format(os.path.basename(fname)))
-            os.remove(to_remove)
-
-    def locked(
-        self,
-        fname,
-    ):
-        return os.path.exists(self._get_lock(fname))
-
-    def _get_lock(
-        self,
-        fname,
-    ):
-        return os.path.join(os.path.dirname(fname), ".lock." + os.path.basename(fname))
 
     ### ACTUAL WRAPPERS
 
@@ -244,7 +143,7 @@ class trainer(logger):
         force=False,
         custom_objects=None,
     ):
-        w_path = self.config_file.replace(".h5", "_weights.h5")
+        w_path = self.config_file.replace(".pkl", "_weights.h5")
         # if already trained
         if self.config['trained']:
             if self.config['model_json']:
@@ -294,22 +193,25 @@ class trainer(logger):
         custom_objects={}
     ):
         callbacks = None
+
+        w_path = self.config_file.replace(".pkl", "_weights.h5")
         if use_callbacks:
             callbacks = [
                 EarlyStopping(monitor='val_loss', patience=10, verbose=0),
                 ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=0),
-                TerminateOnNaN()
+                TerminateOnNaN(),
+                ModelCheckpoint(w_path, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
             ]
         
-        w_path = self.config_file.replace(".h5", "_weights.h5")
-
         model = self.load_model(model, force, custom_objects)
 
         if optimizer is None:
             if hasattr(model, "optimizer"):
                 optimizer = model.optimizer
             else:
-                optimizer = "adam"
+                optimizer = getattr(keras.optimizers, "adam")(lr=learning_rate)
+        elif isinstance(optimizer, str):
+            optimizer = getattr(keras.optimizers, optimizer)(lr=learning_rate)
         if loss is None:
             if hasattr(model, "loss"):
                 loss = model.loss
@@ -330,8 +232,9 @@ class trainer(logger):
                 metrics = model.metrics
             else:
                 metrics = []
-
-        model.compile(optimizer=getattr(keras.optimizers, optimizer)(lr=learning_rate), loss=loss, metrics=metrics, loss_weights=loss_weights)
+        
+        model.compile(
+            optimizer=optimizer, loss=loss, metrics=metrics, loss_weights=loss_weights)
 
         start = datetime.now()
 
@@ -351,17 +254,11 @@ class trainer(logger):
         # assert y_test.shape[1] == y_train.shape[1]
 
 
-        previous_epochs = eval(self.training['epoch_splits'])
+        previous_epochs = self.config['epoch_splits']
+
         master_epoch_n = sum(previous_epochs)
-
         finished_epoch_n = master_epoch_n + epochs
-        
-
-        # last_full_epoch = len(self.metrics[-1][(self.metrics[-1] != -1)])
-        # self.metrics = self.metrics[:,:start_epoch]
-        # for metric,name in zip(self.metrics, self.metric_names):
-        #     history[name] = self.metric
-
+    
         history = odict()
 
         if not use_callbacks:
@@ -410,7 +307,7 @@ class trainer(logger):
                 epochs=master_epoch_n + epochs,
                 verbose=verbose,
                 callbacks=callbacks,
-		batch_size=batch_size,
+	        	batch_size=batch_size,
             ).history
 
             for metric in nhistory:
@@ -419,28 +316,26 @@ class trainer(logger):
                     history[metric].append([master_epoch_n + i, value])
             master_epoch_n += epochs
             n_epochs_finished = min(map(len, history.values()))
+
         print "EPOCH N:", master_epoch_n, epochs
         self.log("")
         self.log("trained {} epochs!".format(n_epochs_finished))
         self.log("")
 
+        js = model.to_json()
+        self.config['trained'] = True 
+        self.config['model_json'] = str(js)
+        print "saving to path " + w_path
+        model.save_weights(w_path)
+
         hvalues = [hv[:n_epochs_finished] for hv in history.values()]
         hkeys = history.keys()
 
         for key,value in zip(hkeys, hvalues):
-            if hasattr(self, key):
-                #print(getattr(self, key))
-                #print(np.concatenate([getattr(self, key).rep, value]))
-                getattr(self, key).update(np.concatenate([getattr(self, key).rep, value]))
+            if key in self.config['metrics']:
+                self.config['metrics'][key] = np.round(np.concatenate([self.config['metrics'][key], value]), 7).tolist()
             else:
-                #print(getattr(self, key))
-                # print(np.concatenate([getattr(self, key).rep, value]))
-                setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
-                # setattr(self, key, h5_element_wrapper(self.file, "metric_names", key, None, overwrite=True))
-                getattr(self, key).update(np.asarray(value))
-
-        self.metric_names.update(np.asarray(list(set(self.metric_names).union(hkeys))))
-        self._update_metrics_dict(self.metrics)
+                self.config['metrics'][key] = list(value)
 
         previous_epochs.append(n_epochs_finished)
         finished_epoch_n = sum(previous_epochs)
@@ -450,51 +345,16 @@ class trainer(logger):
         print "finished epoch N", finished_epoch_n
         print "prev", previous_epochs
 
-        model.save_weights(w_path)
 
-        cdict = self.config.copy()
-        cdict['model_json'] = model.to_json()
-        # cdict['model_weights'] = w_path
-        cdict['trained'] = str(start) + " ::: " + str(end)
-        self.config.update(cdict)
+        
         self.log("model saved")
 
-        tdict = self.training.copy()
-        tdict['time'] = str(end - start)
-        tdict['epochs'] = epochs
-        tdict['batch_size'] = str(eval(tdict['batch_size']) + [batch_size,]*n_epochs_finished)
-        tdict['epoch_splits'] = str(previous_epochs)
-        self.training.update(tdict)
 
-        # return odel 
-        # hkeys = history.keys()
-        # self.metric_names.update(hkeys)
-
-        # self.x_train.update(x_train)
-        # self.y_train.update(y_train)
-        # self.x_test.update(x_test)
-        # self.y_test.update(y_test)
-        
-
-        # maxlen = min(map(len, history.values()))
-
-        # hvalues = np.asarray([a[:maxlen] for a in history.values()]))
-        # hkeys = history.keys()
-
-        # new_metrics = self.metrics.copy()
-        # new_keys = self.metric_names.copy()
-
-        # existing = [(i,new_keys.index(hkeys[i])) for i in range(len(hkeys)) if hkeys[i] in new_keys]
-        # to_add = [(i,-1) for i in range(len(hkeys)) if hkeys[i] not in new_keys]
-        # unused = [(-1,i) for i in range(len(new_keys)) if new_keys[i] not in hkeys]
-        
-
-
-        # for i,key in enumerate(to_add):
-            
-        #     new_metrics = np.vstack([new_metrics, ])
-        # self.metrics.update(hvalues)
-
+        self.config['time'] = str(end - start)
+        self.config['epochs'] = epochs
+        self.config['batch_size'] = self.config['batch_size'] + [batch_size,]*n_epochs_finished
+        self.config['epoch_splits'] = previous_epochs
+    
         return model
 
     def plot_metrics(
@@ -506,10 +366,10 @@ class trainer(logger):
         names = []
         metrics = []
 
-        for mname in self.metrics:
+        for mname in self.config['metrics']:
             if glob.fnmatch.fnmatch(mname, fnmatch_criteria):
                 names.append(mname)
-                metrics.append(self.metrics[mname])
+                metrics.append(np.asarray(self.config['metrics'][mname]))
                 
         # break concatenated plot arrays into individual components
         plots = []
@@ -539,36 +399,7 @@ class trainer(logger):
         if not sure:
             self.error("NOT DELETING: run again with keyword 'sure=True' to remove!")
         else:
-            for f in [self.config_file, self.config_file.replace(".h5", "_weights.h5")]:
+            for f in [self.config_file, self.config_file.replace(".pkl", "_weights.h5")]:
                 if os.path.exists(f):
                     os.remove(f)
             self.log("removed associated data files for self!")
-
-def train_unique_instance(
-    name,
-    model,
-    x_train,
-    x_test,
-    show_plots=True,
-    **kwargs
-):
-    if name.endswith(".h5"):
-        name = name.replace(".h5", "")
-    npath = lambda p : p + ".h5"
-    if os.path.exists(npath(name)):
-        i = 0
-        while os.path.exists(npath(name + "_copy{}".format(i))):
-            i += 1
-        name = npath(name + "_copy{}".format(i))
-
-    print "using name {}".format(name)
-    t = trainer(name)
-    t.train(
-        model=model,
-        **kwargs
-    )
-
-    if show_plots:
-        t.plot_metrics("*")
-
-    return t
