@@ -198,28 +198,37 @@ class Converter:
         self,
         tree
     ):
-
         assert tree.Jet_size > 1
-        met, meteta, metphi = tree.MissingET[0].MET, tree.MissingET[0].Eta, tree.MissingET[0].Phi
+
+        met = tree.MissingET[0].MET
+        metphi = tree.MissingET[0].Phi
+        meteta = tree.MissingET[0].Eta
 
         Vjj = tree.Jet[0].P4() + tree.Jet[1].P4()
-
-        metpy = met*np.sin(metphi)
-        metpx = met*np.cos(metphi)
+        met_py = met*np.sin(metphi)
+        met_px = met*np.cos(metphi)
 
         Mjj = Vjj.M()
         Mjj2 = Mjj*Mjj
         ptjj = Vjj.Pt()
         ptjj2 = ptjj*ptjj
-        ptMet = Vjj.Px()*metpx + Vjj.Py()*metpy;
-        MT = np.sqrt(Mjj2 + 2*(np.sqrt(Mjj2 + ptjj2)*met - ptMet))
+        ptMet = Vjj.Px()*met_px + Vjj.Py()*met_py
+
+        MT = np.sqrt(Mjj2 + 2.*(np.sqrt(Mjj2 + ptjj2)*met - ptMet))
+
+        # Mjj = Vjj.M()
+        # Mjj2 = Mjj*Mjj
+        # ptjj = Vjj.Pt()
+        # ptjj2 = ptjj*ptjj
+        # ptMet = Vjj.Px()*metpx + Vjj.Py()*metpy
+        # MT2 = np.sqrt(Mjj2 + 2*(np.sqrt(Mjj2 + ptjj2)*met - ptMet))
 
         return [
             met,
             meteta,
             metphi,
+            MT, 
             Mjj,
-            MT
         ]
 
     def get_jet_constituents(
@@ -431,6 +440,6 @@ if __name__ == "__main__":
             print track_index.shape
         except:
             print "dang"
-            core = Converter(".", "../data/signal_process/small/data_1_selection.txt", "data", save_constituents=False, energyflow_basis_degree=3)
+            core = Converter(".", '/afs/cern.ch/work/l/llepotti/private/CMS/CMSSW_8_0_20/src/autoencodeSVJ/TEST/data_0_selection.txt', "data", save_constituents=False, energyflow_basis_degree=3)
             ret = core.convert((0,10000), return_debug_tree=False)
-            # core.save("test.h5")
+            core.save("TEST.h5")
