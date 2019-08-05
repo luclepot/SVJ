@@ -17,7 +17,7 @@ import pickle
 class pkl_file(collections.MutableMapping):
     """Dictionary which saves all attributes to a .pkl file on access/altering"""
 
-    def __init__(self, path, *args, **kwargs):
+    def __init__(self, path, verbose=1, *args, **kwargs):
         
         if not path.endswith(".pkl"):
             path += ".pkl"
@@ -30,10 +30,8 @@ class pkl_file(collections.MutableMapping):
                 self.update_store()
             except:
                 raise AttributeError("failed to load pickle file!")
-                                
+              
         self.update_pkl()
-        
-        print "loaded pickle file with path '{}'".format(path)
         
     def __getitem__(self, key):
         self.update_store()
@@ -71,7 +69,7 @@ class pkl_file(collections.MutableMapping):
     
     def __repr__(self): 
         self.update_store()
-        return "pkl_file instance\n" + str(self) 
+        return "pkl_file instance at {}\n".format(self.path) + str(self)
 
 class trainer(logger):
     """
@@ -200,7 +198,7 @@ class trainer(logger):
                 EarlyStopping(monitor='val_loss', patience=10, verbose=0),
                 ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=0),
                 TerminateOnNaN(),
-                ModelCheckpoint(w_path, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+                ModelCheckpoint(w_path, monitor='val_loss', verbose=self.VERBOSE, save_best_only=True, save_weights_only=True, mode='min')
             ]
         
         model = self.load_model(model, force, custom_objects)
@@ -291,6 +289,8 @@ class trainer(logger):
                 self.error(traceback.format_exc())
                 if all([len(v) == 0 for v in history]):
                     self._throw("quitting")
+                self.log("saving to path " + w_path)
+                model.save_weights(w_path)
 
             if len(history.values()) == 0:
                 n_epochs_finished = 0
@@ -317,7 +317,7 @@ class trainer(logger):
             master_epoch_n += epochs
             n_epochs_finished = min(map(len, history.values()))
 
-        print "EPOCH N:", master_epoch_n, epochs
+        # self.log("EPOCH N: {}, {}".format(master_epoch_n, epochs))
         self.log("")
         self.log("trained {} epochs!".format(n_epochs_finished))
         self.log("")
@@ -325,25 +325,30 @@ class trainer(logger):
         js = model.to_json()
         self.config['trained'] = True 
         self.config['model_json'] = str(js)
-        print "saving to path " + w_path
-        model.save_weights(w_path)
+        # print "saving to path " + w_path
+        # model.save_weights(w_path)
 
+        # load the last model
+        best = self.load_model()
         hvalues = [hv[:n_epochs_finished] for hv in history.values()]
         hkeys = history.keys()
 
+        nmetrics = self.config['metrics'].copy()
         for key,value in zip(hkeys, hvalues):
-            if key in self.config['metrics']:
-                self.config['metrics'][key] = np.round(np.concatenate([self.config['metrics'][key], value]), 7).tolist()
+            if key in nmetrics:
+                nmetrics[key] = np.concatenate([nmetrics[key], value])
             else:
-                self.config['metrics'][key] = list(value)
+                nmetrics[key] = np.asarray(value)
+
+        self.config['metrics'] = nmetrics
 
         previous_epochs.append(n_epochs_finished)
         finished_epoch_n = sum(previous_epochs)
 
         end = datetime.now()
 
-        print "finished epoch N", finished_epoch_n
-        print "prev", previous_epochs
+        self.log("finished epoch N: {}".format(finished_epoch_n))
+        # print "prev", previous_epochs
 
 
         
