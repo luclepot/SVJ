@@ -67,8 +67,9 @@ class ae_evaluation:
         self.filename = self.d['filename']
         self.filepath = self.d['filepath']
 
-        if not os.path.exists(self.filepath + ".h5"):
-            self.filepath = utils.path_in_repo(self.filepath + ".h5")
+        if not os.path.exists(self.filepath + ".pkl"):
+            print self.filepath + ".pkl"
+            self.filepath = utils.path_in_repo(self.filepath + ".pkl")
             print self.filepath
             if self.filepath is None:
                 raise AttributeError("filepath does not exist with spec {}".format(self.d['filepath']))
@@ -359,12 +360,16 @@ class ae_evaluation:
         if output_dir is None:
             output_dir = os.path.abspath(".")
 
-        out_prefix = os.path.join(output_dir, self.filename)
-
         all_data = {}
 
         for name,cut in cuts.items():
-            out_name = out_prefix + "_" + name + ".root"
+            if  'qcd' in name.lower():
+                oname = "QCD.root"
+            elif 'signal' in name.lower():
+                oname = "SVJ_2000_0p3.root"
+            
+            out_name = os.path.join(output_dir, oname)
+            
             if os.path.exists(out_name):
                 raise AttributeError("File at path " + out_name + " already exists!! Choose another.")
             print "saving root file at " + out_name
