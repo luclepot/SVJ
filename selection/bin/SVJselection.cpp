@@ -26,7 +26,7 @@ namespace Vetos {
     }
 
     bool JetPtVeto(TLorentzVector& jet) {
-        return jet.Pt() > 200.;
+        return jet.Pt() > 170.;
     }
 }
 
@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
 
             // ratio between calculated mt2 of dijet system and missing momentum is not negligible
             core.Cut(
-                (*metFull_Pt) / MT2 > 0.15,
+                ((*metFull_Pt) / MT2) > 0.15,
                 Cuts::metRatio
                 );
 
@@ -183,15 +183,15 @@ int main(int argc, char **argv) {
                 Cuts::jetDiJet
                 );
 
-            // magnitude of MET squared > 1500 
+            // magnitude of MT > 1500 
             core.Cut(
                 MT2 > 1500,
                 Cuts::metValue
                 );
 
-            // tighter MET ratio
+            // tighter MET/MT ratio
             core.Cut(
-                (*metFull_Pt) / MT2 > 0.25,
+                ((*metFull_Pt) / MT2) > 0.25,
                 Cuts::metRatioTight
                 );
                  

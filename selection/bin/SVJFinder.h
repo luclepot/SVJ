@@ -62,7 +62,7 @@ namespace Cuts {
         {jetEtas, "abs jet Etas < 2.4"},
         {jetDeltaEtas, "abs DeltaEta < 1.5"},
         {metRatio,"MET/M_T > 0.15"},
-        {jetPt, "Jet PT > 200"},
+        {jetPt, "Jet PT > 170"},
         {jetDiJet, "Dijet veto"},
         {metValue, "M_T > 1500"},
         {metRatioTight, "MET/M_T > 0.25"},
