@@ -418,6 +418,7 @@ def ae_train(
     custom_objects={},
     interm_architecture=(30,30),
     output_data_path=None,
+    verbose=1, 
 ):
 
     """Training function for basic autoencoder (inputs == outputs). 
@@ -466,7 +467,7 @@ def ae_train(
     filename = "{}{}{}_".format('hlf_' if hlf else '', 'eflow{}_'.format(eflow_base) if eflow else '', target_dim)
     
     if version is None:
-        existing_ids = map(lambda x: int(os.path.basename(x).rstrip('.summary').split('_')[-1].lstrip('v')), utils.summary_match(filename + "v*"))
+        existing_ids = map(lambda x: int(os.path.basename(x).rstrip('.summary').split('_')[-1].lstrip('v')), utils.summary_match(filename + "v*", 0))
         assert len(existing_ids) == len(set(existing_ids)), "no duplicate ids"
         id_set = set(existing_ids)
         this_num = 0
@@ -477,7 +478,7 @@ def ae_train(
 
     filename += "v{}".format(version)
 
-    assert len(utils.summary_match(filename)) == 0, "filename '{}' exists already! Change version id, or leave blank.".format(filename)
+    assert len(utils.summary_match(filename, 0)) == 0, "filename '{}' exists already! Change version id, or leave blank.".format(filename)
 
     filepath = os.path.join(output_data_path, filename)
     input_dim = len(signal.columns)
@@ -511,7 +512,7 @@ def ae_train(
     test.name = "qcd test data"
     val.name = "qcd validation data"
 
-    instance = trainer.trainer(filepath)
+    instance = trainer.trainer(filepath, verbose=verbose)
 
     aes = models.base_autoencoder()
     aes.add(input_dim)
@@ -524,7 +525,8 @@ def ae_train(
 
 
     ae = aes.build()
-    ae.summary()
+    if verbose:
+        ae.summary()
 
     start_time = str(datetime.datetime.now())
 
@@ -536,9 +538,10 @@ def ae_train(
         'learning_rate': learning_rate,
     }
 
-    print "TRAINING WITH PARAMS >>>"
-    for arg in train_args:
-        print arg, ":", train_args[arg]
+    if verbose:
+        print "TRAINING WITH PARAMS >>>"
+        for arg in train_args:
+            print arg, ":", train_args[arg]
 
     if train_me:
         ae = instance.train(
@@ -550,6 +553,7 @@ def ae_train(
             force=True,
             use_callbacks=True,
             custom_objects=custom_objects, 
+            verbose=int(verbose),
             **train_args
         )
     else:
@@ -564,6 +568,7 @@ def ae_train(
     time_args = {'start_time': start_time, 'end_time': end_time}
     utils.dump_summary_json(result_args, train_args, data_args, norm_args, time_args)
 
-    return locals()
+    # roc as figure of merit
+    return max(result_args.values())
 
 
