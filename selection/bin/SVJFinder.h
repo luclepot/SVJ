@@ -206,8 +206,8 @@ public:
 
 
             vector<string> possibleMuons = {
-                "Muon",
                 "MuonLoose",
+                "Muon",
                 "MuonTight"
             };
 
@@ -221,6 +221,8 @@ public:
             if (MuonPrefix == "") {
                 throw std::invalid_argument("Invalid Muon Specification");
             }
+
+            log("Using muon prefix '" + MuonPrefix + "'"); 
 
             log("Success");
             end();
