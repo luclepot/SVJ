@@ -8,7 +8,7 @@ using namespace std;
 const string newname = "/eos/project/d/dshep/TOPCLASS/DijetAnomaly/ZprimeDark_2000GeV_13TeV_PU40/ZprimeDark_2000GeV_13TeV_PU40_1_ap.root";
 const string oldname = "/eos/project/d/dshep/TOPCLASS/DijetAnomaly/ZprimeDark_2000GeV_13TeV_PU40/ZprimeDark_2000GeV_13TeV_PU40_0.root";
 
-TCanvas *PlotTwo(TTree* tree1, TTree* tree2, string name, int bins) {
+TCanvas *PlotTwo(TTree* tree1, TTree* tree2, string name, int bins, string f1label, string f2label) {
 
     float min1 = tree1->GetMinimum(name.c_str());
     float min2 = tree2->GetMinimum(name.c_str()); 
@@ -46,14 +46,14 @@ TCanvas *PlotTwo(TTree* tree1, TTree* tree2, string name, int bins) {
     hs->Draw("nostack"); 
 
     legend->SetHeader("Legend Title","C"); 
-    legend->AddEntry(h1, "old signal", "f"); 
-    legend->AddEntry(h2, "new signal", "f"); 
+    legend->AddEntry(h1, f1label.c_str(), "f"); 
+    legend->AddEntry(h2, f2label.c_str(), "f"); 
     legend->Draw(); 
 
     return cst; 
 } 
 
-void compare(string f1name, string f2name, vector<string> names, string treename="Delphes", int bins=100) {
+void compare(string f1name, string f2name, vector<string> names, string f1label="old signal", string f2label="new signal", string treename="Delphes", int bins=100) {
 
     TFile * f1 = new TFile(f1name.c_str());
     TFile * f2 = new TFile(f2name.c_str());
@@ -64,7 +64,7 @@ void compare(string f1name, string f2name, vector<string> names, string treename
     for (size_t i = 0; i < names.size(); ++i) {
         string name = names[i]; 
         TImage *img = TImage::Create();
-        TCanvas* canvas = PlotTwo(tree1, tree2, name, bins); 
+        TCanvas* canvas = PlotTwo(tree1, tree2, name, bins, f1label, f2label); 
         img->FromPad(canvas);
         string outpath = name + ".png"; 
         cout << "saving image to file '" << outpath << "'" << endl;
