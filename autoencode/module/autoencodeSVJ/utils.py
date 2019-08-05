@@ -1330,7 +1330,7 @@ def dump_summary_json(*dicts):
     fpath = os.path.join(head, summary['filename'] + '.summary')
 
     if os.path.exists(fpath):
-        print "warning.. filepath '{}' exists!".format(fpath)
+        # print "warning.. filepath '{}' exists!".format(fpath)
 
         newpath = fpath
 
@@ -1340,18 +1340,20 @@ def dump_summary_json(*dicts):
         # just a check
         assert not os.path.exists(newpath)
         fpath = newpath
-        print "saving to path '{}' instead :-)".format(fpath)
+        # print "saving to path '{}' instead :-)".format(fpath)
 
     summary['summary_path'] = fpath
 
-    for k,v in summary.items():
-        print k, ":", v
+    # for k,v in summary.items():
+    #     print k, ":", v
     
-    print
+    # print
 
     with open(fpath, "w+") as f:
         json.dump(summary, f)
-    print "successfully dumped size-{} summary dict to file '{}'".format(len(summary), fpath)
+
+    # print "successfully dumped size-{} summary dict to file '{}'".format(len(summary), fpath)
+    return summary
 
 def summary_dir():
     return os.path.join(get_repo_info()['head'], 'autoencode/data/summary')
@@ -1395,14 +1397,15 @@ def summary(custom_dir=None):
 
     return data_table(pd.DataFrame(data), name='summary')
 
-def summary_match(globstr):
+def summary_match(globstr, verbose=1):
     if not (os.path.dirname(globstr) == summary_dir()):
         globstr = os.path.join(summary_dir(), globstr)
     else:
         globstr = os.path.abspath(globstr)
     
     ret = glob.glob(globstr)
-    print "found {} matches with search '{}'".format(len(ret), globstr)
+    if verbose:
+        print "found {} matches with search '{}'".format(len(ret), globstr)
     return ret
 
 def summary_by_features(**kwargs):
@@ -1469,3 +1472,109 @@ def path_in_repo(
         if os.path.exists(considered):
             return considered
     return None
+
+def get_particle_PIDs_statuses(root_filename):
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import os
+    import ROOT as rt
+    from tqdm import tqdm
+
+    DELPHES_DIR = os.environ["DELPHES_DIR"]
+    rt.gSystem.Load("{}/lib/libDelphes.so".format(DELPHES_DIR))
+    rt.gInterpreter.Declare('#include "{}/include/modules/Delphes.h"'.format(DELPHES_DIR))
+    rt.gInterpreter.Declare('#include "{}/include/classes/DelphesClasses.h"'.format(DELPHES_DIR))
+    rt.gInterpreter.Declare('#include "{}/include/classes/DelphesFactory.h"'.format(DELPHES_DIR))
+    rt.gInterpreter.Declare('#include "{}/include/ExRootAnalysis/ExRootTreeReader.h"'.format(DELPHES_DIR))
+
+
+    f = rt.TFile(root_filename)
+    tree = f.Get("Delphes")
+    
+    parr = np.zeros((tree.Draw("Particle.PID", "", "goff"), 2))
+    total = 0
+    for i in tqdm(range(tree.GetEntries())):
+        tree.GetEntry(i)
+        for p in tree.Particle:
+            parr[total,:] = p.PID, p.Status
+            total += 1
+
+    df = pd.DataFrame(parr, columns=["PID", "Status"])
+    new = df[abs(df.PID) > 4900100]
+    counts = new.PID.value_counts()
+    pdict = odict()
+    for c in counts.index:
+        pdict[c] = dict(new[new.PID == c].Status.value_counts())
+
+        
+    converted = pd.DataFrame(pdict).T
+    converted.plot.bar(stacked=True)
+    plt.show()
+    return converted
+
+def plot_particle_statuses(figsize=(7,7), **fdict):
+    """With particle status name=results as the keywords, plot the particle
+    statuses
+    """
+
+    cols = set().union(*[list(frame.columns) for frame in fdict.values()])
+    parts = set().union(*[list(frame.index) for frame in fdict.values()])
+
+    for name in fdict:
+        fdict[name].fillna(0, inplace=True)
+
+        for v in cols:
+            if v not in fdict[name]:
+                fdict[name][v] = 0
+        for i in parts:
+            if i not in fdict[name].index:
+                fdict[name].loc[i] = 0
+
+        fdict[name] = fdict[name][sorted(fdict[name].columns)]
+        fdict[name].sort_index(inplace=True)
+
+    for i,name in enumerate(fdict):
+        ax = fdict[name].plot.bar(stacked=True, title=name, figsize=figsize)
+        ax.set_xlabel("PID")
+        ax.set_ylabel("Count")
+
+        legend = ax.get_legend()
+        legend.set_title("Status")
+    #     plt.suptitle(name)
+        plt.show()
+
+def merge_rootfiles(glob_path, out_name, treename="Delphes"):
+    import traceback as tb
+    try:
+        import ROOT as rt
+        chain = rt.TChain(treename)
+        for f in glob.glob(glob_path):
+            chain.Add(f)
+        chain.Merge(out_name)
+        return 0
+    except:
+        print tb.format_exc()
+        return 1
+
+def set_random_seed(seed_value):
+    # 1. Set `PYTHONHASHSEED` environment variable at a fixed value
+    import os
+    os.environ['PYTHONHASHSEED']=str(seed_value)
+
+    # 2. Set `python` built-in pseudo-random generator at a fixed value
+    import random
+    random.seed(seed_value)
+
+    # 3. Set `numpy` pseudo-random generator at a fixed value
+    import numpy as np
+    np.random.seed(seed_value)
+
+    # 4. Set `tensorflow` pseudo-random generator at a fixed value
+    import tensorflow as tf
+    tf.set_random_seed(seed_value)
+
+    # 5. Configure a new global `tensorflow` session
+    from keras import backend as K
+    session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+    sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+    K.set_session(sess)
