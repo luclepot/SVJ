@@ -45,7 +45,7 @@ TCanvas *PlotTwo(TTree* tree1, TTree* tree2, string name, int bins, string f1lab
     cst->cd();
     hs->Draw("nostack"); 
 
-    legend->SetHeader("Legend Title","C"); 
+    // legend->SetHeader("","C"); 
     legend->AddEntry(h1, f1label.c_str(), "f"); 
     legend->AddEntry(h2, f2label.c_str(), "f"); 
     legend->Draw(); 
