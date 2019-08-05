@@ -342,8 +342,8 @@ class ae_evaluation:
                 s += len(cuts[k][subk])
             print " - size:", s
 
-        print " - og signal size:", len(e.signal)/2 
-        print " - og test size:", len(e.test)/2
+        print " - og signal size:", len(self.signal)/2 
+        print " - og test size:", len(self.test)/2
 
     def fill_cuts(
         self,
