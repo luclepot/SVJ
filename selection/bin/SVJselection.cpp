@@ -26,7 +26,7 @@ namespace Vetos {
     }
 
     bool JetPtVeto(TLorentzVector& jet) {
-        return jet.Pt() > 170.;
+        return jet.Pt() > 200.;
     }
 }
 
