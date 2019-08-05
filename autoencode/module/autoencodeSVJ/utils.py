@@ -1463,8 +1463,6 @@ def path_in_repo(
 ):
     head = get_repo_info()['head']
     suffix = ""
-    if not filename.endswith(".h5"):
-        suffix = ".h5"
     comps = filter(len, filename.split(os.path.sep))
     for i in range(len(comps)):
         considered = os.path.join(head, os.path.join(*comps[i:])) + suffix
