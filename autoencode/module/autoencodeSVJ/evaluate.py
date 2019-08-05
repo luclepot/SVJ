@@ -57,8 +57,7 @@ class ae_evaluation:
 
         self.seed = self.d['seed']
 
-        np.random.seed(self.seed)
-        tf.set_random_seed(self.seed)
+        utils.set_random_seed(self.seed)
 
         self.target_dim = self.d['target_dim']
         self.input_dim = len(self.signal.columns)
@@ -377,7 +376,7 @@ class ae_evaluation:
             histos = []
             all_data[out_name] = []
             for jet_n, idx  in cut.items():
-                hname = name + "_{}_jet".format(jet_n)
+                hname = "{}_SVJ{}".format(var, jet_n)
                 hist = rt.TH1F(hname, hname, bins, *rng)
                 
                 data = getattr(self, name + "_event").loc[idx][var]
@@ -432,8 +431,7 @@ def ae_train(
         seed = np.random.randint(0, 99999999)
 
     # set random seed
-    np.random.seed(seed)
-    tf.set_random_seed(seed)
+    utils.set_random_seed(seed)
 
     if output_data_path is None:
         output_data_path = os.path.join(utils.get_repo_info()['head'], "autoencode/data/training_runs")
