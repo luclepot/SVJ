@@ -4,6 +4,8 @@ import numpy as np
 import tensorflow as tf
 import os
 import models
+import datetime
+from collections import OrderedDict as odict 
 
 class ae_evaluation:
     
@@ -11,7 +13,8 @@ class ae_evaluation:
         self,
         name,
         qcd_path=None,
-        signal_path=None,
+        SVJ_path=None,
+        aux_signals_dict={},
         custom_objects={},
     ):
         self.name = utils.summary_by_name(name)
@@ -23,28 +26,32 @@ class ae_evaluation:
             else:
                 raise AttributeError("No QCD path found; please specify!")
 
-        if signal_path is None:
+        if SVJ_path is None:
             if 'signal_path' in self.d:
-                signal_path = self.d['signal_path']
+                SVJ_path = self.d['signal_path']
             else:
-                raise AttributeError("No signal path found; please specify!")
+                raise AttributeError("No SVJ signal path found; please specify!")
         
+        assert isinstance(aux_signals_dict, (dict, odict)), 'aux_signals_dict must be dict or odict with {name: path} format'
+
+
+        self.signals = {
+            "SVJ": SVJ_path,
+        }
+
+        self.signals.update(aux_signals_dict)
+
+        # set path attributes for all signals
+        for signal in self.signals:
+            setattr(self, signal + '_path', self.signals[signal])
+
         self.qcd_path = qcd_path
-        self.signal_path = signal_path
                 
         self.hlf = self.d['hlf']
         self.eflow = self.d['eflow']
         self.eflow_base = self.d['eflow_base']
-        #     signal_path = "data/signal/base_{}/*.h5".format(eflow_base)
+        #     SVJ_path = "data/SVJ/base_{}/*.h5".format(eflow_base)
         #     qcd_path = "data/background/base_{}/*.h5".format(eflow_base)
-
-        (self.signal,
-         self.signal_jets,
-         self.signal_event,
-         self.signal_flavor) = utils.load_all_data(
-            self.signal_path,
-            "signal", include_hlf=self.hlf, include_eflow=self.eflow
-        )
 
         (self.qcd,
          self.qcd_jets,
@@ -54,20 +61,44 @@ class ae_evaluation:
             "qcd background", include_hlf=self.hlf, include_eflow=self.eflow
         )
 
+        # set attributes for signals
+        for signal in self.signals:
+            (data,
+            jets,
+            event,
+            flavor) = utils.load_all_data(
+                getattr(self, signal + '_path'),
+                signal, include_hlf=self.hlf, include_eflow=self.eflow
+            )
+            setattr(self, signal, data)
+            setattr(self, signal + '_jets', jets)
+            setattr(self, signal + '_event', event)
+            setattr(self, signal + '_flavor', flavor)
+
+        # get and set random seed for reproductions
         self.seed = self.d['seed']
+        utils.set_random_seed(self.seed)
 
-        np.random.seed(self.seed)
-        tf.set_random_seed(self.seed)
-
+        # manually set a bunch of parameters from the summary dict
         self.target_dim = self.d['target_dim']
-        self.input_dim = len(self.signal.columns)
+        self.input_dim = len(self.SVJ.columns)
         self.test_split = self.d['test_split']
         self.val_split = self.d['val_split']
         self.filename = self.d['filename']
         self.filepath = self.d['filepath']
 
-        print self.filepath
+        # try to find training pkl file and load 'er up 
+        if not os.path.exists(self.filepath + ".pkl"):
+            print self.filepath + ".pkl"
+            self.filepath = utils.path_in_repo(self.filepath + ".pkl")
+            print self.filepath
+            if self.filepath is None:
+                raise AttributeError("filepath does not exist with spec {}".format(self.d['filepath']))
+            else:
+                if self.filepath.endswith(".h5"):
+                    self.filepath.rstrip(".h5")
 
+        # normalization args
         self.norm_args = {
             "norm_type": str(self.d["norm_type"])
         }
@@ -81,32 +112,73 @@ class ae_evaluation:
         self.val_norm = self.train.norm(self.val, out_name="qcd val norm", **self.norm_args)
 
         self.test_norm = self.test.norm(out_name="qcd test norm", **self.norm_args)
-        self.signal_norm = self.signal.norm(out_name="signal norm", **self.norm_args)
+
+        # set signal norms
+        for signal in self.signals:
+            # self.SVJ_norm = self.SVJ.norm(out_name="SVJ norm", **self.norm_args)
+            setattr(self, signal + '_norm', getattr(self, signal).norm(out_name=signal + ' norm', **self.norm_args))
 
         self.train.name = "qcd training data"
         self.test.name = "qcd test data"
         self.val.name = "qcd validation data"
         
         self.custom_objects = custom_objects
-        
+    
         self.instance = trainer.trainer(self.filepath)
 
         self.ae = self.instance.load_model(custom_objects=self.custom_objects)
         
-        [self.qcd_err, self.signal_err], [self.qcd_recon, self.signal_recon] = utils.get_recon_errors([self.test_norm, self.signal_norm], self.ae)
+        errors, recons = utils.get_recon_errors([self.test_norm] + [getattr(self, signal + '_norm') for signal in self.signals], self.ae)
+        # [self.qcd_err, self.SVJ_err], [self.qcd_recon, self.SVJ_recon] = utils.get_recon_errors([self.test_norm, self.SVJ_norm], self.ae)
+        self.qcd_err, signal_errs = errors[0], errors[1:]
+        self.qcd_recon, signal_recons = recons[0], recons[1:]
 
-        self.qcd_reps = utils.data_table(self.ae.layers[1].predict(self.test_norm.data), name='background reps')
-        self.signal_reps = utils.data_table(self.ae.layers[1].predict(self.signal_norm.data), name='signal reps')
+        for err,recon,signal in zip(signal_errs, signal_recons, self.signals):
+            setattr(self, signal + '_err', err)
+            setattr(self, signal + '_recon', recon)
+
+        self.qcd_reps = utils.data_table(self.ae.layers[1].predict(self.test_norm.data), name='QCD reps')
+
+        for signal in self.signals:
+            setattr(self, signal + '_reps', utils.data_table(self.ae.layers[1].predict(getattr(self, signal + '_norm').data), name=signal + ' reps'))
 
         self.qcd_err_jets = [utils.data_table(self.qcd_err.loc[self.qcd_err.index % 2 == i], name=self.qcd_err.name + " jet " + str(i)) for i in range(2)]
-        self.signal_err_jets = [utils.data_table(self.signal_err.loc[self.signal_err.index % 2 == i], name=self.signal_err.name + " jet " + str(i)) for i in range(2)]
+
+        for signal in self.signals:
+            serr = getattr(self, signal + '_err')
+            setattr(self, signal + '_err_jets', [utils.data_table(serr.loc[serr.index % 2 == i], name=serr.name + " jet " + str(i)) for i in range(2)])
 
         self.test_flavor = self.qcd_flavor.iloc[self.test.index]
+
+        # all 'big lists' for signals
+        names = list(self.signals.keys())
+        self.norms_dict = odict([(name, getattr(self, name + '_norm')) for name in names])
+        self.errs_dict = odict([(name, getattr(self, name + '_err')) for name in names])
+        self.reps_dict = odict([(name, getattr(self, name + '_reps')) for name in names])
+        self.recons_dict = odict([(name, getattr(self, name + '_recon')) for name in names])
+        self.errs_jet_dict = odict([(name, getattr(self, name + '_err_jets')) for name in names])
+        self.flavors_dict = odict([(name, getattr(self, name + '_flavor')) for name in names])
+
+        # add qcd manually
+        self.norms_dict['qcd'] = self.test_norm
+        self.errs_dict['qcd'] = self.qcd_err
+        self.reps_dict['qcd'] = self.qcd_reps
+        self.recons_dict['qcd'] = self.qcd_recon
+        self.errs_jet_dict['qcd'] = self.qcd_err_jets
+        self.flavors_dict['qcd'] = self.test_flavor
+
+        self.all_names = list(self.norms_dict.keys())
+        self.norms = list(self.norms_dict.values())
+        self.errs = list(self.errs_dict.values())
+        self.reps = list(self.reps_dict.values())
+        self.recons = list(self.recons_dict.values())
+        self.errs_jet = list(self.errs_jet_dict.values())
+        self.flavors = list(self.flavors_dict.values())
 
     def split_my_jets(
         self,
         test_vec,
-        signal_vec, 
+        SVJ_vec, 
         split_by_leading_jet,
         split_by_flavor,
         include_names=False,
@@ -114,7 +186,7 @@ class ae_evaluation:
         if split_by_flavor and split_by_leading_jet:
             raise AttributeError("Cannot split by both Flavor and leading/subleading jets (too messy of a plot)")
 
-        signal_out = signal_vec
+        SVJ_out = SVJ_vec
         qcd_out = [test_vec]
         flag = 0
 
@@ -125,17 +197,17 @@ class ae_evaluation:
                     qcd_out[i].name = qcd_out[i].name + ", " + test_vec.name 
 
         if split_by_leading_jet:
-            j1s, j2s = map(utils.data_table, [signal_vec.iloc[0::2], signal_vec.iloc[1::2]])
-            j1s.name = 'leading signal jet'
-            j2s.name = 'subleading signal jet'
+            j1s, j2s = map(utils.data_table, [SVJ_vec.iloc[0::2], SVJ_vec.iloc[1::2]])
+            j1s.name = 'leading SVJ jet'
+            j2s.name = 'subleading SVJ jet'
             if include_names:
-                j1s.name += ", " + signal_vec.name
-                j2s.name += ", " + signal_vec.name
-            signal_out = [j1s, j2s]
+                j1s.name += ", " + SVJ_vec.name
+                j2s.name += ", " + SVJ_vec.name
+            SVJ_out = [j1s, j2s]
             qcd_out = test_vec
             flag = 1
 
-        return signal_out, qcd_out, flag
+        return SVJ_out, qcd_out, flag
 
     def retdict(
         self,
@@ -151,7 +223,7 @@ class ae_evaluation:
     def recon(
         self,
         show_plot=True,
-        signal=True,
+        SVJ=True,
         qcd=True,
         pre=True,
         post=True,        
@@ -165,27 +237,27 @@ class ae_evaluation:
         *args,
         **kwargs
     ):
-        assert signal or qcd, "must select one of either 'signal' or 'qcd' distributions to show"
+        assert SVJ or qcd, "must select one of either 'SVJ' or 'qcd' distributions to show"
         assert pre or post, "must select one of either 'pre' or 'post' distributions to show"
         
-        this_arr, signal_arr = [], []
+        this_arr, SVJ_arr = [], []
 
-        signal_pre, qcd_pre, flag_pre = self.split_my_jets(self.test_norm, self.signal_norm, split_by_leading_jet, split_by_flavor, include_names=True)
-        signal_post, qcd_post, flag_post = self.split_my_jets(self.qcd_recon, self.signal_recon, split_by_leading_jet, split_by_flavor, include_names=True)
+        SVJ_pre, qcd_pre, flag_pre = self.split_my_jets(self.test_norm, self.SVJ_norm, split_by_leading_jet, split_by_flavor, include_names=True)
+        SVJ_post, qcd_post, flag_post = self.split_my_jets(self.qcd_recon, self.SVJ_recon, split_by_leading_jet, split_by_flavor, include_names=True)
 
         to_plot = []
 
-        if signal:
+        if SVJ:
             if pre:
                 if flag_pre:
-                    to_plot += signal_pre
+                    to_plot += SVJ_pre
                 else:
-                    to_plot.append(signal_pre)
+                    to_plot.append(SVJ_pre)
             if post:
                 if flag_post:
-                    to_plot += signal_post
+                    to_plot += SVJ_post
                 else:
-                    to_plot.append(signal_post)
+                    to_plot.append(SVJ_post)
 
         if qcd:
             if pre:
@@ -227,7 +299,7 @@ class ae_evaluation:
         **kwargs
     ):
          
-        sig, qcd, flag = self.split_my_jets(self.qcd_reps, self.signal_reps, split_by_leading_jet, split_by_flavor)
+        sig, qcd, flag = self.split_my_jets(self.qcd_reps, self.SVJ_reps, split_by_leading_jet, split_by_flavor)
         
         if flag:
             this, others = qcd, sig
@@ -247,13 +319,15 @@ class ae_evaluation:
     def metrics(
         self,
         show_plot=True,
+        figname='metrics',
+        figsize=(8,7),
+        figloc='upper right',
         *args,
         **kwargs
     ):
         if show_plot:
-            self.instance.plot_metrics(*args, **kwargs)
-            return
-        return self.instance.metrics
+            self.instance.plot_metrics(figname=figname, figsize=figsize, figloc=figloc, *args, **kwargs)
+        return self.instance.config['metrics']
     
     def error(
         self,
@@ -264,7 +338,7 @@ class ae_evaluation:
         split_by_leading_jet=False, split_by_flavor=False,
         figloc="upper right", *args, **kwargs
     ):
-        sig, qcd, flag = self.split_my_jets(self.qcd_err, self.signal_err, split_by_leading_jet, split_by_flavor)
+        sig, qcd, flag = self.split_my_jets(self.qcd_err, self.SVJ_err, split_by_leading_jet, split_by_flavor)
 
         if flag:
             this, others = qcd, sig
@@ -287,28 +361,30 @@ class ae_evaluation:
         metrics=['mae', 'mse'],
         figsize=8,
         figloc=(0.3, 0.2),
-        split_by_leading_jet=False,
         *args,
         **kwargs
     ):
+        # split_by_leading_jet = False
+        
+        qcd = self.errs_dict['qcd']
+        others = [self.errs_dict[n] for n in self.all_names if n != 'qcd']
 
-        qcd, signal = self.qcd_err, self.signal_err
-        if split_by_leading_jet:
-            signal, qcd, _ = self.split_my_jets(self.qcd_err, self.signal_err, True, False)
-            signal += [self.signal_err]
-            signal[-1].name = "combined signal error"
+        # if split_by_leading_jet:
+        #     SVJ, qcd, _ = self.split_my_jets(self.qcd_err, self.SVJ_err, True, False)
+        #     SVJ += [self.SVJ_err]
+        #     SVJ[-1].name = "combined SVJ error"
         
         if show_plot:
             utils.roc_auc_plot(
-                qcd, signal,
+                qcd, others,
                 metrics=metrics, figsize=figsize,
-                figloc=figloc
+                figloc=figloc, *args, **kwargs
             )
             
             return
 
         return utils.roc_auc_dict(
-            qcd, signal,
+            qcd, others,
             metrics=metrics
         )
 
@@ -317,16 +393,30 @@ class ae_evaluation:
         threshold,
         metric="mae"
     ):
-        sig = utils.event_error_tags(self.signal_err_jets, threshold, "signal", metric)
+        sig = utils.event_error_tags(self.SVJ_err_jets, threshold, "SVJ", metric)
         qcd = utils.event_error_tags(self.qcd_err_jets, threshold, "qcd", metric)
 
-        return {"signal": sig, "qcd": qcd}
+        return {"SVJ": sig, "qcd": qcd}
 
-    def fill_at_threshold(
+    def check_cuts(
         self,
-        threshold,
+        cuts,
+    ):
+        for k in cuts:
+            s = 0
+            print k +":"
+            for subk in cuts[k]:
+                print " -", str(subk) + ":", cuts[k][subk].shape
+                s += len(cuts[k][subk])
+            print " - size:", s
+
+        print " - og SVJ size:", len(self.SVJ)/2 
+        print " - og test size:", len(self.test)/2
+
+    def fill_cuts(
+        self,
+        cuts,
         output_dir=None,
-        metric='mae',
         rng=(0., 3000.),
         bins=50,
         var="MT"
@@ -334,30 +424,33 @@ class ae_evaluation:
         import ROOT as rt
         import root_numpy as rtnp
 
-        cuts = self.cut_at_threshold(threshold, metric)
-
         if output_dir is None:
             output_dir = os.path.abspath(".")
 
-        out_prefix = os.path.join(output_dir, self.filename)
-
         all_data = {}
+
         for name,cut in cuts.items():
-            out_name = out_prefix + "_" + name + ".root"
+            if  'qcd' in name.lower():
+                oname = "QCD.root"
+            elif 'SVJ' in name.lower():
+                oname = "SVJ_2000_0p3.root"
+            
+            out_name = os.path.join(output_dir, oname)
+            
             if os.path.exists(out_name):
                 raise AttributeError("File at path " + out_name + " already exists!! Choose another.")
             print "saving root file at " + out_name
             f = rt.TFile(out_name, "RECREATE")
-
+            histos = []
             all_data[out_name] = []
             for jet_n, idx  in cut.items():
-                
-                hname = name + "_{}_jet".format(jet_n)
+                hname = "{}_SVJ{}".format(var, jet_n)
                 hist = rt.TH1F(hname, hname, bins, *rng)
                 
                 data = getattr(self, name + "_event").loc[idx][var]
-                all_data[out_name].append(rtnp.fill_hist(hist, data, return_indices=True))
-                
+                rtnp.fill_hist(hist, data)
+                all_data[out_name].append(np.histogram(data, bins=bins, range=rng))
+                histos.append(hist)
 
             f.Write()
             
@@ -377,11 +470,11 @@ def ae_train(
     hlf=True,
     eflow=True,
     version=None,
-    seed=40,
+    seed=None,
     test_split=0.15, 
     val_split=0.15,
     norm_args={
-        "norm_type": "StandardScaler"
+        "norm_type": "MinMaxScaler"
     },
     train_me=True,
     batch_size=64,
@@ -392,6 +485,7 @@ def ae_train(
     custom_objects={},
     interm_architecture=(30,30),
     output_data_path=None,
+    verbose=1, 
 ):
 
     """Training function for basic autoencoder (inputs == outputs). 
@@ -400,9 +494,12 @@ def ae_train(
 
     Not super flexible, but gives a good idea of how good your standard AE is.
     """
+
+    if seed is None:
+        seed = np.random.randint(0, 99999999)
+
     # set random seed
-    np.random.seed(seed)
-    tf.set_random_seed(seed)
+    utils.set_random_seed(seed)
 
     if output_data_path is None:
         output_data_path = os.path.join(utils.get_repo_info()['head'], "autoencode/data/training_runs")
@@ -436,7 +533,7 @@ def ae_train(
     filename = "{}{}{}_".format('hlf_' if hlf else '', 'eflow{}_'.format(eflow_base) if eflow else '', target_dim)
     
     if version is None:
-        existing_ids = map(lambda x: int(os.path.basename(x).rstrip('.summary').split('_')[-1].lstrip('v')), utils.summary_match(filename + "v*"))
+        existing_ids = map(lambda x: int(os.path.basename(x).rstrip('.summary').split('_')[-1].lstrip('v')), utils.summary_match(filename + "v*", 0))
         assert len(existing_ids) == len(set(existing_ids)), "no duplicate ids"
         id_set = set(existing_ids)
         this_num = 0
@@ -447,7 +544,7 @@ def ae_train(
 
     filename += "v{}".format(version)
 
-    assert len(utils.summary_match(filename)) == 0, "filename '{}' exists already! Change version id, or leave blank.".format(filename)
+    assert len(utils.summary_match(filename, 0)) == 0, "filename '{}' exists already! Change version id, or leave blank.".format(filename)
 
     filepath = os.path.join(output_data_path, filename)
     input_dim = len(signal.columns)
@@ -481,7 +578,7 @@ def ae_train(
     test.name = "qcd test data"
     val.name = "qcd validation data"
 
-    instance = trainer.trainer(filepath)
+    instance = trainer.trainer(filepath, verbose=verbose)
 
     aes = models.base_autoencoder()
     aes.add(input_dim)
@@ -492,8 +589,13 @@ def ae_train(
         aes.add(elt, activation='relu')
     aes.add(input_dim, activation='linear')
 
+
     ae = aes.build()
-    ae.summary()
+    if verbose:
+        ae.summary()
+
+    start_time = str(datetime.datetime.now())
+
     train_args = {
         'batch_size': batch_size, 
         'loss': loss, 
@@ -502,9 +604,10 @@ def ae_train(
         'learning_rate': learning_rate,
     }
 
-    print "TRAINING WITH PARAMS >>>"
-    for arg in train_args:
-        print arg, ":", train_args[arg]
+    if verbose:
+        print "TRAINING WITH PARAMS >>>"
+        for arg in train_args:
+            print arg, ":", train_args[arg]
 
     if train_me:
         ae = instance.train(
@@ -516,17 +619,22 @@ def ae_train(
             force=True,
             use_callbacks=True,
             custom_objects=custom_objects, 
+            verbose=int(verbose),
             **train_args
         )
     else:
         ae = instance.load_model(custom_objects=custom_objects)
 
+    end_time = str(datetime.datetime.now())
+
     [data_err, signal_err], [data_recon, signal_recon] = utils.get_recon_errors([test_norm, signal_norm], ae)
     roc_dict = utils.roc_auc_dict(data_err, signal_err, metrics=['mae', 'mse']).values()[0]
     result_args = dict([(r + '_auc', roc_dict[r]['auc']) for r in roc_dict])
 
-    utils.dump_summary_json(result_args, train_args, data_args, norm_args)
+    time_args = {'start_time': start_time, 'end_time': end_time}
+    utils.dump_summary_json(result_args, train_args, data_args, norm_args, time_args)
 
-    return locals()
+    # roc as figure of merit
+    return max(result_args.values())
 
 
