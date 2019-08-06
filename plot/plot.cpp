@@ -48,8 +48,6 @@ TCanvas *ptCompare(string filename, float xmax=-1., float ymax=-1.) {
     TH1F *post1 = (TH1F*)f->Get("h_post_1pt");
     TH1F *post2 = (TH1F*)f->Get("h_post_2pt");
 
-
-
     pre1->SetLineColor(kRed);
     pre1->SetLineStyle(1);
     pre2->SetLineColor(kOrange); 
