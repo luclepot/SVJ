@@ -1,4 +1,7 @@
+#!/bin/bash
+
 SOURCE_DIR="/cvmfs/sft.cern.ch/lcg/views/LCG_93/x86_64-centos7-gcc7-opt/setup.sh"
+HEAD_DIR=$(git rev-parse --show-toplevel)
 
 echo "assuming platform lxplus"
 
@@ -16,6 +19,6 @@ if [ -f $DELPHES_DIR/delphes-env.sh ]; then
     source $DELPHES_DIR/delphes-env.sh
 fi
 echo "Building autoencodeSVJ module"
-source build.sh
+source "$HEAD_DIR/autoencode/build.sh"
 
 
