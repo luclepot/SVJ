@@ -1271,7 +1271,7 @@ def jet_flavor_split(to_split, ref=None):
         ref = to_split
     return split_table_by_column("Flavor", ref, tag_names=delphes_jet_tags_dict, df_to_write=to_split, keep_split_column=False)[0]
 
-def load_all_data(globstring, name, include_hlf=True, include_eflow=True):
+def load_all_data(globstring, name, include_hlf=True, include_eflow=True, hlf_to_drop=['Energy', 'Flavor']):
     
     """returns...
         - data: full data matrix wrt variables
@@ -1302,9 +1302,9 @@ def load_all_data(globstring, name, include_hlf=True, include_eflow=True):
         
     train_modify=None
     if include_hlf and include_eflow:
-        train_modify = all_modify
+        train_modify = lambda *args, **kwargs: all_modify(hlf_to_drop=hlf_to_drop, *args, **kwargs)
     elif include_hlf:
-        train_modify = hlf_modify
+        train_modify = lambda *args, **kwargs: hlf_modify(hlf_to_drop=hlf_to_drop, *args, **kwargs)
     else:
         train_modify = eflow_modify
         
