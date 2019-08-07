@@ -24,23 +24,28 @@ TCanvas *PlotTwo(TTree* tree1, TTree* tree2, string name, int bins, string f1lab
 
     tree1->Draw((name + ">>h1").c_str(), "Jet.PT>0", "goff");
     tree2->Draw((name + ">>h2").c_str(), "Jet.PT>0", "goff");
+    
+    h1->Scale(1./h1->Integral());
+    h2->Scale(1./h2->Integral());
+
+    // h1->SetMarkerSize(0)/
 
     TCanvas *cst = new TCanvas("cst");
     auto legend = new TLegend(0.6, 0.7, .95, .92);
 
     THStack *hs = new THStack("hs", name.c_str()); 
 
-    h1->SetMarkerStyle(21);
+    // h1->SetMarkerStyle(21);
     h1->SetLineColor(kBlue);
     h1->SetLineStyle(1); 
 
-    h2->SetMarkerStyle(21);
+    // h2->SetMarkerStyle(21);
     h2->SetLineColor(kRed);
     h2->SetLineStyle(1); 
 
 
-    hs->Add(h1);
-    hs->Add(h2);
+    hs->Add(h1, "HIST");
+    hs->Add(h2, "HIST");
 
     cst->cd();
     hs->Draw("nostack"); 
