@@ -1224,22 +1224,22 @@ def glob_in_repo(globstring):
     
     return files
 
-def all_modify(tables):
+def all_modify(tables, hlf_to_drop=['Energy', 'Flavor']):
     if not isinstance(tables, list) or isinstance(tables, tuple):
         tables = [tables] 
     for i,table in enumerate(tables):
-        tables[i].cdrop(["Energy", '0', 'Flavor'], inplace=True)
+        tables[i].cdrop(['0'] + hlf_to_drop, inplace=True)
         tables[i].df.rename(columns=dict([(c, "eflow {}".format(c)) for c in tables[i].df.columns if c.isdigit()]), inplace=True)
         tables[i].headers = list(tables[i].df.columns)
     if len(tables) == 1:
         return tables[0]
     return tables
 
-def hlf_modify(tables):
+def hlf_modify(tables, hlf_to_drop=['Energy', 'Flavor']):
     if not isinstance(tables, list) or isinstance(tables, tuple):
         tables = [tables] 
     for i,table in enumerate(tables):
-        tables[i].cdrop(["Energy", 'Flavor'], inplace=True)
+        tables[i].cdrop(hlf_to_drop, inplace=True)
     if len(tables) == 1:
         return tables[0]
     return tables

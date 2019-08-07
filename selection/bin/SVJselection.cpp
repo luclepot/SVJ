@@ -32,8 +32,8 @@ namespace Vetos {
 
 size_t leptonCount(vector<TLorentzMock>* leptons, vector<double>* isos) {
     size_t n = 0;
-    size_t lepton_size = std::min(leptons->size(), isos->size());
-    for (size_t i = 0; i < lepton_size; ++i)
+    // size_t lepton_size = std::min(leptons->size(), isos->size());
+    for (size_t i = 0; i < leptons->size(); ++i)
         if (Vetos::LeptonVeto(leptons->at(i)) && Vetos::IsolationVeto(isos->at(i))) 
             n++;
     return n;
@@ -70,10 +70,11 @@ int main(int argc, char **argv) {
     core.AddHist(Hists::pre_mjj, "h_pre_Mjj", "pre-cut m_{JJ}", 750, 0, 7500); 
     
     // add componenets for jets (tlorentz)
+
     vector<TLorentzVector>* Jets = core.AddLorentz("Jet", {"Jet.PT","Jet.Eta","Jet.Phi","Jet.Mass"});
     vector<TLorentzMock>* Electrons = core.AddLorentzMock("Electron", {"Electron.PT","Electron.Eta"});
-    vector<TLorentzMock>* Muons = core.AddLorentzMock("Muon", {core.MuonPrefix + ".PT", core.MuonPrefix + ".Eta"});
-    vector<double>* MuonIsolation = core.AddVectorVar("MuonIsolation", core.MuonPrefix + ".IsolationVarRhoCorr");
+    vector<TLorentzMock>* Muons = core.AddLorentzMock("Muon", {"MuonLoose.PT", "MuonLoose.Eta"});
+    vector<double>* MuonIsolation = core.AddVectorVar("MuonIsolation", "MuonLoose.IsolationVarRhoCorr");
     vector<double>* ElectronIsolation = core.AddVectorVar("ElectronIsolation", "Electron.IsolationVarRhoCorr"); 
     double* metFull_Pt = core.AddVar("metMET", "MissingET.MET");
     double* metFull_Phi = core.AddVar("metPhi", "MissingET.Phi");
