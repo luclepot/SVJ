@@ -1355,6 +1355,11 @@ def dump_summary_json(*dicts):
     # print "successfully dumped size-{} summary dict to file '{}'".format(len(summary), fpath)
     return summary
 
+def summary_vid():
+    with open(os.path.join(summary_dir(), "VID")) as f:
+        vid = int(f.read().strip('\n').strip())
+    return vid
+
 def summary_dir():
     return os.path.join(get_repo_info()['head'], 'autoencode/data/summary')
 
@@ -1381,7 +1386,13 @@ def load_summary(path):
          ret = json.load(f)
     return ret
         
-def summary(custom_dir=None):
+def summary(
+    include_outdated=False,
+    custom_dir=None,
+    defaults={
+    'hlf_to_drop': ['Flavor', 'Energy']
+    }
+):
 
     if custom_dir is None:
         custom_dir = summary_dir()
@@ -1393,9 +1404,17 @@ def summary(custom_dir=None):
         with open(f) as to_read:
             d = json.load(to_read)
             d['time'] = datetime.datetime.fromtimestamp(os.path.getmtime(f))
+            for k,v in defaults.items():
+                if k not in d:
+                    d[k] = v
             data.append(d)
 
-    return data_table(pd.DataFrame(data), name='summary')
+    s = data_table(pd.DataFrame(data), name='summary')
+    # if 'hlf_to_drop' in s:
+    #     s.hlf_to_drop.fillna(('Energy', 'Flavor'), inplace=True)
+    if include_outdated:
+        return s
+    return data_table(s[s.VID == s.VID.max()], name='summary')
 
 def summary_match(globstr, verbose=1):
     if not (os.path.dirname(globstr) == summary_dir()):
@@ -1409,7 +1428,7 @@ def summary_match(globstr, verbose=1):
     return ret
 
 def summary_by_features(**kwargs):
-    data = summary()
+    data = summary(include_outdated=True)
     
     for k in kwargs:
         if k in data:
