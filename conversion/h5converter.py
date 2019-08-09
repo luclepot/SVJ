@@ -110,7 +110,7 @@ class Converter:
         else:
             self.save_eflow = True
             self.log("creating energyflow particle set with degree d <= {0}...".format(self.efbn))
-            self.efpset = ef.EFPSet("d<={0}".format(self.efbn), measure='hadr', beta=1.0, normed=True, verbose=True)
+            self.efpset = ef.EFPSet("d<={0}".format(self.efbn), measure='hadr', beta=0.5, normed=True, verbose=True)
             self.efp_size = self.efpset.count()
             self.log("eflow set is size {}".format(self.efp_size))
         # self.selections_abs = np.asarray([sum(self.sizes[:s[0]]) + s[1] for s in self.selections])
