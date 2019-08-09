@@ -50,6 +50,8 @@ class ae_evaluation:
         self.hlf = self.d['hlf']
         self.eflow = self.d['eflow']
         self.eflow_base = self.d['eflow_base']
+        self.hlf_to_drop = map(str, self.d['hlf_to_drop'])
+
         #     SVJ_path = "data/SVJ/base_{}/*.h5".format(eflow_base)
         #     qcd_path = "data/background/base_{}/*.h5".format(eflow_base)
 
@@ -58,7 +60,8 @@ class ae_evaluation:
          self.qcd_event,
          self.qcd_flavor) = utils.load_all_data(
             self.qcd_path, 
-            "qcd background", include_hlf=self.hlf, include_eflow=self.eflow
+            "qcd background", include_hlf=self.hlf, include_eflow=self.eflow,
+            hlf_to_drop=self.hlf_to_drop
         )
 
         # set attributes for signals
@@ -68,7 +71,8 @@ class ae_evaluation:
             event,
             flavor) = utils.load_all_data(
                 getattr(self, signal + '_path'),
-                signal, include_hlf=self.hlf, include_eflow=self.eflow
+                signal, include_hlf=self.hlf, include_eflow=self.eflow,
+                hlf_to_drop=self.hlf_to_drop
             )
             setattr(self, signal, data)
             setattr(self, signal + '_jets', jets)
@@ -116,7 +120,7 @@ class ae_evaluation:
         # set signal norms
         for signal in self.signals:
             # self.SVJ_norm = self.SVJ.norm(out_name="SVJ norm", **self.norm_args)
-            setattr(self, signal + '_norm', getattr(self, signal).norm(out_name=signal + ' norm', **self.norm_args))
+            setattr(self, signal + '_norm', self.test.norm(getattr(self, signal), out_name=signal + ' norm', **self.norm_args))
 
         self.train.name = "qcd training data"
         self.test.name = "qcd test data"
@@ -131,11 +135,11 @@ class ae_evaluation:
         errors, recons = utils.get_recon_errors([self.test_norm] + [getattr(self, signal + '_norm') for signal in self.signals], self.ae)
         # [self.qcd_err, self.SVJ_err], [self.qcd_recon, self.SVJ_recon] = utils.get_recon_errors([self.test_norm, self.SVJ_norm], self.ae)
         self.qcd_err, signal_errs = errors[0], errors[1:]
-        self.qcd_recon, signal_recons = recons[0], recons[1:]
+        self.qcd_recon, signal_recons = self.test.inorm(recons[0], **self.norm_args), recons[1:]
 
         for err,recon,signal in zip(signal_errs, signal_recons, self.signals):
             setattr(self, signal + '_err', err)
-            setattr(self, signal + '_recon', recon)
+            setattr(self, signal + '_recon', self.test.inorm(recon, **self.norm_args))
 
         self.qcd_reps = utils.data_table(self.ae.layers[1].predict(self.test_norm.data), name='QCD reps')
 
@@ -152,14 +156,17 @@ class ae_evaluation:
 
         # all 'big lists' for signals
         names = list(self.signals.keys())
+        self.dists_dict = odict([(name, getattr(self, name)) for name in names])
         self.norms_dict = odict([(name, getattr(self, name + '_norm')) for name in names])
         self.errs_dict = odict([(name, getattr(self, name + '_err')) for name in names])
         self.reps_dict = odict([(name, getattr(self, name + '_reps')) for name in names])
         self.recons_dict = odict([(name, getattr(self, name + '_recon')) for name in names])
         self.errs_jet_dict = odict([(name, getattr(self, name + '_err_jets')) for name in names])
         self.flavors_dict = odict([(name, getattr(self, name + '_flavor')) for name in names])
+        
 
         # add qcd manually
+        self.dists_dict['qcd'] = self.qcd
         self.norms_dict['qcd'] = self.test_norm
         self.errs_dict['qcd'] = self.qcd_err
         self.reps_dict['qcd'] = self.qcd_reps
@@ -168,6 +175,7 @@ class ae_evaluation:
         self.flavors_dict['qcd'] = self.test_flavor
 
         self.all_names = list(self.norms_dict.keys())
+        self.dists = list(self.dists_dict.values())
         self.norms = list(self.norms_dict.values())
         self.errs = list(self.errs_dict.values())
         self.reps = list(self.reps_dict.values())
@@ -486,6 +494,7 @@ def ae_train(
     interm_architecture=(30,30),
     output_data_path=None,
     verbose=1, 
+    hlf_to_drop=['Energy', 'Flavor'],
 ):
 
     """Training function for basic autoencoder (inputs == outputs). 
@@ -510,7 +519,8 @@ def ae_train(
      signal_event,
      signal_flavor) = utils.load_all_data(
         signal_path,
-        "signal", include_hlf=hlf, include_eflow=eflow
+        "signal", include_hlf=hlf, include_eflow=eflow,
+        hlf_to_drop=hlf_to_drop,
     )
 
     (qcd,
@@ -518,7 +528,8 @@ def ae_train(
      qcd_event,
      qcd_flavor) = utils.load_all_data(
         qcd_path, 
-        "qcd background", include_hlf=hlf, include_eflow=eflow
+        "qcd background", include_hlf=hlf, include_eflow=eflow,
+        hlf_to_drop=hlf_to_drop,
     )
 
     if eflow:
@@ -562,7 +573,8 @@ def ae_train(
         'filepath': filepath,
         'qcd_path': qcd_path,
         'signal_path': signal_path,
-        'arch': (input_dim,) + interm_architecture + (target_dim,) + tuple(reversed(interm_architecture)) + (input_dim,)
+        'arch': (input_dim,) + interm_architecture + (target_dim,) + tuple(reversed(interm_architecture)) + (input_dim,),
+        'hlf_to_drop': tuple(hlf_to_drop)
     }
 
     all_train, test = qcd.split_by_event(test_fraction=test_split, random_state=seed, n_skip=len(qcd_jets))
@@ -572,7 +584,7 @@ def ae_train(
     val_norm = train.norm(val, out_name="qcd val norm", **norm_args)
     
     test_norm = test.norm(out_name="qcd test norm", **norm_args)
-    signal_norm = signal.norm(out_name="signal norm", **norm_args)
+    signal_norm = test.norm(signal, out_name="signal norm", **norm_args)
 
     train.name = "qcd training data"
     test.name = "qcd test data"
@@ -631,7 +643,9 @@ def ae_train(
     roc_dict = utils.roc_auc_dict(data_err, signal_err, metrics=['mae', 'mse']).values()[0]
     result_args = dict([(r + '_auc', roc_dict[r]['auc']) for r in roc_dict])
 
-    time_args = {'start_time': start_time, 'end_time': end_time}
+    vid = utils.summary_vid()
+    
+    time_args = {'start_time': start_time, 'end_time': end_time, 'VID': vid}
     utils.dump_summary_json(result_args, train_args, data_args, norm_args, time_args)
 
     # roc as figure of merit
