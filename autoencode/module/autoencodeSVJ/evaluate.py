@@ -7,6 +7,13 @@ import models
 import datetime
 from collections import OrderedDict as odict 
 
+eflow_base_lookup = {
+    12: 3,
+    13: 3,
+    35: 4, 
+    36: 4, 
+}
+
 class ae_evaluation:
     
     def __init__(
@@ -464,13 +471,6 @@ class ae_evaluation:
             
         return all_data
 
-eflow_base_lookup = {
-    12: 3,
-    13: 3,
-    35: 4, 
-    36: 4, 
-}
-
 def ae_train(
     signal_path,
     qcd_path,
@@ -554,6 +554,7 @@ def ae_train(
         version = this_num
 
     filename += "v{}".format(version)
+    print("training under filename '{}'".format(filename))
 
     assert len(utils.summary_match(filename, 0)) == 0, "filename '{}' exists already! Change version id, or leave blank.".format(filename)
 
@@ -824,9 +825,6 @@ def ae_train(
 
     #     # roc as figure of merit
     #     return max(result_args.values())
-
-
-    from autoencodeSVJ.evaluate import eflow_base_lookup
 
     # def ae_cl_train(
     #     signal_path,
