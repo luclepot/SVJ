@@ -407,10 +407,11 @@ class Converter:
 
         if self.save_constituents:
             jet_constituents = f.create_group("jet_constituents")
-            assert self.jet_constituents.shape[-1] == self.n_constituent_particles
+            assert self.jet_constituents.shape[-2] == self.n_constituent_particles
+            assert self.jet_constituents.shape[-1] == len(self.jet_constituent_names)
             self.log("creating feature 'jet_constituents'")
             jet_constituents.create_dataset('data', data=self.jet_constituents)
-            jet_constituents.create_dataset('labels', data=[str(i) for i in range(self.n_constituent_particles)])
+            jet_constituents.create_dataset('labels', data=self.jet_constituent_names)
 
         if self.save_eflow:
             eflow = f.create_group("jet_eflow_variables")           
@@ -435,11 +436,7 @@ if __name__ == "__main__":
     # elif len(sys.argv) == 0:
     else:
         print "TEST MODE"
-        try: 
-            print tree
-            print track_index.shape
-        except:
-            print "dang"
-            core = Converter(".", '/afs/cern.ch/work/l/llepotti/private/CMS/CMSSW_8_0_20/src/autoencodeSVJ/TEST/data_0_selection.txt', "data", save_constituents=False, energyflow_basis_degree=3)
-            ret = core.convert((0,10000), return_debug_tree=False)
-            core.save("TEST.h5")
+
+        core = Converter(".", '/afs/cern.ch/work/l/llepotti/private/CMS/CMSSW_8_0_20/src/autoencodeSVJ/data/background/process/data_0_selection.txt', "data", save_constituents=True, energyflow_basis_degree=-1, n_constituent_particles=100)
+        ret = core.convert((0,100), return_debug_tree=False)
+        core.save("TEST2.h5")
