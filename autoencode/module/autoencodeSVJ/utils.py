@@ -1224,22 +1224,22 @@ def glob_in_repo(globstring):
     
     return files
 
-def all_modify(tables):
+def all_modify(tables, hlf_to_drop=['Energy', 'Flavor']):
     if not isinstance(tables, list) or isinstance(tables, tuple):
         tables = [tables] 
     for i,table in enumerate(tables):
-        tables[i].cdrop(["Energy", '0', 'Flavor'], inplace=True)
+        tables[i].cdrop(['0'] + hlf_to_drop, inplace=True)
         tables[i].df.rename(columns=dict([(c, "eflow {}".format(c)) for c in tables[i].df.columns if c.isdigit()]), inplace=True)
         tables[i].headers = list(tables[i].df.columns)
     if len(tables) == 1:
         return tables[0]
     return tables
 
-def hlf_modify(tables):
+def hlf_modify(tables, hlf_to_drop=['Energy', 'Flavor']):
     if not isinstance(tables, list) or isinstance(tables, tuple):
         tables = [tables] 
     for i,table in enumerate(tables):
-        tables[i].cdrop(["Energy", 'Flavor'], inplace=True)
+        tables[i].cdrop(hlf_to_drop, inplace=True)
     if len(tables) == 1:
         return tables[0]
     return tables
@@ -1271,7 +1271,7 @@ def jet_flavor_split(to_split, ref=None):
         ref = to_split
     return split_table_by_column("Flavor", ref, tag_names=delphes_jet_tags_dict, df_to_write=to_split, keep_split_column=False)[0]
 
-def load_all_data(globstring, name, include_hlf=True, include_eflow=True):
+def load_all_data(globstring, name, include_hlf=True, include_eflow=True, hlf_to_drop=['Energy', 'Flavor']):
     
     """returns...
         - data: full data matrix wrt variables
@@ -1302,9 +1302,9 @@ def load_all_data(globstring, name, include_hlf=True, include_eflow=True):
         
     train_modify=None
     if include_hlf and include_eflow:
-        train_modify = all_modify
+        train_modify = lambda *args, **kwargs: all_modify(hlf_to_drop=hlf_to_drop, *args, **kwargs)
     elif include_hlf:
-        train_modify = hlf_modify
+        train_modify = lambda *args, **kwargs: hlf_modify(hlf_to_drop=hlf_to_drop, *args, **kwargs)
     else:
         train_modify = eflow_modify
         
@@ -1355,6 +1355,11 @@ def dump_summary_json(*dicts):
     # print "successfully dumped size-{} summary dict to file '{}'".format(len(summary), fpath)
     return summary
 
+def summary_vid():
+    with open(os.path.join(summary_dir(), "VID")) as f:
+        vid = int(f.read().strip('\n').strip())
+    return vid
+
 def summary_dir():
     return os.path.join(get_repo_info()['head'], 'autoencode/data/summary')
 
@@ -1381,7 +1386,13 @@ def load_summary(path):
          ret = json.load(f)
     return ret
         
-def summary(custom_dir=None):
+def summary(
+    include_outdated=False,
+    custom_dir=None,
+    defaults={
+    'hlf_to_drop': ['Flavor', 'Energy']
+    }
+):
 
     if custom_dir is None:
         custom_dir = summary_dir()
@@ -1393,9 +1404,17 @@ def summary(custom_dir=None):
         with open(f) as to_read:
             d = json.load(to_read)
             d['time'] = datetime.datetime.fromtimestamp(os.path.getmtime(f))
+            for k,v in defaults.items():
+                if k not in d:
+                    d[k] = v
             data.append(d)
 
-    return data_table(pd.DataFrame(data), name='summary')
+    s = data_table(pd.DataFrame(data), name='summary')
+    # if 'hlf_to_drop' in s:
+    #     s.hlf_to_drop.fillna(('Energy', 'Flavor'), inplace=True)
+    if include_outdated:
+        return s
+    return data_table(s[s.VID == s.VID.max()], name='summary')
 
 def summary_match(globstr, verbose=1):
     if not (os.path.dirname(globstr) == summary_dir()):
@@ -1409,7 +1428,7 @@ def summary_match(globstr, verbose=1):
     return ret
 
 def summary_by_features(**kwargs):
-    data = summary()
+    data = summary(include_outdated=True)
     
     for k in kwargs:
         if k in data:

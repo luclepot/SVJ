@@ -204,26 +204,6 @@ public:
             if (nMax < 0 || nMax > nEvents)
                 nMax = nEvents;
 
-
-            vector<string> possibleMuons = {
-                "MuonLoose",
-                "Muon",
-                "MuonTight"
-            };
-
-            for (size_t i = 0; i < possibleMuons.size(); ++i) {
-                if (chain->Contains(possibleMuons[i])) {
-                    MuonPrefix = possibleMuons[i]; 
-                    break;
-                }
-            }
-
-            if (MuonPrefix == "") {
-                throw std::invalid_argument("Invalid Muon Specification");
-            }
-
-            log("Using muon prefix '" + MuonPrefix + "'"); 
-
             log("Success");
             end();
             logt();
@@ -603,8 +583,6 @@ public:
         // general init vars, parsed from argv
         string sample, inputspec, outputdir;
 
-        string MuonPrefix = ""; 
-
         // number of events
         Int_t nEvents, nMin, nMax;
         // internal debug switch
@@ -678,7 +656,8 @@ private:
 
         void SetMock(size_t leafIndex, size_t mvIndex, size_t treeIndex) {
             vector<vector<TLeaf*>> & v = compVectors[leafIndex];
-            vector<TLorentzMock>* ret = MockVectors[mvIndex];          
+            vector<TLorentzMock>* ret = MockVectors[mvIndex];   
+            ret->clear();        
 
             size_t n = v[0][treeIndex]->GetLen(), size = v.size();
 

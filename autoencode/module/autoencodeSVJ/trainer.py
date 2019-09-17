@@ -188,7 +188,8 @@ class trainer(logger):
         verbose=1,
         use_callbacks=False,
         learning_rate=0.01,
-        custom_objects={}
+        custom_objects={},
+        compile_me=True,
     ):
         callbacks = None
 
@@ -230,9 +231,9 @@ class trainer(logger):
                 metrics = model.metrics
             else:
                 metrics = []
-        
-        model.compile(
-            optimizer=optimizer, loss=loss, metrics=metrics, loss_weights=loss_weights)
+        if compile_me:
+            model.compile(
+                optimizer=optimizer, loss=loss, metrics=metrics, loss_weights=loss_weights)
 
         start = datetime.now()
 
