@@ -1315,6 +1315,49 @@ def load_all_data(globstring, name, include_hlf=True, include_eflow=True, hlf_to
     
     return data, jets, event, flavors
 
+def BDT_load_all_data(
+    SVJ_path, QCD_path, 
+    test_split=0.2, random_state=-1,
+    include_hlf=True, include_eflow=True,
+    hlf_to_drop=['Energy', 'Flavor']
+):
+    """General-purpose data loader for BDT training, which separates classes and splits data into training/testing data.
+    
+    Args: 
+        SVJ_path (str): glob-style specification of .h5 files to load as SVJ signal
+        qcd_path (str): glob-style specification of .h5 files to load as qcd background
+        test_split (float): fraction of total data to use for testing 
+        random_state (int): random seed, leave as -1 for random assignment
+        include_hlf (bool): true to include high-level features in loaded data, false for not
+        include_eflow (bool): true to include energy-flow basis features in loaded data, false for not
+        hlf_to_drop (list(str)): list of high-level features to drop from the final dataset. Defaults to dropping Energy and Flavor.
+    
+    Returns:
+        tuple(pandas.DataFrame, pandas.DataFrame): X,Y training data, where X is the data samples for each jet, and Y is the 
+            signal/background tag for each jet
+        tuple(pandas.DataFrame, pandas.DataFrame): X_test,Y_test testing data, where X are data samples for each jet and Y is the
+            signal/background tag for each jet
+    """
+    if random_state < 0:
+        random_state = np.random.randint(0, 2**32 - 1)
+    SVJ,_,_,_ = load_all_data(SVJ_path, "SVJ", include_hlf=include_hlf, include_eflow=include_eflow, hlf_to_drop=hlf_to_drop)
+    QCD,_,_,_ = load_all_data(QCD_path, "QCD", include_hlf=include_hlf, include_eflow=include_eflow, hlf_to_drop=hlf_to_drop)
+    
+    
+    SVJ_train, SVJ_test = train_test_split(SVJ.df, test_size=test_split, random_state=random_state)
+    QCD_train, QCD_test = train_test_split(QCD.df, test_size=test_split, random_state=random_state)
+
+    SVJ_Y_train, SVJ_Y_test = map(lambda elt: pd.DataFrame(np.ones((len(elt), 1)), index=elt.index, columns=['Tag']), [SVJ_train, SVJ_test])
+    QCD_Y_train, QCD_Y_test = map(lambda elt: pd.DataFrame(np.ones((len(elt), 1)), index=elt.index, columns=['Tag']), [QCD_train, QCD_test])
+
+    X = SVJ_train.append(QCD_train)
+    Y = SVJ_Y_train.append(QCD_Y_train)
+    
+    X_test = SVJ_test.append(QCD_test)
+    Y_test = SVJ_Y_test.append(QCD_Y_test)
+    
+    return (X, Y), (X_test, Y_test)
+
 def dump_summary_json(*dicts):
     from collections import OrderedDict
     import json
