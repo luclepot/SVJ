@@ -86,7 +86,7 @@ def condor_submit(
         f.write("+JobFlavour = \"workday\"\n")
         f.write("queue\n")
     os.system("chmod +rwx {0}".format(run_script))
-    condor_cmd = "condor_submit {0}; condor_q".format(run_submit)
+    condor_cmd = "condor_submit {0}".format(run_submit)
     if setup_cmd is not None:
         condor_cmd = "{0}; ".format(setup_cmd) + condor_cmd
     os.system(condor_cmd)
