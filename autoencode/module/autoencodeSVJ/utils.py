@@ -1338,8 +1338,10 @@ def BDT_load_all_data(
         tuple(pandas.DataFrame, pandas.DataFrame): X_test,Y_test testing data, where X are data samples for each jet and Y is the
             signal/background tag for each jet
     """
+
     if random_state < 0:
         random_state = np.random.randint(0, 2**32 - 1)
+
     SVJ,_,_,_ = load_all_data(SVJ_path, "SVJ", include_hlf=include_hlf, include_eflow=include_eflow, hlf_to_drop=hlf_to_drop)
     QCD,_,_,_ = load_all_data(QCD_path, "QCD", include_hlf=include_hlf, include_eflow=include_eflow, hlf_to_drop=hlf_to_drop)
     
@@ -1347,8 +1349,8 @@ def BDT_load_all_data(
     SVJ_train, SVJ_test = train_test_split(SVJ.df, test_size=test_split, random_state=random_state)
     QCD_train, QCD_test = train_test_split(QCD.df, test_size=test_split, random_state=random_state)
 
-    SVJ_Y_train, SVJ_Y_test = map(lambda elt: pd.DataFrame(np.ones((len(elt), 1)), index=elt.index, columns=['Tag']), [SVJ_train, SVJ_test])
-    QCD_Y_train, QCD_Y_test = map(lambda elt: pd.DataFrame(np.ones((len(elt), 1)), index=elt.index, columns=['Tag']), [QCD_train, QCD_test])
+    SVJ_Y_train, SVJ_Y_test = map(lambda elt: pd.DataFrame(np.ones((len(elt), 1)), index=elt.index, columns=['tag']), [SVJ_train, SVJ_test])
+    QCD_Y_train, QCD_Y_test = map(lambda elt: pd.DataFrame(np.zeros((len(elt), 1)), index=elt.index, columns=['tag']), [QCD_train, QCD_test])
 
     X = SVJ_train.append(QCD_train)
     Y = SVJ_Y_train.append(QCD_Y_train)
