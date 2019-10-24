@@ -835,8 +835,8 @@ def get_selections_dict(list_of_selections):
 
 def get_repo_info():
     info = {}
-    info['head'] = subprocess.Popen("git rev-parse --show-toplevel".split(), stdout=subprocess.PIPE).communicate()[0].strip('\n')
-    info['name'] = subprocess.Popen("git config --get remote.origin.url".split(), stdout=subprocess.PIPE).communicate()[0].strip('\n')
+    info['head'] = subprocess.Popen("git rev-parse --show-toplevel".split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0].strip('\n')
+    info['name'] = subprocess.Popen("git config --get remote.origin.url".split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()[0].strip('\n')
     return info
 
 def split_to_jets(data):
