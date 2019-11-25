@@ -6,6 +6,9 @@ import os
 import models
 import datetime
 from collections import OrderedDict as odict 
+import time
+import pandas as pd
+
 
 eflow_base_lookup = {
     12: 3,
@@ -948,3 +951,151 @@ class data_holder(object):
     ):
         return [getattr(v, name) for v in self.KEYS.values()]
 
+class auc_getter(object):
+    '''This object basically needs to be able to load a training run into memory, including all 
+    training/testing fractions and random seeds. It then should take a library of signals as input
+    and be able to evaluate the auc on each signal to determine a 'general auc' for all signals. 
+    '''
+    def __init__(
+        self,
+        filename,
+        qcd_path=None,
+        times=False
+    ):
+        self.times = times
+        self.start()
+        self.name = utils.summary_by_name(filename)
+        self.d = utils.load_summary(self.name)
+        
+        self.norm_args = {
+            "norm_type": str(self.d["norm_type"])
+        }
+        
+        if qcd_path is None:
+            if 'qcd_path' in self.d:
+                qcd_path = self.d['qcd_path']
+            else:
+                raise AttributeError("No QCD path found; please specify!")
+
+        self.qcd_path = qcd_path
+                
+        self.hlf = self.d['hlf']
+        self.eflow = self.d['eflow']
+        self.eflow_base = self.d['eflow_base']
+        self.hlf_to_drop = map(str, self.d['hlf_to_drop'])
+
+        # get and set random seed for reproductions
+        self.seed = self.d['seed']
+
+        # manually set a bunch of parameters from the summary dict
+        for param in ['target_dim', 'input_dim', 'test_split', 'val_split', 'filename', 'filepath']:
+            setattr(self, param, self.d[param])
+
+        if not os.path.exists(self.filepath + ".pkl"):
+            print self.filepath + ".pkl"
+            self.filepath = utils.path_in_repo(self.filepath + ".pkl")
+            print self.filepath
+            if self.filepath is None:
+                raise AttributeError("filepath does not exist with spec {}".format(self.d['filepath']))
+            else:
+                if self.filepath.endswith(".h5"):
+                    self.filepath.rstrip(".h5")
+                
+        self.instance = trainer.trainer(self.filepath)
+        self.time('init')
+        
+    def start(
+        self,
+    ):
+        self.__TIME = time.time()
+        
+    def time(
+        self,
+        info=None,
+    ):
+        end = time.time() - self.__TIME
+        if self.times:
+            print(':: TIME: ' + '{}executed in {:.2f} s'.format('' if info is None else info + ' ', end))
+        return end
+    
+    def get_test_dataset(
+        self,
+        data,
+        test_key='qcd'
+    ):
+        self.start()
+        assert hasattr(data, test_key), 'please pass a data_holder object instance with attribute \'{}\''.format(test_key)
+    
+        utils.set_random_seed(self.seed)
+        
+        qcd = getattr(data, test_key).data
+        train, test = qcd.split_by_event(test_fraction=self.test_split, random_state=self.seed, n_skip=2)
+        self.time('test dataset')
+        return test
+    
+    def get_errs_recon(
+        self,
+        data,
+        test_key='qcd'
+    ):
+        test = self.get_test_dataset(data, test_key)
+        self.start()
+        normed = {d: test.norm(getattr(data, d).data, **self.norm_args) for d in data.KEYS if d != test_key}
+        normed[test_key] = test.norm(test, **self.norm_args)
+        for key in normed:
+            normed[key].name = key
+        ae = self.instance.load_model()
+        normed = normed.values()
+        err, recon = utils.get_recon_errors(normed, ae)
+        for i in range(len(err)):
+            err[i].name = err[i].name.rstrip('error').strip()
+        del ae
+        self.time('recon gen')
+        return normed, err, recon
+    
+    def get_aucs(
+        self,
+        err,
+        qcd_key='qcd',
+        metrics=None,
+    ):
+        self.start()
+        derr = [elt for elt in err if elt.name == qcd_key]
+        serr = [elt for elt in err if elt.name != qcd_key]
+        
+        if metrics is None:
+            metrics = ['mae']
+
+        ret = utils.roc_auc_dict(data_errs=derr, signal_errs=serr, metrics=metrics)
+        self.time('auc grab')
+        return ret
+
+    def plot_aucs(
+        self,
+        err,
+        qcd_key='qcd',
+        metrics=None
+    ):
+        self.start()
+        derr = [elt for elt in err if elt.name == qcd_key]
+        serr = [elt for elt in err if elt.name != qcd_key]
+        
+        if metrics is None:
+            metrics = ['mae']
+        ret = utils.roc_auc_plot(data_errs=derr, signal_errs=serr, metrics=metrics)
+        self.time('auc plot')
+        return ret
+    
+    def auc_metric(
+        self,
+        aucs
+    ):
+        fmt = pd.DataFrame([(k,v['mae']['auc']) for k,v in aucs.items()], columns=['name', 'auc'])
+
+        mass, nu = np.asarray(map(lambda x: list(map(lambda y: float(y.rstrip('GeV')), x.split('_')[1:])), fmt.name)).T
+        nu /= 100
+
+        fmt['mass'] = mass
+        fmt['nu'] = nu
+
+        return fmt
