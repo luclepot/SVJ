@@ -1051,7 +1051,7 @@ class auc_getter(object):
             err[i].name = err[i].name.rstrip('error').strip()
         del ae
         self.time('recon gen')
-        return normed, err, recon
+        return map(lambda x: {y.name: y for y in x}, [normed, err, recon])
     
     def get_aucs(
         self,
@@ -1060,8 +1060,8 @@ class auc_getter(object):
         metrics=None,
     ):
         self.start()
-        derr = [elt for elt in err if elt.name == qcd_key]
-        serr = [elt for elt in err if elt.name != qcd_key]
+        derr = [v for elt,v in err.items() if elt == qcd_key]
+        serr = [v for elt,v in err.items() if elt != qcd_key]
         
         if metrics is None:
             metrics = ['mae']
@@ -1077,8 +1077,8 @@ class auc_getter(object):
         metrics=None
     ):
         self.start()
-        derr = [elt for elt in err if elt.name == qcd_key]
-        serr = [elt for elt in err if elt.name != qcd_key]
+        derr = [v for elt,v in err.items() if elt == qcd_key]
+        serr = [v for elt,v in err.items() if elt != qcd_key]
         
         if metrics is None:
             metrics = ['mae']
