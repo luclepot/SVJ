@@ -1049,6 +1049,9 @@ class auc_getter(object):
         err, recon = utils.get_recon_errors(normed, ae)
         for i in range(len(err)):
             err[i].name = err[i].name.rstrip('error').strip()
+
+        for i in range(len(recon)):
+            recon[i] = test.inorm(recon[i], out_name=recon[i].name, **self.norm_args)
         del ae
         self.time('recon gen')
         return map(lambda x: {y.name: y for y in x}, [normed, err, recon])
