@@ -197,7 +197,7 @@ class trainer(logger):
         if use_callbacks:
             callbacks = [
                 EarlyStopping(monitor='val_loss', patience=10, verbose=0),
-                ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=0),
+                ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=9, verbose=0),
                 TerminateOnNaN(),
                 ModelCheckpoint(w_path, monitor='val_loss', verbose=self.VERBOSE, save_best_only=True, save_weights_only=True, mode='min')
             ]
