@@ -16,6 +16,7 @@
 !autoencode/data/training_runs/*.h5
 !autoencode/data/training_runs/*.pkl
 !autoencode/data/summary/*.summary
+TEST/
 #
 # CUSTOM
 
