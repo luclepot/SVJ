@@ -484,9 +484,6 @@ def ae_train(
     seed=None,
     test_split=0.15, 
     val_split=0.15,
-    norm_args={
-        "norm_type": "MinMaxScaler"
-    },
     train_me=True,
     batch_size=64,
     loss='mse',
@@ -498,6 +495,7 @@ def ae_train(
     output_data_path=None,
     verbose=1, 
     hlf_to_drop=['Energy', 'Flavor'],
+    norm_percentile=1,
 ):
 
     """Training function for basic autoencoder (inputs == outputs). 
@@ -583,12 +581,19 @@ def ae_train(
 
     all_train, test = qcd.split_by_event(test_fraction=test_split, random_state=seed, n_skip=len(qcd_jets))
     train, val = all_train.train_test_split(val_split, seed)
-
-    train_norm = train.norm(out_name="qcd train norm", **norm_args)
-    val_norm = train.norm(val, out_name="qcd val norm", **norm_args)
     
-    test_norm = test.norm(out_name="qcd test norm", **norm_args)
-    signal_norm = test.norm(signal, out_name="signal norm", **norm_args)
+    rng = utils.percentile_normalization_ranges(train, norm_percentile)
+    
+    train_norm = train.norm(out_name="qcd train norm", rng=rng)
+    val_norm = val.norm(out_name="qcd val norm", rng=rng)
+    
+    test_norm = test.norm(out_name="qcd test norm", rng=rng)
+    signal_norm = signal.norm(out_name="signal norm", rng=rng)
+
+    norm_args = {
+        'norm_percentile': norm_percentile,
+        'range': rng.tolist()
+    }
 
     train.name = "qcd training data"
     test.name = "qcd test data"
@@ -766,11 +771,11 @@ def ae_train(
     #     all_train, test = qcd.split_by_event(test_fraction=test_split, random_state=seed, n_skip=len(qcd_jets))
     #     train, val = all_train.train_test_split(val_split, seed)
 
-    #     train_norm = train.norm(out_name="qcd train norm", **norm_args)
-    #     val_norm = train.norm(val, out_name="qcd val norm", **norm_args)
+    #     train_norm = train.norm(out_name="qcd train norm", rng=rng)
+    #     val_norm = train.norm(val, out_name="qcd val norm", rng=rng)
         
-    #     test_norm = test.norm(out_name="qcd test norm", **norm_args)
-    #     signal_norm = test.norm(signal, out_name="signal norm", **norm_args)
+    #     test_norm = test.norm(out_name="qcd test norm", rng=rng)
+    #     signal_norm = test.norm(signal, out_name="signal norm", rng=rng)
 
     #     train.name = "qcd training data"
     #     test.name = "qcd test data"

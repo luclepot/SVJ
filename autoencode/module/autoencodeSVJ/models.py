@@ -347,6 +347,7 @@ def build_vae(input_dim, latent_dim, middle_arch=(100,100), loss='mse'):
     inputs = keras.layers.Input(shape=input_shape, name='encoder_input')
     last = inputs
     first_middle = []
+    
     for i,n in enumerate(middle_arch):
         first_middle.append(keras.layers.Dense(n, activation='relu', name='interm_1.{}'.format(i))(last))
         last = first_middle[i]
