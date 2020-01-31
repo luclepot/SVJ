@@ -973,8 +973,13 @@ class auc_getter(object):
         self.d = utils.load_summary(self.name)
         
         self.norm_args = {
-            "norm_type": str(self.d["norm_type"])
         }
+
+        if 'norm_type' in self.d:
+            self.norm_args["norm_type"] = str(self.d["norm_type"])
+
+        if 'range' in self.d:
+            self.norm_args['rng'] = np.asarray(self.d['range'])
         
         if qcd_path is None:
             if 'qcd_path' in self.d:
@@ -1043,10 +1048,17 @@ class auc_getter(object):
         data,
         test_key='qcd'
     ):
+
         test = self.get_test_dataset(data, test_key)
+
+        
         self.start()
-        normed = {d: test.norm(getattr(data, d).data, **self.norm_args) for d in data.KEYS if d != test_key}
-        normed[test_key] = test.norm(test, **self.norm_args)
+        if 'rng' in self.norm_args:
+            normed = {d: getattr(data, d).data.norm(**self.norm_args) for d in data.KEYS}
+        else:
+            normed = {d: test.norm(getattr(data, d).data, **self.norm_args) for d in data.KEYS if d != test_key}
+            normed[test_key] = test.norm(test, **self.norm_args)
+
         for key in normed:
             normed[key].name = key
         ae = self.instance.load_model()
@@ -1054,9 +1066,12 @@ class auc_getter(object):
         err, recon = utils.get_recon_errors(normed, ae)
         for i in range(len(err)):
             err[i].name = err[i].name.rstrip('error').strip()
-
-        for i in range(len(recon)):
-            recon[i] = test.inorm(recon[i], out_name=recon[i].name, **self.norm_args)
+        
+        if 'rng' in self.norm_args:
+            recon[i] = recon[i].inorm(out_name=recon[i].name, **self.norm_args)
+        else:
+            for i in range(len(recon)):
+                recon[i] = test.inorm(recon[i], out_name=recon[i].name, **self.norm_args)
         del ae
         self.time('recon gen')
         return map(lambda x: {y.name: y for y in x}, [normed, err, recon])
