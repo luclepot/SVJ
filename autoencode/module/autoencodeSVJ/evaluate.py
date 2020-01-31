@@ -1028,10 +1028,23 @@ class auc_getter(object):
             print(':: TIME: ' + '{}executed in {:.2f} s'.format('' if info is None else info + ' ', end))
         return end
     
+    def update_event_range(
+        self,
+        data,
+        percentile_n,
+        test_key='qcd'
+    ):
+        utils.set_random_seed(self.seed)
+        qcd = getattr(data, test_key).data
+        train, test = qcd.split_by_event(test_fraction=self.test_split, random_state=self.seed, n_skip=2)
+        rng = utils.percentile_normalization_ranges(train, percentile_n)
+        self.norm_args['range'] = rng
+        return rng        
+
     def get_test_dataset(
         self,
         data,
-        test_key='qcd'
+        test_key='qcd',
     ):
         self.start()
         assert hasattr(data, test_key), 'please pass a data_holder object instance with attribute \'{}\''.format(test_key)
@@ -1040,6 +1053,8 @@ class auc_getter(object):
         
         qcd = getattr(data, test_key).data
         train, test = qcd.split_by_event(test_fraction=self.test_split, random_state=self.seed, n_skip=2)
+
+
         self.time('test dataset')
         return test
     
