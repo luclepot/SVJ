@@ -1038,7 +1038,7 @@ class auc_getter(object):
         qcd = getattr(data, test_key).data
         train, test = qcd.split_by_event(test_fraction=self.test_split, random_state=self.seed, n_skip=2)
         rng = utils.percentile_normalization_ranges(train, percentile_n)
-        self.norm_args['range'] = rng
+        self.norm_args['rng'] = rng
         return rng        
 
     def get_test_dataset(
