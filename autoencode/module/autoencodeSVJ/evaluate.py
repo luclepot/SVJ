@@ -873,6 +873,11 @@ class signal_element(object):
         self._path = path
         self._loaded = False
 
+    def keys(
+        self
+    ):
+        return [elt for elt in dir(self) if not elt.startswith('__')]
+
     def _load(
         self,
         hlf=True,
@@ -1069,9 +1074,10 @@ class auc_getter(object):
         
         self.start()
         if 'rng' in self.norm_args:
-            normed = {d: getattr(data, d).data.norm(**self.norm_args) for d in data.KEYS}
+            normed = {d: getattr(data, d).data.norm(**self.norm_args) for d in data.KEYS if d != test_key}
+            normed[test_key] = test.norm(**self.norm_args)
         else:
-            normed = {d: test.norm(getattr(data, d).data, **self.norm_args) for d in data.KEYS if d != test_key}
+            normed = {d: test.norm(elt.data, **self.norm_args) for d,elt in data.KEYS.items() if d != test_key}
             normed[test_key] = test.norm(test, **self.norm_args)
 
         for key in normed:
