@@ -1,5 +1,6 @@
 import utils
 import trainer
+import evaluate
 import numpy as np
 import tensorflow as tf
 import os
@@ -8,6 +9,7 @@ import datetime
 from collections import OrderedDict as odict 
 import time
 import pandas as pd
+import glob
 
 
 eflow_base_lookup = {
@@ -1143,3 +1145,103 @@ class auc_getter(object):
         fmt['nu'] = nu
 
         return fmt
+
+def update_all_signal_evals(path='autoencode/data/aucs'):
+    """update signal auc evaluations, with path `path`. 
+    """
+    top = utils.summary().cfilter(['*auc*', 'target_dim', 'filename', 'signal_path', 'batch*', 'learning_rate']).sort_values('mae_auc')[::-1]
+    eflow_base = 3
+    
+    to_add = ['{}/{}'.format(path, f) for f in top.filename.values if not os.path.exists('{}/{}'.format(path, f))]
+    to_update = [f for f in glob.glob('{}/*'.format(path)) if f.split('/')[-1] not in top.filename.values]
+    
+    total = len(to_add) + len(to_update)
+    print('found {} trainings total'.format(total))
+    if total > 0:
+        
+        d = evaluate.data_holder(
+                qcd='data/background/base_3/*.h5',
+                **{os.path.basename(p): '{}/base_{}/*.h5'.format(p, eflow_base) for p in glob.glob('data/all_signals/*')}
+            )
+        d.load()
+        
+        if len(to_add) > 0:
+            print('found {} trainings to add'.format(len(to_add)))
+            print('filelist to add: {}'.format('\n'.join(to_add)))
+
+        for path in to_add:
+            name = path.split('/')[-1]
+            tf.reset_default_graph()            
+            a = evaluate.auc_getter(name, times=True)
+            norm, err, recon = a.get_errs_recon(d)
+            aucs = a.get_aucs(err)
+            fmt = a.auc_metric(aucs)
+            fmt.to_csv(path)
+            
+        if len(to_update) > 0:
+            print('found {} trainings to update'.format(len(to_update)))
+            print('filelist to update: {}'.format('\n'.join(to_update)))
+            
+        for path in to_update:
+
+            name = path.split('/')[-1]
+            tf.reset_default_graph()            
+            a = evaluate.auc_getter(name, times=True)
+            a.update_event_range(d, percentile_n=1)
+            norm, err, recon = a.get_errs_recon(d)
+            aucs = a.get_aucs(err)
+            fmt = a.auc_metric(aucs)
+            fmt.to_csv(path)
+
+def get_training_info_dict(filepath):
+    default = os.path.join(utils.get_repo_info()['head'], 'autoencode/data/training_runs/')
+    fp = filepath
+    if not filepath.endswith('.pkl'):
+        filepath += '.pkl'
+    if not os.path.exists(fp):
+        fp = os.path.join(default, filepath)
+    if not os.path.exists(fp):
+        raise AttributeError('unrecognized filepath \'{}\''.format(fp))
+    return trainer.pkl_file(fp).store.copy()
+    
+def check_training(filepath):
+    info_dict = get_training_info_dict(filepath)
+    idxs = set([tuple(v[:,0].tolist()) for v in info_dict['metrics'].values()])
+    assert len(idxs) == 1, 'datafile corrupt!!'
+    idx = np.asarray(idxs.pop())
+    vals = {k:v[:,1] for k,v in info_dict['metrics'].items()}
+    return pd.DataFrame(vals, index=idx)
+
+def update_aucs(filelist):
+    print('filelist: {}'.format(filelst))
+    eflow_base = 3
+    d = evaluate.data_holder(
+        qcd='data/background/base_3/*.h5',
+        **{os.path.basename(p): '{}/base_{}/*.h5'.format(p, eflow_base) for p in glob.glob('data/all_signals/*')}
+    )
+    d.load()
+    
+    
+    for name, path in filelist.items():
+        tf.reset_default_graph()
+        a = evaluate.auc_getter(name, times=True)
+        norm, err, recon = a.get_errs_recon(d)
+        aucs = a.get_aucs(err)
+        fmt = a.auc_metric(aucs)
+        fmt.to_csv(path)
+
+def load_auc_table(path='autoencode/data/aucs'):
+    auc_dict = {}
+    for f in glob.glob('{}/*'.format(path)):
+        data_elt = pd.read_csv(f)
+        file_elt = str(f.split('/')[-1].decode('utf8'))
+        data_elt['name'] = file_elt
+        auc_dict[file_elt] = data_elt
+    aucs = pd.concat(auc_dict)
+
+    aucs['mass_nu_ratio'] = zip(aucs.mass, aucs.nu)
+
+    pivoted = aucs.pivot('mass_nu_ratio', 'name', 'auc')
+    
+    return pivoted
+    # l0 = l0p.loc[:,l0p.columns.isin(set(s.filename))]
