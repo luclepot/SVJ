@@ -1242,6 +1242,7 @@ def load_auc_table(path='autoencode/data/aucs'):
     aucs['mass_nu_ratio'] = zip(aucs.mass, aucs.nu)
 
     pivoted = aucs.pivot('mass_nu_ratio', 'name', 'auc')
-    
+
     return pivoted
     # l0 = l0p.loc[:,l0p.columns.isin(set(s.filename))]
+    
