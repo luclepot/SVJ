@@ -168,8 +168,13 @@ class data_table(logger):
         data=None,
         norm_type=0,
         out_name=None,
+        rng=None,
         **scaler_args
     ):
+
+        if rng is not None:
+            return self.norm_alt(rng, out_name)
+
         if isinstance(norm_type, str):
             norm_type = getattr(self.NORM_TYPES, norm_type)
         elif isinstance(norm_type, int):
@@ -196,9 +201,11 @@ class data_table(logger):
         data=None,
         norm_type=0,
         out_name=None,
+        rng=None,
         **scaler_args
     ):
-
+        if rng is not None:
+            return self.inorm_alt(rng, out_name)
         if isinstance(norm_type, str):
             norm_type = getattr(self.NORM_TYPES, norm_type)
         elif isinstance(norm_type, int):
@@ -222,6 +229,35 @@ class data_table(logger):
         # ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name=out_name)
         return ret
         
+    def norm_alt(
+        self,
+        rng,
+        out_name=None,
+    ):
+        
+        if out_name is None:
+            out_name = "{} norm".format(self.name)
+
+
+        return data_table((self.df - rng[:,0])/(rng[:,1] - rng[:,0]), name=out_name)
+
+    def inorm_alt(
+        self,
+        rng,
+        out_name=None
+    ):
+
+        if out_name is None:
+            if self.name.endswith('norm'):
+                out_name = self.name.replace('norm', '').strip()
+            else:
+                out_name = "{} inverse normed".format(self.name)
+
+        ret = data_table(self.df*(rng[:,1] - rng[:,0]) + rng[:,0], name=out_name)
+
+        # ret = data_table(self.scaler.inverse_transform(data.df), headers=self.headers, name=out_name)
+        return ret     
+
     def __getattr__(
         self,
         attr,
@@ -1103,6 +1139,9 @@ def evaluate_model(data_path, signal_path, model_path):
     )
     
     signal_error.plot(data_error, normed=1, bins=100, figname="signal vs data errors")
+
+def percentile_normalization_ranges(data, n):
+    return np.asarray(zip(np.percentile(data, n, axis=0), np.percentile(data, 100-n, axis=0)))
 
 def get_plot_params(
     n_plots,

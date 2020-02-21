@@ -1,5 +1,6 @@
 import utils
 import trainer
+import evaluate
 import numpy as np
 import tensorflow as tf
 import os
@@ -8,6 +9,7 @@ import datetime
 from collections import OrderedDict as odict 
 import time
 import pandas as pd
+import glob
 
 
 eflow_base_lookup = {
@@ -484,9 +486,6 @@ def ae_train(
     seed=None,
     test_split=0.15, 
     val_split=0.15,
-    norm_args={
-        "norm_type": "MinMaxScaler"
-    },
     train_me=True,
     batch_size=64,
     loss='mse',
@@ -498,6 +497,7 @@ def ae_train(
     output_data_path=None,
     verbose=1, 
     hlf_to_drop=['Energy', 'Flavor'],
+    norm_percentile=1,
 ):
 
     """Training function for basic autoencoder (inputs == outputs). 
@@ -583,12 +583,19 @@ def ae_train(
 
     all_train, test = qcd.split_by_event(test_fraction=test_split, random_state=seed, n_skip=len(qcd_jets))
     train, val = all_train.train_test_split(val_split, seed)
-
-    train_norm = train.norm(out_name="qcd train norm", **norm_args)
-    val_norm = train.norm(val, out_name="qcd val norm", **norm_args)
     
-    test_norm = test.norm(out_name="qcd test norm", **norm_args)
-    signal_norm = test.norm(signal, out_name="signal norm", **norm_args)
+    rng = utils.percentile_normalization_ranges(train, norm_percentile)
+    
+    train_norm = train.norm(out_name="qcd train norm", rng=rng)
+    val_norm = val.norm(out_name="qcd val norm", rng=rng)
+    
+    test_norm = test.norm(out_name="qcd test norm", rng=rng)
+    signal_norm = signal.norm(out_name="signal norm", rng=rng)
+
+    norm_args = {
+        'norm_percentile': norm_percentile,
+        'range': rng.tolist()
+    }
 
     train.name = "qcd training data"
     test.name = "qcd test data"
@@ -766,11 +773,11 @@ def ae_train(
     #     all_train, test = qcd.split_by_event(test_fraction=test_split, random_state=seed, n_skip=len(qcd_jets))
     #     train, val = all_train.train_test_split(val_split, seed)
 
-    #     train_norm = train.norm(out_name="qcd train norm", **norm_args)
-    #     val_norm = train.norm(val, out_name="qcd val norm", **norm_args)
+    #     train_norm = train.norm(out_name="qcd train norm", rng=rng)
+    #     val_norm = train.norm(val, out_name="qcd val norm", rng=rng)
         
-    #     test_norm = test.norm(out_name="qcd test norm", **norm_args)
-    #     signal_norm = test.norm(signal, out_name="signal norm", **norm_args)
+    #     test_norm = test.norm(out_name="qcd test norm", rng=rng)
+    #     signal_norm = test.norm(signal, out_name="signal norm", rng=rng)
 
     #     train.name = "qcd training data"
     #     test.name = "qcd test data"
@@ -867,6 +874,11 @@ class signal_element(object):
         self._name = name
         self._path = path
         self._loaded = False
+
+    def keys(
+        self
+    ):
+        return [elt for elt in dir(self) if not elt.startswith('__')]
 
     def _load(
         self,
@@ -968,8 +980,13 @@ class auc_getter(object):
         self.d = utils.load_summary(self.name)
         
         self.norm_args = {
-            "norm_type": str(self.d["norm_type"])
         }
+
+        if 'norm_type' in self.d:
+            self.norm_args["norm_type"] = str(self.d["norm_type"])
+
+        if 'range' in self.d:
+            self.norm_args['rng'] = np.asarray(self.d['range'])
         
         if qcd_path is None:
             if 'qcd_path' in self.d:
@@ -1018,10 +1035,23 @@ class auc_getter(object):
             print(':: TIME: ' + '{}executed in {:.2f} s'.format('' if info is None else info + ' ', end))
         return end
     
+    def update_event_range(
+        self,
+        data,
+        percentile_n,
+        test_key='qcd'
+    ):
+        utils.set_random_seed(self.seed)
+        qcd = getattr(data, test_key).data
+        train, test = qcd.split_by_event(test_fraction=self.test_split, random_state=self.seed, n_skip=2)
+        rng = utils.percentile_normalization_ranges(train, percentile_n)
+        self.norm_args['rng'] = rng
+        return rng        
+
     def get_test_dataset(
         self,
         data,
-        test_key='qcd'
+        test_key='qcd',
     ):
         self.start()
         assert hasattr(data, test_key), 'please pass a data_holder object instance with attribute \'{}\''.format(test_key)
@@ -1030,6 +1060,8 @@ class auc_getter(object):
         
         qcd = getattr(data, test_key).data
         train, test = qcd.split_by_event(test_fraction=self.test_split, random_state=self.seed, n_skip=2)
+
+
         self.time('test dataset')
         return test
     
@@ -1038,10 +1070,18 @@ class auc_getter(object):
         data,
         test_key='qcd'
     ):
+
         test = self.get_test_dataset(data, test_key)
+
+        
         self.start()
-        normed = {d: test.norm(getattr(data, d).data, **self.norm_args) for d in data.KEYS if d != test_key}
-        normed[test_key] = test.norm(test, **self.norm_args)
+        if 'rng' in self.norm_args:
+            normed = {d: getattr(data, d).data.norm(**self.norm_args) for d in data.KEYS if d != test_key}
+            normed[test_key] = test.norm(**self.norm_args)
+        else:
+            normed = {d: test.norm(elt.data, **self.norm_args) for d,elt in data.KEYS.items() if d != test_key}
+            normed[test_key] = test.norm(test, **self.norm_args)
+
         for key in normed:
             normed[key].name = key
         ae = self.instance.load_model()
@@ -1049,9 +1089,12 @@ class auc_getter(object):
         err, recon = utils.get_recon_errors(normed, ae)
         for i in range(len(err)):
             err[i].name = err[i].name.rstrip('error').strip()
-
-        for i in range(len(recon)):
-            recon[i] = test.inorm(recon[i], out_name=recon[i].name, **self.norm_args)
+        
+        if 'rng' in self.norm_args:
+            recon[i] = recon[i].inorm(out_name=recon[i].name, **self.norm_args)
+        else:
+            for i in range(len(recon)):
+                recon[i] = test.inorm(recon[i], out_name=recon[i].name, **self.norm_args)
         del ae
         self.time('recon gen')
         return map(lambda x: {y.name: y for y in x}, [normed, err, recon])
@@ -1102,3 +1145,104 @@ class auc_getter(object):
         fmt['nu'] = nu
 
         return fmt
+
+def update_all_signal_evals(path='autoencode/data/aucs'):
+    """update signal auc evaluations, with path `path`. 
+    """
+    top = utils.summary().cfilter(['*auc*', 'target_dim', 'filename', 'signal_path', 'batch*', 'learning_rate']).sort_values('mae_auc')[::-1]
+    eflow_base = 3
+    
+    to_add = ['{}/{}'.format(path, f) for f in top.filename.values if not os.path.exists('{}/{}'.format(path, f))]
+    to_update = [f for f in glob.glob('{}/*'.format(path)) if f.split('/')[-1] not in top.filename.values]
+    
+    total = len(to_add) + len(to_update)
+    print('found {} trainings total'.format(total))
+    if total > 0:
+        
+        d = evaluate.data_holder(
+                qcd='data/background/base_3/*.h5',
+                **{os.path.basename(p): '{}/base_{}/*.h5'.format(p, eflow_base) for p in glob.glob('data/all_signals/*')}
+            )
+        d.load()
+        
+        if len(to_add) > 0:
+            print('found {} trainings to add'.format(len(to_add)))
+            print('filelist to add: {}'.format('\n'.join(to_add)))
+
+        for path in to_add:
+            name = path.split('/')[-1]
+            tf.reset_default_graph()            
+            a = evaluate.auc_getter(name, times=True)
+            norm, err, recon = a.get_errs_recon(d)
+            aucs = a.get_aucs(err)
+            fmt = a.auc_metric(aucs)
+            fmt.to_csv(path)
+            
+        if len(to_update) > 0:
+            print('found {} trainings to update'.format(len(to_update)))
+            print('filelist to update: {}'.format('\n'.join(to_update)))
+            
+        for path in to_update:
+
+            name = path.split('/')[-1]
+            tf.reset_default_graph()            
+            a = evaluate.auc_getter(name, times=True)
+            a.update_event_range(d, percentile_n=1)
+            norm, err, recon = a.get_errs_recon(d)
+            aucs = a.get_aucs(err)
+            fmt = a.auc_metric(aucs)
+            fmt.to_csv(path)
+
+def get_training_info_dict(filepath):
+    default = os.path.join(utils.get_repo_info()['head'], 'autoencode/data/training_runs/')
+    fp = filepath
+    if not filepath.endswith('.pkl'):
+        filepath += '.pkl'
+    if not os.path.exists(fp):
+        fp = os.path.join(default, filepath)
+    if not os.path.exists(fp):
+        raise AttributeError('unrecognized filepath \'{}\''.format(fp))
+    return trainer.pkl_file(fp).store.copy()
+    
+def check_training(filepath):
+    info_dict = get_training_info_dict(filepath)
+    idxs = set([tuple(v[:,0].tolist()) for v in info_dict['metrics'].values()])
+    assert len(idxs) == 1, 'datafile corrupt!!'
+    idx = np.asarray(idxs.pop())
+    vals = {k:v[:,1] for k,v in info_dict['metrics'].items()}
+    return pd.DataFrame(vals, index=idx)
+
+def update_aucs(filelist):
+    print('filelist: {}'.format(filelst))
+    eflow_base = 3
+    d = evaluate.data_holder(
+        qcd='data/background/base_3/*.h5',
+        **{os.path.basename(p): '{}/base_{}/*.h5'.format(p, eflow_base) for p in glob.glob('data/all_signals/*')}
+    )
+    d.load()
+    
+    
+    for name, path in filelist.items():
+        tf.reset_default_graph()
+        a = evaluate.auc_getter(name, times=True)
+        norm, err, recon = a.get_errs_recon(d)
+        aucs = a.get_aucs(err)
+        fmt = a.auc_metric(aucs)
+        fmt.to_csv(path)
+
+def load_auc_table(path='autoencode/data/aucs'):
+    auc_dict = {}
+    for f in glob.glob('{}/*'.format(path)):
+        data_elt = pd.read_csv(f)
+        file_elt = str(f.split('/')[-1].decode('utf8'))
+        data_elt['name'] = file_elt
+        auc_dict[file_elt] = data_elt
+    aucs = pd.concat(auc_dict)
+
+    aucs['mass_nu_ratio'] = zip(aucs.mass, aucs.nu)
+
+    pivoted = aucs.pivot('mass_nu_ratio', 'name', 'auc')
+
+    return pivoted
+    # l0 = l0p.loc[:,l0p.columns.isin(set(s.filename))]
+    
